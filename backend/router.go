@@ -36,6 +36,7 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	switchHandler           := handlers.NewSwitchHandler(database)
 	switchPortHandler       := handlers.NewSwitchPortHandler(database)
 	patchPanelHandler      := handlers.NewPatchPanelHandler(database)
+	patchPanelPortHandler  := handlers.NewPatchPanelPortHandler(database)
 
 	api := r.Group("/api/v1")
 	api.GET("/health", handlers.Health)
@@ -72,6 +73,16 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		patchPanels.GET("/:id", patchPanelHandler.GetByID)
 		patchPanels.PUT("/:id", patchPanelHandler.Update)
 		patchPanels.DELETE("/:id", patchPanelHandler.Delete)
+		patchPanels.GET("/:id/ports", patchPanelPortHandler.ListByPatchPanel)
+	}
+
+	patchPanelPorts := api.Group("/patch-panel-ports")
+	{
+		patchPanelPorts.GET("", patchPanelPortHandler.List)
+		patchPanelPorts.POST("", patchPanelPortHandler.Create)
+		patchPanelPorts.GET("/:id", patchPanelPortHandler.GetByID)
+		patchPanelPorts.PUT("/:id", patchPanelPortHandler.Update)
+		patchPanelPorts.DELETE("/:id", patchPanelPortHandler.Delete)
 	}
 
 	switches := api.Group("/switches")
