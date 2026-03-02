@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "./ciptr.db"
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://ciptr:ciptr@localhost:5432/ciptr?sslmode=disable"
 	}
 
 	port := os.Getenv("PORT")
@@ -18,13 +18,13 @@ func main() {
 		port = "8080"
 	}
 
-	database, err := db.Open(dbPath)
+	database, err := db.Open(dsn)
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
 	defer database.Close()
 
-	log.Printf("database opened at %s", dbPath)
+	log.Printf("database connected")
 
 	r := setupRouter(database)
 

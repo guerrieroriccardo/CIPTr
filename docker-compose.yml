@@ -1,15 +1,31 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ciptr
+      POSTGRES_USER: ciptr
+      POSTGRES_PASSWORD: ciptr
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ciptr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     restart: unless-stopped
     ports:
-      - "8080:8080"        # exposed for the reverse proxy; remove if proxy is in same Docker network
-    volumes:
-      - db_data:/app/data
+      - "8080:8080"  # exposed for the reverse proxy; remove if proxy is in same Docker network
     environment:
-      - DB_PATH=/app/data/ciptr.db
+      - DATABASE_URL=postgres://ciptr:ciptr@postgres:5432/ciptr?sslmode=disable
       - PORT=8080
       - GIN_MODE=release
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # frontend service will be added in a later step
 

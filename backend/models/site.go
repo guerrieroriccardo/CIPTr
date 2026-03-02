@@ -1,13 +1,15 @@
 package models
 
+import "time"
+
 // Site represents a physical location belonging to a client.
 type Site struct {
-	ID        int64   `json:"id"`
-	ClientID  int64   `json:"client_id"`
-	Name      string  `json:"name"`
-	Address   *string `json:"address"`
-	Notes     *string `json:"notes"`
-	CreatedAt string  `json:"created_at"`
+	ID        int64     `json:"id"`
+	ClientID  int64     `json:"client_id"`
+	Name      string    `json:"name"`
+	Address   *string   `json:"address"`
+	Notes     *string   `json:"notes"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // SiteInput is used for create and update requests.

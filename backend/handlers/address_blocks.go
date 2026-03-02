@@ -38,7 +38,7 @@ func (h *AddressBlockHandler) List(c *gin.Context) {
 	args := []any{}
 
 	if siteID := c.Query("site_id"); siteID != "" {
-		query += ` WHERE site_id = ?`
+		query += ` WHERE site_id = $1`
 		args = append(args, siteID)
 	}
 	query += ` ORDER BY network`
@@ -73,7 +73,7 @@ func (h *AddressBlockHandler) ListBySite(c *gin.Context) {
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		addressBlockSelectSQL+` WHERE site_id = ? ORDER BY network`, siteID)
+		addressBlockSelectSQL+` WHERE site_id = $1 ORDER BY network`, siteID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -103,7 +103,7 @@ func (h *AddressBlockHandler) GetByID(c *gin.Context) {
 	}
 
 	ab, err := scanAddressBlock(h.db.QueryRowContext(c.Request.Context(),
-		addressBlockSelectSQL+` WHERE id = ?`, id))
+		addressBlockSelectSQL+` WHERE id = $1`, id))
 
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("address block not found"))
@@ -118,7 +118,7 @@ func (h *AddressBlockHandler) GetByID(c *gin.Context) {
 }
 
 // Create handles POST /address-blocks
-// site_id and network are required.
+// site_id and network are required. network must be valid CIDR notation.
 func (h *AddressBlockHandler) Create(c *gin.Context) {
 	var input models.AddressBlockInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -126,18 +126,15 @@ func (h *AddressBlockHandler) Create(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`INSERT INTO address_blocks (site_id, network, description, notes) VALUES (?, ?, ?, ?)`,
+	ab, err := scanAddressBlock(h.db.QueryRowContext(c.Request.Context(),
+		`INSERT INTO address_blocks (site_id, network, description, notes) VALUES ($1, $2, $3, $4)
+		 RETURNING id, site_id, network, description, notes`,
 		input.SiteID, input.Network, input.Description, input.Notes,
-	)
+	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
-
-	newID, _ := res.LastInsertId()
-	ab, _ := scanAddressBlock(h.db.QueryRowContext(c.Request.Context(),
-		addressBlockSelectSQL+` WHERE id = ?`, newID))
 
 	ok(c, http.StatusCreated, ab)
 }
@@ -157,29 +154,25 @@ func (h *AddressBlockHandler) Update(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`UPDATE address_blocks SET site_id = ?, network = ?, description = ?, notes = ? WHERE id = ?`,
+	ab, err := scanAddressBlock(h.db.QueryRowContext(c.Request.Context(),
+		`UPDATE address_blocks SET site_id = $1, network = $2, description = $3, notes = $4 WHERE id = $5
+		 RETURNING id, site_id, network, description, notes`,
 		input.SiteID, input.Network, input.Description, input.Notes, id,
-	)
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("address block not found"))
+		return
+	}
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
 
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		fail(c, http.StatusNotFound, errors.New("address block not found"))
-		return
-	}
-
-	ab, _ := scanAddressBlock(h.db.QueryRowContext(c.Request.Context(),
-		addressBlockSelectSQL+` WHERE id = ?`, id))
-
 	ok(c, http.StatusOK, ab)
 }
 
 // Delete handles DELETE /address-blocks/:id
-// Cascades to vlans via the DB foreign key ON DELETE CASCADE.
+// VLANs referencing this block have their address_block_id set to NULL (ON DELETE SET NULL).
 func (h *AddressBlockHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -187,16 +180,16 @@ func (h *AddressBlockHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`DELETE FROM address_blocks WHERE id = ?`, id)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, err)
+	var deletedID int64
+	err = h.db.QueryRowContext(c.Request.Context(),
+		`DELETE FROM address_blocks WHERE id = $1 RETURNING id`, id,
+	).Scan(&deletedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("address block not found"))
 		return
 	}
-
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		fail(c, http.StatusNotFound, errors.New("address block not found"))
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
 		return
 	}
 
