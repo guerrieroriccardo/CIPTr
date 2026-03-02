@@ -24,6 +24,7 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	}))
 
 	clientHandler := handlers.NewClientHandler(database)
+	siteHandler := handlers.NewSiteHandler(database)
 
 	api := r.Group("/api/v1")
 	{
@@ -35,6 +36,14 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		api.GET("/clients/:id", clientHandler.GetByID)
 		api.PUT("/clients/:id", clientHandler.Update)
 		api.DELETE("/clients/:id", clientHandler.Delete)
+		api.GET("/clients/:id/sites", siteHandler.ListByClient)
+
+		// Sites
+		api.GET("/sites", siteHandler.List)
+		api.POST("/sites", siteHandler.Create)
+		api.GET("/sites/:id", siteHandler.GetByID)
+		api.PUT("/sites/:id", siteHandler.Update)
+		api.DELETE("/sites/:id", siteHandler.Delete)
 	}
 
 	return r
