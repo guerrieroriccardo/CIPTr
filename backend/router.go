@@ -34,6 +34,7 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	deviceIPHandler         := handlers.NewDeviceIPHandler(database)
 	deviceConnectionHandler := handlers.NewDeviceConnectionHandler(database)
 	switchHandler           := handlers.NewSwitchHandler(database)
+	switchPortHandler       := handlers.NewSwitchPortHandler(database)
 
 	api := r.Group("/api/v1")
 	api.GET("/health", handlers.Health)
@@ -69,6 +70,16 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		switches.GET("/:id", switchHandler.GetByID)
 		switches.PUT("/:id", switchHandler.Update)
 		switches.DELETE("/:id", switchHandler.Delete)
+		switches.GET("/:id/ports", switchPortHandler.ListBySwitch)
+	}
+
+	switchPorts := api.Group("/switch-ports")
+	{
+		switchPorts.GET("", switchPortHandler.List)
+		switchPorts.POST("", switchPortHandler.Create)
+		switchPorts.GET("/:id", switchPortHandler.GetByID)
+		switchPorts.PUT("/:id", switchPortHandler.Update)
+		switchPorts.DELETE("/:id", switchPortHandler.Delete)
 	}
 
 	addressBlocks := api.Group("/address-blocks")
