@@ -172,7 +172,7 @@ func (h *AddressBlockHandler) Update(c *gin.Context) {
 }
 
 // Delete handles DELETE /address-blocks/:id
-// Cascades to vlans via the DB foreign key ON DELETE CASCADE.
+// VLANs referencing this block have their address_block_id set to NULL (ON DELETE SET NULL).
 func (h *AddressBlockHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

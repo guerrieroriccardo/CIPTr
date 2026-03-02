@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS address_blocks (
 CREATE TABLE IF NOT EXISTS vlans (
     id               BIGSERIAL PRIMARY KEY,
     site_id          BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    address_block_id BIGINT REFERENCES address_blocks(id),
+    address_block_id BIGINT REFERENCES address_blocks(id) ON DELETE SET NULL,
     vlan_id          INTEGER NOT NULL,  -- VLAN tag number, e.g. 10, 20, 100
     name             TEXT NOT NULL,     -- e.g. "Users LAN", "VOIP"
     subnet           CIDR,              -- e.g. '10.10.0.0/24'
