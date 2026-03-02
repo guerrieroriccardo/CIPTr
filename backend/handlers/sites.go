@@ -50,7 +50,7 @@ func (h *SiteHandler) List(c *gin.Context) {
 	// e.g. GET /sites?client_id=3 → clientID = "3"
 	// If the param is absent it returns "", so we only add the WHERE clause when set.
 	if clientID := c.Query("client_id"); clientID != "" {
-		query += ` WHERE client_id = ?`
+		query += ` WHERE client_id = $1`
 		args = append(args, clientID)
 	}
 	query += ` ORDER BY name`
@@ -78,8 +78,6 @@ func (h *SiteHandler) List(c *gin.Context) {
 // ListByClient handles GET /clients/:id/sites
 // Convenience nested route equivalent to GET /sites?client_id=:id.
 // Returns 200 with an empty list if the client exists but has no sites.
-// (Does not verify that the client itself exists — a 404 for unknown clients
-// is not strictly necessary here since the result is just an empty list.)
 func (h *SiteHandler) ListByClient(c *gin.Context) {
 	// :id here refers to the client id from the parent route /clients/:id/sites
 	clientID, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -89,7 +87,7 @@ func (h *SiteHandler) ListByClient(c *gin.Context) {
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		siteSelectSQL+` WHERE client_id = ? ORDER BY name`, clientID)
+		siteSelectSQL+` WHERE client_id = $1 ORDER BY name`, clientID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -119,7 +117,7 @@ func (h *SiteHandler) GetByID(c *gin.Context) {
 	}
 
 	s, err := scanSite(h.db.QueryRowContext(c.Request.Context(),
-		siteSelectSQL+` WHERE id = ?`, id))
+		siteSelectSQL+` WHERE id = $1`, id))
 
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("site not found"))
@@ -134,8 +132,7 @@ func (h *SiteHandler) GetByID(c *gin.Context) {
 }
 
 // Create handles POST /sites
-// client_id and name are required. Fails with 500 if client_id does not exist
-// (SQLite foreign key constraint).
+// client_id and name are required.
 func (h *SiteHandler) Create(c *gin.Context) {
 	var input models.SiteInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -143,18 +140,15 @@ func (h *SiteHandler) Create(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`INSERT INTO sites (client_id, name, address, notes) VALUES (?, ?, ?, ?)`,
+	s, err := scanSite(h.db.QueryRowContext(c.Request.Context(),
+		`INSERT INTO sites (client_id, name, address, notes) VALUES ($1, $2, $3, $4)
+		 RETURNING id, client_id, name, address, notes, created_at`,
 		input.ClientID, input.Name, input.Address, input.Notes,
-	)
+	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
-
-	newID, _ := res.LastInsertId()
-	s, _ := scanSite(h.db.QueryRowContext(c.Request.Context(),
-		siteSelectSQL+` WHERE id = ?`, newID))
 
 	ok(c, http.StatusCreated, s)
 }
@@ -174,23 +168,19 @@ func (h *SiteHandler) Update(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`UPDATE sites SET client_id = ?, name = ?, address = ?, notes = ? WHERE id = ?`,
+	s, err := scanSite(h.db.QueryRowContext(c.Request.Context(),
+		`UPDATE sites SET client_id = $1, name = $2, address = $3, notes = $4 WHERE id = $5
+		 RETURNING id, client_id, name, address, notes, created_at`,
 		input.ClientID, input.Name, input.Address, input.Notes, id,
-	)
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("site not found"))
+		return
+	}
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
-
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		fail(c, http.StatusNotFound, errors.New("site not found"))
-		return
-	}
-
-	s, _ := scanSite(h.db.QueryRowContext(c.Request.Context(),
-		siteSelectSQL+` WHERE id = ?`, id))
 
 	ok(c, http.StatusOK, s)
 }
@@ -204,16 +194,16 @@ func (h *SiteHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`DELETE FROM sites WHERE id = ?`, id)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, err)
+	var deletedID int64
+	err = h.db.QueryRowContext(c.Request.Context(),
+		`DELETE FROM sites WHERE id = $1 RETURNING id`, id,
+	).Scan(&deletedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("site not found"))
 		return
 	}
-
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		fail(c, http.StatusNotFound, errors.New("site not found"))
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
 		return
 	}
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -39,14 +40,17 @@ func (h *VLANHandler) List(c *gin.Context) {
 	query := vlanSelectSQL
 	var conds []string
 	var args []any
+	n := 1 // PostgreSQL placeholder counter
 
 	if siteID := c.Query("site_id"); siteID != "" {
-		conds = append(conds, "site_id = ?")
+		conds = append(conds, fmt.Sprintf("site_id = $%d", n))
 		args = append(args, siteID)
+		n++
 	}
 	if blockID := c.Query("address_block_id"); blockID != "" {
-		conds = append(conds, "address_block_id = ?")
+		conds = append(conds, fmt.Sprintf("address_block_id = $%d", n))
 		args = append(args, blockID)
+		n++
 	}
 	if len(conds) > 0 {
 		query += " WHERE " + strings.Join(conds, " AND ")
@@ -83,7 +87,7 @@ func (h *VLANHandler) ListBySite(c *gin.Context) {
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		vlanSelectSQL+` WHERE site_id = ? ORDER BY vlan_id`, siteID)
+		vlanSelectSQL+` WHERE site_id = $1 ORDER BY vlan_id`, siteID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -113,7 +117,7 @@ func (h *VLANHandler) ListByAddressBlock(c *gin.Context) {
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		vlanSelectSQL+` WHERE address_block_id = ? ORDER BY vlan_id`, blockID)
+		vlanSelectSQL+` WHERE address_block_id = $1 ORDER BY vlan_id`, blockID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -143,7 +147,7 @@ func (h *VLANHandler) GetByID(c *gin.Context) {
 	}
 
 	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
-		vlanSelectSQL+` WHERE id = ?`, id))
+		vlanSelectSQL+` WHERE id = $1`, id))
 
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("vlan not found"))
@@ -166,20 +170,17 @@ func (h *VLANHandler) Create(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
+	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
 		`INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway, description)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway, description`,
 		input.SiteID, input.AddressBlockID, input.VlanID, input.Name,
 		input.Subnet, input.Gateway, input.Description,
-	)
+	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
-
-	newID, _ := res.LastInsertId()
-	v, _ := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
-		vlanSelectSQL+` WHERE id = ?`, newID))
 
 	ok(c, http.StatusCreated, v)
 }
@@ -199,25 +200,21 @@ func (h *VLANHandler) Update(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`UPDATE vlans SET site_id = ?, address_block_id = ?, vlan_id = ?, name = ?,
-		 subnet = ?, gateway = ?, description = ? WHERE id = ?`,
+	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
+		`UPDATE vlans SET site_id = $1, address_block_id = $2, vlan_id = $3, name = $4,
+		 subnet = $5, gateway = $6, description = $7 WHERE id = $8
+		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway, description`,
 		input.SiteID, input.AddressBlockID, input.VlanID, input.Name,
 		input.Subnet, input.Gateway, input.Description, id,
-	)
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("vlan not found"))
+		return
+	}
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
-
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		fail(c, http.StatusNotFound, errors.New("vlan not found"))
-		return
-	}
-
-	v, _ := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
-		vlanSelectSQL+` WHERE id = ?`, id))
 
 	ok(c, http.StatusOK, v)
 }
@@ -231,16 +228,16 @@ func (h *VLANHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	res, err := h.db.ExecContext(c.Request.Context(),
-		`DELETE FROM vlans WHERE id = ?`, id)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, err)
+	var deletedID int64
+	err = h.db.QueryRowContext(c.Request.Context(),
+		`DELETE FROM vlans WHERE id = $1 RETURNING id`, id,
+	).Scan(&deletedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("vlan not found"))
 		return
 	}
-
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		fail(c, http.StatusNotFound, errors.New("vlan not found"))
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
 		return
 	}
 
