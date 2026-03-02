@@ -28,6 +28,8 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	addressBlockHandler := handlers.NewAddressBlockHandler(database)
 	vlanHandler        := handlers.NewVLANHandler(database)
 	locationHandler    := handlers.NewLocationHandler(database)
+	deviceModelHandler := handlers.NewDeviceModelHandler(database)
+	deviceHandler      := handlers.NewDeviceHandler(database)
 
 	api := r.Group("/api/v1")
 	{
@@ -50,6 +52,7 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		api.GET("/sites/:id/address-blocks", addressBlockHandler.ListBySite)
 		api.GET("/sites/:id/vlans", vlanHandler.ListBySite)
 		api.GET("/sites/:id/locations", locationHandler.ListBySite)
+		api.GET("/sites/:id/devices", deviceHandler.ListBySite)
 
 		// Address Blocks
 		api.GET("/address-blocks", addressBlockHandler.List)
@@ -65,6 +68,20 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		api.GET("/locations/:id", locationHandler.GetByID)
 		api.PUT("/locations/:id", locationHandler.Update)
 		api.DELETE("/locations/:id", locationHandler.Delete)
+
+		// Devices
+		api.GET("/devices", deviceHandler.List)
+		api.POST("/devices", deviceHandler.Create)
+		api.GET("/devices/:id", deviceHandler.GetByID)
+		api.PUT("/devices/:id", deviceHandler.Update)
+		api.DELETE("/devices/:id", deviceHandler.Delete)
+
+		// Device Models
+		api.GET("/device-models", deviceModelHandler.List)
+		api.POST("/device-models", deviceModelHandler.Create)
+		api.GET("/device-models/:id", deviceModelHandler.GetByID)
+		api.PUT("/device-models/:id", deviceModelHandler.Update)
+		api.DELETE("/device-models/:id", deviceModelHandler.Delete)
 
 		// VLANs
 		api.GET("/vlans", vlanHandler.List)
