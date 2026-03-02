@@ -31,7 +31,8 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	deviceModelHandler := handlers.NewDeviceModelHandler(database)
 	deviceHandler          := handlers.NewDeviceHandler(database)
 	deviceInterfaceHandler := handlers.NewDeviceInterfaceHandler(database)
-	deviceIPHandler        := handlers.NewDeviceIPHandler(database)
+	deviceIPHandler         := handlers.NewDeviceIPHandler(database)
+	deviceConnectionHandler := handlers.NewDeviceConnectionHandler(database)
 
 	api := r.Group("/api/v1")
 	{
@@ -93,6 +94,14 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		api.PUT("/device-ips/:id", deviceIPHandler.Update)
 		api.DELETE("/device-ips/:id", deviceIPHandler.Delete)
 		api.GET("/devices/:id/ips", deviceIPHandler.ListByDevice)
+		api.GET("/devices/:id/connections", deviceConnectionHandler.ListByDevice)
+
+		// Device Connections
+		api.GET("/device-connections", deviceConnectionHandler.List)
+		api.POST("/device-connections", deviceConnectionHandler.Create)
+		api.GET("/device-connections/:id", deviceConnectionHandler.GetByID)
+		api.PUT("/device-connections/:id", deviceConnectionHandler.Update)
+		api.DELETE("/device-connections/:id", deviceConnectionHandler.Delete)
 
 		// Device Models
 		api.GET("/device-models", deviceModelHandler.List)
