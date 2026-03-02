@@ -88,7 +88,7 @@ clients
   └── sites (physical locations of the client)
         └── address_blocks  (/20 block assigned to the site)
               └── vlans (subnets carved from the block, e.g. /24 per VLAN)
-        └── offices (departments / rooms within the site)
+        └── locations (rooms, floors, closets within the site)
         └── switches (physical switches at the site)
               └── switch_ports (ports on each switch)
         └── patch_panels (patch panels at the site)
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS sites (
     UNIQUE(client_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS offices (
+CREATE TABLE IF NOT EXISTS locations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     site_id     INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,          -- e.g. "IT Dept", "Reception"
@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS device_models (
 CREATE TABLE IF NOT EXISTS devices (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     site_id             INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    office_id           INTEGER REFERENCES offices(id),
+    location_id           INTEGER REFERENCES locations(id),
     model_id            INTEGER REFERENCES device_models(id),
 
     -- Identification

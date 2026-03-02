@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS sites (
     UNIQUE(client_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS offices (
+CREATE TABLE IF NOT EXISTS locations (
     id          BIGSERIAL PRIMARY KEY,
     site_id     BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,          -- e.g. "IT Dept", "Reception"
+    name        TEXT NOT NULL,          -- e.g. "Server Room", "Floor 2", "Reception"
     floor       TEXT,
     notes       TEXT,
     UNIQUE(site_id, name)
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS patch_panel_ports (
 CREATE TABLE IF NOT EXISTS devices (
     id                  BIGSERIAL PRIMARY KEY,
     site_id             BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    office_id           BIGINT REFERENCES offices(id),
+    location_id         BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     model_id            BIGINT REFERENCES device_models(id),
 
     -- Identification
