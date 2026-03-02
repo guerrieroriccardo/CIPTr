@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS device_interfaces (
     id          BIGSERIAL PRIMARY KEY,
     device_id   BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,      -- e.g. "eth0", "iDRAC", "WAN", "LAN1"
-    mac_address TEXT,               -- MAC address of this NIC
+    mac_address MACADDR,            -- MAC address of this NIC
     notes       TEXT,
     UNIQUE(device_id, name)
 );
