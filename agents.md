@@ -18,9 +18,10 @@ Sostituire un foglio Excel con una webapp che permette a un team MSP di:
 | Layer | Tecnologia |
 |-------|-----------|
 | Backend | Go (Gin framework) |
-| Database | SQLite (via `modernc.org/sqlite`) |
+| Database | PostgreSQL 18 (driver: `pgx/v5`) |
 | Query | raw SQL con `database/sql` |
-| Frontend | React + TypeScript |
+| CLI | Go (bubbletea TUI) |
+| Frontend | React + TypeScript (da fare) |
 | UI Components | shadcn/ui (basato su Tailwind CSS + Radix UI) |
 | HTTP Client | TanStack Query (react-query) per fetching e caching |
 | Routing | React Router v6 |
@@ -28,10 +29,17 @@ Sostituire un foglio Excel con una webapp che permette a un team MSP di:
 | Containerizzazione | Docker + Docker Compose |
 | TLS/SSL | Gestito da reverse proxy esterno (es. Nginx, Traefik) |
 
+### Repository e Moduli Go
+- GitHub: `github.com/guerrieroriccardo/CIPTr`
+- Go workspace (`go.work`) alla root collega `backend/` e `cli/`
+- Modulo backend: `github.com/guerrieroriccardo/CIPTr/backend`
+- Modulo CLI: `github.com/guerrieroriccardo/CIPTr/cli`
+- La CLI importa `backend/models` via workspace (nessuna duplicazione struct)
+
 ### Note Docker
 - Il backend gira in HTTP puro (porta 8080) — TLS è responsabilità del reverse proxy
-- Il DB SQLite è persistito tramite Docker volume (`db_data`)
-- Il path del DB è configurabile via env `DB_PATH` (default `/app/data/ciptr.db`)
+- PostgreSQL persistito tramite Docker volume
+- Connessione DB configurabile via env `DATABASE_URL`
 - Build multi-stage per immagine backend minimale (golang:alpine → alpine)
 - Il frontend viene servito da nginx:alpine con proxy `/api` → backend
 
@@ -45,23 +53,43 @@ Sostituire un foglio Excel con una webapp che permette a un team MSP di:
 ## 2. Struttura del Progetto
 
 ```
-ciptr/
+CIPTr/
+├── go.work                     # Go workspace (collega backend/ e cli/)
 ├── backend/
 │   ├── main.go
-│   ├── go.mod
+│   ├── go.mod                  # module github.com/guerrieroriccardo/CIPTr/backend
 │   ├── go.sum
 │   ├── router.go               # Gin engine + routes
 │   ├── db/
-│   │   ├── schema.sql          # Schema SQLite
+│   │   ├── schema.sql          # Schema PostgreSQL
 │   │   └── database.go         # Inizializzazione DB
 │   ├── handlers/               # Handler HTTP per ogni risorsa
 │   │   ├── health.go
+│   │   ├── response.go         # ok() e fail() helpers
 │   │   ├── clients.go
 │   │   ├── devices.go
 │   │   ├── switches.go
 │   │   └── ...
-│   ├── models/                 # Struct Go che rispecchiano le tabelle
+│   ├── models/                 # Struct Go che rispecchiano le tabelle (condivise con CLI)
 │   └── Dockerfile              # Multi-stage build
+├── cli/
+│   ├── main.go                 # Entry point bubbletea
+│   ├── go.mod                  # module github.com/guerrieroriccardo/CIPTr/cli
+│   └── internal/
+│       ├── apiclient/          # Client HTTP per la REST API
+│       │   ├── client.go       # HTTP helpers + envelope parsing
+│       │   └── clients.go      # Metodi per ogni risorsa (uno per file)
+│       └── tui/                # Componenti bubbletea
+│           ├── app.go          # Root model + dispatching
+│           ├── nav.go          # Stack di navigazione + breadcrumb
+│           ├── styles.go       # Stili lipgloss
+│           ├── menu.go         # Menu principale
+│           ├── table.go        # Tabella generica per ogni risorsa
+│           ├── form.go         # Form generico create/edit
+│           ├── confirm.go      # Dialog conferma eliminazione
+│           └── resource/       # Definizioni per risorsa (colonne, campi form)
+│               ├── registry.go # Tipo Def + registro
+│               └── clients.go  # ClientDef, SiteDef, ecc.
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                # Funzioni fetch verso il backend
@@ -410,42 +438,58 @@ Base URL: `http://localhost:8080/api/v1`
 
 ## 6. Fasi di Sviluppo (per agente AI)
 
-### Fase 1 — Setup Progetto
-1. Inizializzare modulo Go in `backend/` (`go mod init ciptr`)
-2. Installare dipendenze Go: `github.com/gin-gonic/gin`, `modernc.org/sqlite`
-3. Creare `backend/db/schema.sql` e funzione `db.Init()` che lo applica
-4. Inizializzare progetto React con Vite + TypeScript in `frontend/`
-5. Installare e configurare shadcn/ui, TanStack Query, React Router
+### Fase 1 — Setup Progetto ✅
+1. Inizializzare modulo Go in `backend/`
+2. Installare dipendenze Go: `gin`, `pgx/v5`
+3. Creare `backend/db/schema.sql` e funzione `db.Open()`
+4. Docker Compose con PostgreSQL
 
-### Fase 2 — Backend Core
-1. Implementare struct Go in `models/` per ogni tabella
-2. Implementare funzioni CRUD in `handlers/` per clients e sites
-3. Implementare funzioni CRUD in `handlers/` per devices e device_ips
-4. Implementare funzioni CRUD in `handlers/` per switches e switch_ports
-5. Aggiungere CORS middleware (permissivo in sviluppo)
-6. Aggiungere endpoint `GET /api/v1/health` per health check
+### Fase 2 — Backend Core ✅
+Tutte le 14 risorse CRUD implementate e testate:
+clients, sites, locations, address_blocks, vlans, device_models, devices,
+device_interfaces, device_ips, device_connections, switches, switch_ports,
+patch_panels, patch_panel_ports
 
-### Fase 3 — Frontend Core
-1. Configurare TanStack Query provider e React Router
-2. Creare funzioni API client in `src/api/` (una per risorsa)
-3. Creare tipi TypeScript in `src/types/` speculari ai modelli Go
-4. Implementare pagina Lista Clienti con DataTable
-5. Implementare pagina Dettaglio Sede (tab: Dispositivi, Switch, VLAN)
-6. Implementare pagina Lista Dispositivi con filtri
-7. Implementare form creazione/modifica dispositivo
+### Fase 3 — CLI (bubbletea TUI) 🔄
+TUI interattiva per gestire i dati via REST API (senza frontend web).
+- Stack: bubbletea + bubbles + lipgloss
+- Navigazione: gerarchica (Client → Site → risorse) + accesso flat a tutte le 14 risorse
+- Componenti generici (table, form, confirm) guidati da un registro di definizioni per risorsa
+- Passi:
+  1. ✅ Scaffold CLI + Go workspace
+  2. ✅ API client con envelope parsing
+  3. ✅ Stack di navigazione + App root
+  4. ✅ Menu principale
+  5. 🔄 Registro risorse + definizione Clients
+  6. API client per Clients
+  7. Tabella generica
+  8. Form generico + conferma eliminazione
+  9. Sites + navigazione gerarchica
+  10. Risorse rimanenti (una alla volta)
+  11. Polish (statusbar, spinner, filtri)
 
-### Fase 4 — Features Avanzate
+### Fase 4 — Frontend Core
+1. Inizializzare progetto React con Vite + TypeScript in `frontend/`
+2. Installare e configurare shadcn/ui, TanStack Query, React Router
+3. Creare funzioni API client in `src/api/` (una per risorsa)
+4. Creare tipi TypeScript in `src/types/` speculari ai modelli Go
+5. Implementare pagina Lista Clienti con DataTable
+6. Implementare pagina Dettaglio Sede (tab: Dispositivi, Switch, VLAN)
+7. Implementare pagina Lista Dispositivi con filtri
+8. Implementare form creazione/modifica dispositivo
+
+### Fase 5 — Features Avanzate
 1. Implementare SwitchPortMap (griglia visiva delle porte)
 2. Implementare catalogo modelli (Inventario) con CRUD
 3. Implementare gestione VLAN
 4. Aggiungere ricerca globale per hostname/IP
 5. Dashboard con statistiche (contatori per cliente/stato)
 
-### Fase 5 — Rifinitura
+### Fase 6 — Rifinitura
 1. Toast per conferma operazioni (shadcn/ui Toaster)
 2. Dialog di conferma per eliminazioni
 3. Esportazione CSV della lista dispositivi
-4. File `README.md` con istruzioni di avvio (`go run` + `npm run dev`)
+4. File `README.md` con istruzioni di avvio
 
 ---
 
@@ -461,9 +505,17 @@ Base URL: `http://localhost:8080/api/v1`
 - Codici HTTP standard: 200, 201, 400, 404, 500
 - Tutti gli ID nelle URL sono interi
 - Query parametri per filtri: `?site_id=1&status=active&search=testo`
-- DB file di default `./ciptr.db` (configurabile via env `DB_PATH`)
+- PostgreSQL con parametri `$1, $2, ...` e `RETURNING` per INSERT/UPDATE
+- Tipi PostgreSQL: `MACADDR` per MAC address, `INET` per IP, `CIDR` per blocchi rete
+- Connessione DB via env `DATABASE_URL` (default `postgres://ciptr:ciptr@localhost:5432/ciptr`)
 - Server di default porta `8080` (configurabile via env `PORT`)
 - Nessun framework ORM: SQL diretto con `database/sql`
+
+### CLI (bubbletea)
+- Binario separato in `cli/`, chiama la REST API (non accede al DB direttamente)
+- URL API configurabile via env `CIPTR_API_URL` (default `http://localhost:8080/api/v1`)
+- Componenti generici (table, form) guidati da un registro di definizioni (`resource/registry.go`)
+- Navigazione stack-based: `PushScreenMsg` / `PopScreenMsg` / Esc per tornare indietro
 
 ### Frontend (React)
 - Un file per pagina in `src/pages/`
@@ -476,6 +528,7 @@ Base URL: `http://localhost:8080/api/v1`
 - **Una risorsa alla volta**: implementare model, handler e routes per UNA sola risorsa, poi committare e attendere review prima di procedere alla successiva
 - Non accorpare più risorse in un unico blocco di lavoro
 - L'utente vuole poter leggere e capire ogni cambiamento singolarmente
+- **Aggiornare sempre `agents.md`** quando si pianificano cambiamenti architetturali, nuove feature, nuovi componenti o nuove fasi — questo file è la fonte di verità del progetto
 
 ### Git
 - Committare spesso: dopo ogni risorsa CRUD completata, ogni refactor, ogni modifica significativa
@@ -483,9 +536,9 @@ Base URL: `http://localhost:8080/api/v1`
 - Commit message in inglese, stile conventional commits (`feat`, `fix`, `refactor`, ecc.)
 
 ### Database
-- `PRAGMA foreign_keys = ON` sempre attivo
-- Nessun soft delete: eliminazione reale con conferma nel frontend
-- Migrazioni numerate in `backend/db/migrations/` (es. `001_initial.sql`)
+- PostgreSQL 18 — FK enforcement è attivo di default
+- Nessun soft delete: eliminazione reale con conferma nel frontend/CLI
+- Schema in `backend/db/schema.sql`
 
 ---
 
