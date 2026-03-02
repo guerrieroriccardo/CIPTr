@@ -23,9 +23,18 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		AllowCredentials: false,
 	}))
 
+	clientHandler := handlers.NewClientHandler(database)
+
 	api := r.Group("/api/v1")
 	{
 		api.GET("/health", handlers.Health)
+
+		// Clients
+		api.GET("/clients", clientHandler.List)
+		api.POST("/clients", clientHandler.Create)
+		api.GET("/clients/:id", clientHandler.GetByID)
+		api.PUT("/clients/:id", clientHandler.Update)
+		api.DELETE("/clients/:id", clientHandler.Delete)
 	}
 
 	return r
