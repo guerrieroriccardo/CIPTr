@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"        # exposed for the reverse proxy; remove if proxy is in same Docker network
+    volumes:
+      - db_data:/app/data
+    environment:
+      - DB_PATH=/app/data/ciptr.db
+      - PORT=8080
+      - GIN_MODE=release
+
+  # frontend service will be added in a later step
+
+volumes:
+  db_data:
