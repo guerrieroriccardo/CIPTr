@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS switches (
     id              BIGSERIAL PRIMARY KEY,
     site_id         BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,      -- e.g. "SW006", "CORE-SW01"
-    model_id        BIGINT REFERENCES device_models(id),
+    model_id        BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
     ip_address      INET,               -- management IP
     location        TEXT,               -- e.g. "Rack A, Cabinet 3"
     total_ports     INTEGER NOT NULL DEFAULT 24,
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS devices (
     id                  BIGSERIAL PRIMARY KEY,
     site_id             BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     location_id         BIGINT REFERENCES locations(id) ON DELETE SET NULL,
-    model_id            BIGINT REFERENCES device_models(id),
+    model_id            BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
 
     -- Identification
     hostname            TEXT NOT NULL,
