@@ -96,8 +96,9 @@ clients
 
 device_models (hardware catalog: HP ProLiant, Cisco 2960, ...)
   └── devices (deployed devices)
-        └── device_ips (IP addresses of the device, linked to a VLAN)
-        └── device_connections (physical link: switch_port ↔ patch_panel_port)
+        └── device_interfaces (NICs: eth0, iDRAC, WAN, LAN1, ...)
+              └── device_ips (IP per NIC, linked to a VLAN)
+              └── device_connections (physical link: NIC → switch_port ↔ patch_panel_port)
 ```
 
 ### SQL — schema.sql
@@ -493,7 +494,7 @@ Base URL: `http://localhost:8080/api/v1`
 
 ## 9. Note Importanti
 
-- **IP multipli**: un dispositivo può avere più IP (server con più NIC). La tabella `device_ips` gestisce questo con il flag `is_primary`.
+- **NIC multiple**: un dispositivo può avere più schede di rete (server, router, ecc.). La tabella `device_interfaces` modella ogni NIC come entità separata (es. eth0, iDRAC, WAN). Ogni NIC può avere più IP (`device_ips`) e una connessione fisica (`device_connections`). Il flag `is_primary` su `device_ips` indica l'IP principale del dispositivo.
 - **Switch come dispositivo**: uno switch fisico è un record in `switches` (per gestire le porte) ma NON va duplicato in `devices`. Se si vuole tracciarne IP e seriale, si aggiungono campi direttamente a `switches`.
 - **Patch panel**: il collegamento fisico è `device → patch_panel_port → switch_port`. La tabella `device_connections` tiene entrambi i riferimenti opzionali.
 - **Import da Excel**: prevedere in futuro un endpoint `POST /api/v1/import/csv`. Non prioritario ora, ma lo schema deve poter accogliere tutti i campi del vecchio Excel.

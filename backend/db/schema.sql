@@ -170,27 +170,44 @@ BEGIN
 END;
 
 -- ============================================================
--- IP ADDRESSES (multiple IPs per device)
+-- NETWORK INTERFACES (NICs on a device)
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS device_ips (
+-- Each row is one physical or virtual NIC on a device.
+-- A PC typically has one; a server may have eth0, eth1, iDRAC;
+-- a router may have WAN, LAN1, LAN2, mgmt.
+CREATE TABLE IF NOT EXISTS device_interfaces (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id   INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-    ip_address  TEXT NOT NULL,
-    mac_address TEXT,
-    vlan_id     INTEGER REFERENCES vlans(id),
-    is_primary  BOOLEAN DEFAULT 0,
-    interface   TEXT,                   -- e.g. "eth0", "Wi-Fi"
-    notes       TEXT
+    name        TEXT NOT NULL,      -- e.g. "eth0", "iDRAC", "WAN", "LAN1"
+    mac_address TEXT,               -- MAC address of this NIC
+    notes       TEXT,
+    UNIQUE(device_id, name)
 );
 
 -- ============================================================
--- PHYSICAL CONNECTIONS (device → switch port / patch panel port)
+-- IP ADDRESSES (one or more IPs per NIC)
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS device_ips (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    interface_id    INTEGER NOT NULL REFERENCES device_interfaces(id) ON DELETE CASCADE,
+    ip_address      TEXT NOT NULL,
+    vlan_id         INTEGER REFERENCES vlans(id),
+    is_primary      BOOLEAN DEFAULT 0,  -- primary IP of the whole device
+    notes           TEXT
+);
+
+-- ============================================================
+-- PHYSICAL CONNECTIONS (NIC → switch port / patch panel port)
+-- ============================================================
+
+-- Tracks which NIC is physically plugged into which switch port
+-- and/or patch panel port. Both columns are optional because a
+-- cable may bypass the patch panel and go directly to the switch.
 CREATE TABLE IF NOT EXISTS device_connections (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    device_id           INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    interface_id        INTEGER NOT NULL REFERENCES device_interfaces(id) ON DELETE CASCADE,
     switch_port_id      INTEGER REFERENCES switch_ports(id),
     patch_panel_port_id INTEGER REFERENCES patch_panel_ports(id),
     connected_at        DATE,
@@ -201,9 +218,10 @@ CREATE TABLE IF NOT EXISTS device_connections (
 -- INDEXES
 -- ============================================================
 
-CREATE INDEX IF NOT EXISTS idx_devices_site         ON devices(site_id);
-CREATE INDEX IF NOT EXISTS idx_devices_hostname     ON devices(hostname);
-CREATE INDEX IF NOT EXISTS idx_device_ips_address   ON device_ips(ip_address);
-CREATE INDEX IF NOT EXISTS idx_switch_ports_sw      ON switch_ports(switch_id);
-CREATE INDEX IF NOT EXISTS idx_address_blocks_site  ON address_blocks(site_id);
-CREATE INDEX IF NOT EXISTS idx_vlans_block          ON vlans(address_block_id);
+CREATE INDEX IF NOT EXISTS idx_devices_site             ON devices(site_id);
+CREATE INDEX IF NOT EXISTS idx_devices_hostname         ON devices(hostname);
+CREATE INDEX IF NOT EXISTS idx_device_interfaces_device ON device_interfaces(device_id);
+CREATE INDEX IF NOT EXISTS idx_device_ips_address       ON device_ips(ip_address);
+CREATE INDEX IF NOT EXISTS idx_switch_ports_sw          ON switch_ports(switch_id);
+CREATE INDEX IF NOT EXISTS idx_address_blocks_site      ON address_blocks(site_id);
+CREATE INDEX IF NOT EXISTS idx_vlans_block              ON vlans(address_block_id);
