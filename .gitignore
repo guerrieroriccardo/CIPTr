@@ -1,0 +1,19 @@
+# Go
+backend/ciptr-backend
+backend/*.db
+*.db
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Docker
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
