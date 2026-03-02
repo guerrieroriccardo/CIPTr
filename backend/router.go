@@ -35,87 +35,105 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	deviceConnectionHandler := handlers.NewDeviceConnectionHandler(database)
 
 	api := r.Group("/api/v1")
+	api.GET("/health", handlers.Health)
+
+	clients := api.Group("/clients")
 	{
-		api.GET("/health", handlers.Health)
+		clients.GET("", clientHandler.List)
+		clients.POST("", clientHandler.Create)
+		clients.GET("/:id", clientHandler.GetByID)
+		clients.PUT("/:id", clientHandler.Update)
+		clients.DELETE("/:id", clientHandler.Delete)
+		clients.GET("/:id/sites", siteHandler.ListByClient)
+	}
 
-		// Clients
-		api.GET("/clients", clientHandler.List)
-		api.POST("/clients", clientHandler.Create)
-		api.GET("/clients/:id", clientHandler.GetByID)
-		api.PUT("/clients/:id", clientHandler.Update)
-		api.DELETE("/clients/:id", clientHandler.Delete)
-		api.GET("/clients/:id/sites", siteHandler.ListByClient)
+	sites := api.Group("/sites")
+	{
+		sites.GET("", siteHandler.List)
+		sites.POST("", siteHandler.Create)
+		sites.GET("/:id", siteHandler.GetByID)
+		sites.PUT("/:id", siteHandler.Update)
+		sites.DELETE("/:id", siteHandler.Delete)
+		sites.GET("/:id/address-blocks", addressBlockHandler.ListBySite)
+		sites.GET("/:id/vlans", vlanHandler.ListBySite)
+		sites.GET("/:id/locations", locationHandler.ListBySite)
+		sites.GET("/:id/devices", deviceHandler.ListBySite)
+	}
 
-		// Sites
-		api.GET("/sites", siteHandler.List)
-		api.POST("/sites", siteHandler.Create)
-		api.GET("/sites/:id", siteHandler.GetByID)
-		api.PUT("/sites/:id", siteHandler.Update)
-		api.DELETE("/sites/:id", siteHandler.Delete)
-		api.GET("/sites/:id/address-blocks", addressBlockHandler.ListBySite)
-		api.GET("/sites/:id/vlans", vlanHandler.ListBySite)
-		api.GET("/sites/:id/locations", locationHandler.ListBySite)
-		api.GET("/sites/:id/devices", deviceHandler.ListBySite)
+	addressBlocks := api.Group("/address-blocks")
+	{
+		addressBlocks.GET("", addressBlockHandler.List)
+		addressBlocks.POST("", addressBlockHandler.Create)
+		addressBlocks.GET("/:id", addressBlockHandler.GetByID)
+		addressBlocks.PUT("/:id", addressBlockHandler.Update)
+		addressBlocks.DELETE("/:id", addressBlockHandler.Delete)
+		addressBlocks.GET("/:id/vlans", vlanHandler.ListByAddressBlock)
+	}
 
-		// Address Blocks
-		api.GET("/address-blocks", addressBlockHandler.List)
-		api.POST("/address-blocks", addressBlockHandler.Create)
-		api.GET("/address-blocks/:id", addressBlockHandler.GetByID)
-		api.PUT("/address-blocks/:id", addressBlockHandler.Update)
-		api.DELETE("/address-blocks/:id", addressBlockHandler.Delete)
-		api.GET("/address-blocks/:id/vlans", vlanHandler.ListByAddressBlock)
+	locations := api.Group("/locations")
+	{
+		locations.GET("", locationHandler.List)
+		locations.POST("", locationHandler.Create)
+		locations.GET("/:id", locationHandler.GetByID)
+		locations.PUT("/:id", locationHandler.Update)
+		locations.DELETE("/:id", locationHandler.Delete)
+	}
 
-		// Locations
-		api.GET("/locations", locationHandler.List)
-		api.POST("/locations", locationHandler.Create)
-		api.GET("/locations/:id", locationHandler.GetByID)
-		api.PUT("/locations/:id", locationHandler.Update)
-		api.DELETE("/locations/:id", locationHandler.Delete)
+	devices := api.Group("/devices")
+	{
+		devices.GET("", deviceHandler.List)
+		devices.POST("", deviceHandler.Create)
+		devices.GET("/:id", deviceHandler.GetByID)
+		devices.PUT("/:id", deviceHandler.Update)
+		devices.DELETE("/:id", deviceHandler.Delete)
+		devices.GET("/:id/interfaces", deviceInterfaceHandler.ListByDevice)
+		devices.GET("/:id/ips", deviceIPHandler.ListByDevice)
+		devices.GET("/:id/connections", deviceConnectionHandler.ListByDevice)
+	}
 
-		// Devices
-		api.GET("/devices", deviceHandler.List)
-		api.POST("/devices", deviceHandler.Create)
-		api.GET("/devices/:id", deviceHandler.GetByID)
-		api.PUT("/devices/:id", deviceHandler.Update)
-		api.DELETE("/devices/:id", deviceHandler.Delete)
-		api.GET("/devices/:id/interfaces", deviceInterfaceHandler.ListByDevice)
+	deviceInterfaces := api.Group("/device-interfaces")
+	{
+		deviceInterfaces.GET("", deviceInterfaceHandler.List)
+		deviceInterfaces.POST("", deviceInterfaceHandler.Create)
+		deviceInterfaces.GET("/:id", deviceInterfaceHandler.GetByID)
+		deviceInterfaces.PUT("/:id", deviceInterfaceHandler.Update)
+		deviceInterfaces.DELETE("/:id", deviceInterfaceHandler.Delete)
+	}
 
-		// Device Interfaces
-		api.GET("/device-interfaces", deviceInterfaceHandler.List)
-		api.POST("/device-interfaces", deviceInterfaceHandler.Create)
-		api.GET("/device-interfaces/:id", deviceInterfaceHandler.GetByID)
-		api.PUT("/device-interfaces/:id", deviceInterfaceHandler.Update)
-		api.DELETE("/device-interfaces/:id", deviceInterfaceHandler.Delete)
+	deviceIPs := api.Group("/device-ips")
+	{
+		deviceIPs.GET("", deviceIPHandler.List)
+		deviceIPs.POST("", deviceIPHandler.Create)
+		deviceIPs.GET("/:id", deviceIPHandler.GetByID)
+		deviceIPs.PUT("/:id", deviceIPHandler.Update)
+		deviceIPs.DELETE("/:id", deviceIPHandler.Delete)
+	}
 
-		// Device IPs
-		api.GET("/device-ips", deviceIPHandler.List)
-		api.POST("/device-ips", deviceIPHandler.Create)
-		api.GET("/device-ips/:id", deviceIPHandler.GetByID)
-		api.PUT("/device-ips/:id", deviceIPHandler.Update)
-		api.DELETE("/device-ips/:id", deviceIPHandler.Delete)
-		api.GET("/devices/:id/ips", deviceIPHandler.ListByDevice)
-		api.GET("/devices/:id/connections", deviceConnectionHandler.ListByDevice)
+	deviceConnections := api.Group("/device-connections")
+	{
+		deviceConnections.GET("", deviceConnectionHandler.List)
+		deviceConnections.POST("", deviceConnectionHandler.Create)
+		deviceConnections.GET("/:id", deviceConnectionHandler.GetByID)
+		deviceConnections.PUT("/:id", deviceConnectionHandler.Update)
+		deviceConnections.DELETE("/:id", deviceConnectionHandler.Delete)
+	}
 
-		// Device Connections
-		api.GET("/device-connections", deviceConnectionHandler.List)
-		api.POST("/device-connections", deviceConnectionHandler.Create)
-		api.GET("/device-connections/:id", deviceConnectionHandler.GetByID)
-		api.PUT("/device-connections/:id", deviceConnectionHandler.Update)
-		api.DELETE("/device-connections/:id", deviceConnectionHandler.Delete)
+	deviceModels := api.Group("/device-models")
+	{
+		deviceModels.GET("", deviceModelHandler.List)
+		deviceModels.POST("", deviceModelHandler.Create)
+		deviceModels.GET("/:id", deviceModelHandler.GetByID)
+		deviceModels.PUT("/:id", deviceModelHandler.Update)
+		deviceModels.DELETE("/:id", deviceModelHandler.Delete)
+	}
 
-		// Device Models
-		api.GET("/device-models", deviceModelHandler.List)
-		api.POST("/device-models", deviceModelHandler.Create)
-		api.GET("/device-models/:id", deviceModelHandler.GetByID)
-		api.PUT("/device-models/:id", deviceModelHandler.Update)
-		api.DELETE("/device-models/:id", deviceModelHandler.Delete)
-
-		// VLANs
-		api.GET("/vlans", vlanHandler.List)
-		api.POST("/vlans", vlanHandler.Create)
-		api.GET("/vlans/:id", vlanHandler.GetByID)
-		api.PUT("/vlans/:id", vlanHandler.Update)
-		api.DELETE("/vlans/:id", vlanHandler.Delete)
+	vlans := api.Group("/vlans")
+	{
+		vlans.GET("", vlanHandler.List)
+		vlans.POST("", vlanHandler.Create)
+		vlans.GET("/:id", vlanHandler.GetByID)
+		vlans.PUT("/:id", vlanHandler.Update)
+		vlans.DELETE("/:id", vlanHandler.Delete)
 	}
 
 	return r

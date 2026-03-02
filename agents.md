@@ -472,6 +472,11 @@ Base URL: `http://localhost:8080/api/v1`
 - Nessun global state manager
 - Tutti i tipi TypeScript in `src/types/index.ts`
 
+### Git
+- Committare spesso: dopo ogni risorsa CRUD completata, ogni refactor, ogni modifica significativa
+- Non aggiungere `Co-Authored-By` nei commit message
+- Commit message in inglese, stile conventional commits (`feat`, `fix`, `refactor`, ecc.)
+
 ### Database
 - `PRAGMA foreign_keys = ON` sempre attivo
 - Nessun soft delete: eliminazione reale con conferma nel frontend
