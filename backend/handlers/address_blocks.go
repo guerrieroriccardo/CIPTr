@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ciptr/models"
+	"github.com/guerrieroriccardo/CIPTr/backend/models"
 )
 
 // AddressBlockHandler groups all HTTP handlers for the /address-blocks resource.

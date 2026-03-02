@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ciptr/models"
+	"github.com/guerrieroriccardo/CIPTr/backend/models"
 )
 
 // SwitchHandler groups all HTTP handlers for the /switches resource.

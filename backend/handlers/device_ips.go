@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ciptr/models"
+	"github.com/guerrieroriccardo/CIPTr/backend/models"
 )
 
 // DeviceIPHandler groups all HTTP handlers for the /device-ips resource.

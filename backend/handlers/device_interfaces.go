@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ciptr/models"
+	"github.com/guerrieroriccardo/CIPTr/backend/models"
 )
 
 // DeviceInterfaceHandler groups all HTTP handlers for the /device-interfaces resource.

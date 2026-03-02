@@ -6,7 +6,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"ciptr/handlers"
+	"github.com/guerrieroriccardo/CIPTr/backend/handlers"
 )
 
 func setupRouter(database *sql.DB) *gin.Engine {

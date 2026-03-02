@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ciptr/models"
+	"github.com/guerrieroriccardo/CIPTr/backend/models"
 )
 
 // VLANHandler groups all HTTP handlers for the /vlans resource.

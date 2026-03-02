@@ -1,4 +1,4 @@
-module ciptr
+module github.com/guerrieroriccardo/CIPTr/backend
 
 go 1.25.0
 

@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"ciptr/db"
+	"github.com/guerrieroriccardo/CIPTr/backend/db"
 )
 
 func main() {
