@@ -472,6 +472,11 @@ Base URL: `http://localhost:8080/api/v1`
 - Nessun global state manager
 - Tutti i tipi TypeScript in `src/types/index.ts`
 
+### Ritmo di lavoro
+- **Una risorsa alla volta**: implementare model, handler e routes per UNA sola risorsa, poi committare e attendere review prima di procedere alla successiva
+- Non accorpare più risorse in un unico blocco di lavoro
+- L'utente vuole poter leggere e capire ogni cambiamento singolarmente
+
 ### Git
 - Committare spesso: dopo ogni risorsa CRUD completata, ogni refactor, ogni modifica significativa
 - Non aggiungere `Co-Authored-By` nei commit message
