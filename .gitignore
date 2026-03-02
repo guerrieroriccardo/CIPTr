@@ -1,7 +1,11 @@
 # Go
 backend/ciptr-backend
 backend/*.db
+backend/*.db-shm
+backend/*.db-wal
 *.db
+*.db-shm
+*.db-wal
 
 # Node
 frontend/node_modules/
