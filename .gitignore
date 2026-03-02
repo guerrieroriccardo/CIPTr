@@ -1,5 +1,6 @@
 # Go
 backend/ciptr-backend
+cli/ciptr-cli
 backend/*.db
 backend/*.db-shm
 backend/*.db-wal
