@@ -62,8 +62,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case PushScreenMsg:
 		a.nav.Push(msg.Screen)
-		cmd := msg.Screen.Init()
-		return a, cmd
+		// Forward current window size so the new screen renders correctly.
+		sizeCmd := func() tea.Msg {
+			return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+		}
+		return a, tea.Batch(msg.Screen.Init(), sizeCmd)
 
 	case resource.ResolverReadyMsg:
 		resource.Resolve = msg.R
