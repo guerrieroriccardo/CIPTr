@@ -59,19 +59,44 @@ CREATE TABLE IF NOT EXISTS vlans (
 );
 
 -- ============================================================
+-- LOOKUP TABLES (manufacturers, categories, suppliers)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS manufacturers (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,   -- e.g. "HP", "Cisco", "Dell"
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,   -- e.g. "Server", "PC", "Switch", "Printer"
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS suppliers (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    address     TEXT,
+    phone       TEXT,
+    email       TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
 -- DEVICE CATALOG (defined before switches/devices that reference it)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS device_models (
     id              BIGSERIAL PRIMARY KEY,
-    manufacturer    TEXT NOT NULL,      -- e.g. "HP", "Cisco", "Dell"
+    manufacturer_id BIGINT NOT NULL REFERENCES manufacturers(id),
     model_name      TEXT NOT NULL,      -- e.g. "ProLiant DL360 Gen10"
-    category        TEXT NOT NULL,      -- Server, PC, Laptop, Printer, Switch, Router, AP, NAS, Camera, Phone, UPS, Other
+    category_id     BIGINT NOT NULL REFERENCES categories(id),
     os_default      TEXT,               -- typical OS for this model
     specs           TEXT,               -- free text: CPU, RAM, etc.
     notes           TEXT,
     created_at      TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(manufacturer, model_name)
+    UNIQUE(manufacturer_id, model_name)
 );
 
 -- ============================================================
@@ -137,7 +162,7 @@ CREATE TABLE IF NOT EXISTS devices (
     asset_tag           TEXT,
 
     -- Type and status
-    device_type         TEXT NOT NULL,  -- PC, Server, Printer, Switch, AP, Camera, Phone, NAS, UPS, Other
+    category_id         BIGINT NOT NULL REFERENCES categories(id),
     status              TEXT NOT NULL DEFAULT 'active',  -- active, inactive, reserved, decommissioned
     is_up               BOOLEAN DEFAULT TRUE,
 
@@ -145,15 +170,11 @@ CREATE TABLE IF NOT EXISTS devices (
     os                  TEXT,
     has_rmm             BOOLEAN DEFAULT FALSE,  -- RMM agent installed
     has_antivirus       BOOLEAN DEFAULT FALSE,  -- antivirus installed
-    supplier            TEXT,
+    supplier_id         BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
 
     -- Logistics
     installation_date   DATE,
     is_reserved         BOOLEAN DEFAULT FALSE,
-
-    -- Ticket / reason
-    ticket_ref          TEXT,
-    reason              TEXT,
 
     notes               TEXT,
     created_at          TIMESTAMPTZ DEFAULT NOW(),
