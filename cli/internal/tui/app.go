@@ -2,6 +2,9 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
 )
 
 // PushScreenMsg tells the app to push a new screen onto the nav stack.
@@ -15,13 +18,14 @@ type PopScreenMsg struct{}
 // App is the root bubbletea model that manages the navigation stack.
 type App struct {
 	nav    NavStack
+	client *apiclient.Client
 	width  int
 	height int
 }
 
 // NewApp creates the root application model with the given initial screen.
-func NewApp(initial Screen) App {
-	app := App{}
+func NewApp(initial Screen, client *apiclient.Client) App {
+	app := App{client: client}
 	app.nav.Push(initial)
 	return app
 }
@@ -35,7 +39,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		// Forward to current screen.
 		return a.updateCurrent(msg)
 
 	case tea.KeyMsg:
@@ -45,9 +48,14 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			if a.nav.Len() > 1 {
 				a.nav.Pop()
-				return a.updateCurrent(nil)
+				// Re-init the screen we're returning to (refresh data).
+				cmd := a.nav.Current().Init()
+				return a, cmd
 			}
 		}
+
+	case MenuItemSelected:
+		return a.handleMenuSelection(msg.Key)
 
 	case PushScreenMsg:
 		a.nav.Push(msg.Screen)
@@ -57,7 +65,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PopScreenMsg:
 		if a.nav.Len() > 1 {
 			a.nav.Pop()
-			return a.updateCurrent(nil)
+			// Re-init to refresh data after create/edit/delete.
+			cmd := a.nav.Current().Init()
+			return a, cmd
 		}
 	}
 
@@ -79,6 +89,20 @@ func (a App) View() string {
 
 	out += current.View()
 	return out
+}
+
+// handleMenuSelection maps a menu key to a resource table screen.
+func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
+	def, ok := resource.Registry[key]
+	if !ok {
+		// Unknown key, ignore.
+		return a, nil
+	}
+
+	screen := NewResourceTable(def, a.client)
+	return a, func() tea.Msg {
+		return PushScreenMsg{Screen: screen}
+	}
 }
 
 // updateCurrent forwards a message to the current screen and returns the result.
