@@ -93,6 +93,14 @@ func (a App) View() string {
 
 // handleMenuSelection maps a menu key to a resource table screen.
 func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
+	// Hierarchical browse entry point.
+	if key == "browse_clients" {
+		screen := NewBrowseByClientScreen(a.client)
+		return a, func() tea.Msg {
+			return PushScreenMsg{Screen: screen}
+		}
+	}
+
 	def, ok := resource.Registry[key]
 	if !ok {
 		// Unknown key, ignore.

@@ -22,14 +22,15 @@ type dataErrorMsg struct {
 
 // ResourceTable is a generic list screen for any resource.
 type ResourceTable struct {
-	def    *resource.Def
-	client *apiclient.Client
-	table  table.Model
-	items  []any // raw items from API
-	err    error
-	loaded bool
-	width  int
-	height int
+	def      *resource.Def
+	client   *apiclient.Client
+	table    table.Model
+	items    []any // raw items from API
+	err      error
+	loaded   bool
+	width    int
+	height   int
+	onSelect func(item any) tea.Cmd // if set, enter drills down instead of editing
 }
 
 // NewResourceTable creates a table screen for the given resource definition.
@@ -57,6 +58,13 @@ func NewResourceTable(def *resource.Def, client *apiclient.Client) ResourceTable
 		client: client,
 		table:  t,
 	}
+}
+
+// NewResourceTableWithSelect creates a browse-mode table where enter drills down.
+func NewResourceTableWithSelect(def *resource.Def, client *apiclient.Client, onSelect func(item any) tea.Cmd) ResourceTable {
+	rt := NewResourceTable(def, client)
+	rt.onSelect = onSelect
+	return rt
 }
 
 func (rt ResourceTable) Title() string {
@@ -97,7 +105,22 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return PushScreenMsg{Screen: NewResourceForm(rt.def, rt.client, "", nil)}
 			}
 		case "enter":
-			// Edit selected item
+			// Drill-down (if onSelect is set) or edit selected item
+			if len(rt.items) > 0 {
+				idx := rt.table.Cursor()
+				if idx < len(rt.items) {
+					item := rt.items[idx]
+					if rt.onSelect != nil {
+						return rt, rt.onSelect(item)
+					}
+					id := rt.def.GetID(item)
+					return rt, func() tea.Msg {
+						return PushScreenMsg{Screen: NewResourceForm(rt.def, rt.client, id, item)}
+					}
+				}
+			}
+		case "e":
+			// Edit selected item (always available, needed in browse mode)
 			if len(rt.items) > 0 {
 				idx := rt.table.Cursor()
 				if idx < len(rt.items) {
@@ -143,7 +166,11 @@ func (rt ResourceTable) View() string {
 	}
 
 	title := TitleStyle.Render(fmt.Sprintf("%s (%d)", rt.def.Plural, len(rt.items)))
-	help := HelpStyle.Render("n new • enter edit • d delete • r refresh • esc back")
+	helpText := "n new • enter edit • d delete • r refresh • esc back"
+	if rt.onSelect != nil {
+		helpText = "n new • enter open • e edit • d delete • r refresh • esc back"
+	}
+	help := HelpStyle.Render(helpText)
 
 	return fmt.Sprintf("%s\n%s\n%s", title, rt.table.View(), help)
 }

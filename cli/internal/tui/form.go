@@ -50,6 +50,15 @@ func NewResourceForm(def *resource.Def, client *apiclient.Client, id string, ite
 		inputs: inputs,
 	}
 
+	// Pre-fill defaults for create mode (used in browse to scope parent IDs).
+	if item == nil && def.Defaults != nil {
+		for i, f := range def.Fields {
+			if v, ok := def.Defaults[f.Key]; ok {
+				inputs[i].SetValue(v)
+			}
+		}
+	}
+
 	// Pre-populate for edit mode by reading current row values.
 	if item != nil {
 		row := def.ToRow(item)

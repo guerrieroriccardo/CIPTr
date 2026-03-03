@@ -27,6 +27,10 @@ type Def struct {
 	// Form fields for create/edit
 	Fields []Field
 
+	// Defaults are pre-filled values for the create form (used in browse mode).
+	// Keys match Field.Key values.
+	Defaults map[string]string
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)
