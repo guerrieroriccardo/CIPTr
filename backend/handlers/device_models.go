@@ -22,26 +22,41 @@ func NewDeviceModelHandler(db *sql.DB) *DeviceModelHandler {
 }
 
 // deviceModelSelectSQL is the base SELECT used by every read operation.
-const deviceModelSelectSQL = `SELECT id, manufacturer, model_name, category, os_default, specs, notes, created_at FROM device_models`
+const deviceModelSelectSQL = `SELECT id, manufacturer_id, model_name, category_id, os_default, specs, notes, created_at FROM device_models`
 
 // scanDeviceModel reads one row into a DeviceModel struct.
 func scanDeviceModel(row interface{ Scan(...any) error }) (models.DeviceModel, error) {
 	var dm models.DeviceModel
-	err := row.Scan(&dm.ID, &dm.Manufacturer, &dm.ModelName, &dm.Category, &dm.OsDefault, &dm.Specs, &dm.Notes, &dm.CreatedAt)
+	err := row.Scan(&dm.ID, &dm.ManufacturerID, &dm.ModelName, &dm.CategoryID, &dm.OsDefault, &dm.Specs, &dm.Notes, &dm.CreatedAt)
 	return dm, err
 }
 
 // List handles GET /device-models
-// Supports optional query param: ?category=Server
+// Supports optional query params: ?category_id=, ?manufacturer_id=
 func (h *DeviceModelHandler) List(c *gin.Context) {
 	query := deviceModelSelectSQL
-	args := []any{}
+	var conds []string
+	var args []any
+	n := 1
 
-	if category := c.Query("category"); category != "" {
-		query += ` WHERE category = $1`
-		args = append(args, category)
+	if catID := c.Query("category_id"); catID != "" {
+		conds = append(conds, "category_id = $"+strconv.Itoa(n))
+		args = append(args, catID)
+		n++
 	}
-	query += ` ORDER BY manufacturer, model_name`
+	if mfgID := c.Query("manufacturer_id"); mfgID != "" {
+		conds = append(conds, "manufacturer_id = $"+strconv.Itoa(n))
+		args = append(args, mfgID)
+		n++
+	}
+
+	if len(conds) > 0 {
+		query += " WHERE " + conds[0]
+		for _, cond := range conds[1:] {
+			query += " AND " + cond
+		}
+	}
+	query += ` ORDER BY manufacturer_id, model_name`
 
 	rows, err := h.db.QueryContext(c.Request.Context(), query, args...)
 	if err != nil {
@@ -88,7 +103,7 @@ func (h *DeviceModelHandler) GetByID(c *gin.Context) {
 }
 
 // Create handles POST /device-models
-// manufacturer, model_name, and category are required.
+// manufacturer_id, model_name, and category_id are required.
 func (h *DeviceModelHandler) Create(c *gin.Context) {
 	var input models.DeviceModelInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -97,10 +112,10 @@ func (h *DeviceModelHandler) Create(c *gin.Context) {
 	}
 
 	dm, err := scanDeviceModel(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO device_models (manufacturer, model_name, category, os_default, specs, notes)
+		`INSERT INTO device_models (manufacturer_id, model_name, category_id, os_default, specs, notes)
 		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, manufacturer, model_name, category, os_default, specs, notes, created_at`,
-		input.Manufacturer, input.ModelName, input.Category,
+		 RETURNING id, manufacturer_id, model_name, category_id, os_default, specs, notes, created_at`,
+		input.ManufacturerID, input.ModelName, input.CategoryID,
 		input.OsDefault, input.Specs, input.Notes,
 	))
 	if err != nil {
@@ -127,10 +142,10 @@ func (h *DeviceModelHandler) Update(c *gin.Context) {
 	}
 
 	dm, err := scanDeviceModel(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE device_models SET manufacturer = $1, model_name = $2, category = $3,
+		`UPDATE device_models SET manufacturer_id = $1, model_name = $2, category_id = $3,
 		 os_default = $4, specs = $5, notes = $6 WHERE id = $7
-		 RETURNING id, manufacturer, model_name, category, os_default, specs, notes, created_at`,
-		input.Manufacturer, input.ModelName, input.Category,
+		 RETURNING id, manufacturer_id, model_name, category_id, os_default, specs, notes, created_at`,
+		input.ManufacturerID, input.ModelName, input.CategoryID,
 		input.OsDefault, input.Specs, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
