@@ -28,6 +28,9 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	addressBlockHandler := handlers.NewAddressBlockHandler(database)
 	vlanHandler        := handlers.NewVLANHandler(database)
 	locationHandler    := handlers.NewLocationHandler(database)
+	manufacturerHandler := handlers.NewManufacturerHandler(database)
+	categoryHandler     := handlers.NewCategoryHandler(database)
+	supplierHandler     := handlers.NewSupplierHandler(database)
 	deviceModelHandler := handlers.NewDeviceModelHandler(database)
 	deviceHandler          := handlers.NewDeviceHandler(database)
 	deviceInterfaceHandler := handlers.NewDeviceInterfaceHandler(database)
@@ -64,6 +67,33 @@ func setupRouter(database *sql.DB) *gin.Engine {
 		sites.GET("/:id/devices", deviceHandler.ListBySite)
 		sites.GET("/:id/switches", switchHandler.ListBySite)
 		sites.GET("/:id/patch-panels", patchPanelHandler.ListBySite)
+	}
+
+	manufacturers := api.Group("/manufacturers")
+	{
+		manufacturers.GET("", manufacturerHandler.List)
+		manufacturers.POST("", manufacturerHandler.Create)
+		manufacturers.GET("/:id", manufacturerHandler.GetByID)
+		manufacturers.PUT("/:id", manufacturerHandler.Update)
+		manufacturers.DELETE("/:id", manufacturerHandler.Delete)
+	}
+
+	categoriesGroup := api.Group("/categories")
+	{
+		categoriesGroup.GET("", categoryHandler.List)
+		categoriesGroup.POST("", categoryHandler.Create)
+		categoriesGroup.GET("/:id", categoryHandler.GetByID)
+		categoriesGroup.PUT("/:id", categoryHandler.Update)
+		categoriesGroup.DELETE("/:id", categoryHandler.Delete)
+	}
+
+	suppliersGroup := api.Group("/suppliers")
+	{
+		suppliersGroup.GET("", supplierHandler.List)
+		suppliersGroup.POST("", supplierHandler.Create)
+		suppliersGroup.GET("/:id", supplierHandler.GetByID)
+		suppliersGroup.PUT("/:id", supplierHandler.Update)
+		suppliersGroup.DELETE("/:id", supplierHandler.Delete)
 	}
 
 	patchPanels := api.Group("/patch-panels")
