@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -19,6 +21,25 @@ type AddressBlockHandler struct {
 // NewAddressBlockHandler creates an AddressBlockHandler with the given database connection.
 func NewAddressBlockHandler(db *sql.DB) *AddressBlockHandler {
 	return &AddressBlockHandler{db: db}
+}
+
+// validateAddressBlock checks that the new network does not overlap with any
+// existing address block in the same site. excludeID can be 0 for creates.
+func (h *AddressBlockHandler) validateAddressBlock(ctx context.Context, input *models.AddressBlockInput, excludeID int64) error {
+	var overlapping string
+	err := h.db.QueryRowContext(ctx,
+		`SELECT network FROM address_blocks
+		 WHERE site_id = $1 AND id != $2 AND network && $3::cidr
+		 LIMIT 1`,
+		input.SiteID, excludeID, input.Network,
+	).Scan(&overlapping)
+	if err == nil {
+		return fmt.Errorf("network %s overlaps with existing block %s", input.Network, overlapping)
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	return nil
 }
 
 // addressBlockSelectSQL is the base SELECT used by every read operation.
@@ -126,6 +147,11 @@ func (h *AddressBlockHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if err := h.validateAddressBlock(c.Request.Context(), &input, 0); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
 	ab, err := scanAddressBlock(h.db.QueryRowContext(c.Request.Context(),
 		`INSERT INTO address_blocks (site_id, network, description, notes) VALUES ($1, $2, $3, $4)
 		 RETURNING id, site_id, network, description, notes`,
@@ -150,6 +176,11 @@ func (h *AddressBlockHandler) Update(c *gin.Context) {
 
 	var input models.AddressBlockInput
 	if err := c.ShouldBindJSON(&input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.validateAddressBlock(c.Request.Context(), &input, id); err != nil {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
