@@ -76,8 +76,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.nav.Len() > 1 {
 			a.nav.Pop()
 			// Re-init to refresh data after create/edit/delete.
-			cmd := a.nav.Current().Init()
-			return a, cmd
+			// Also refresh the resolver so newly created entities appear in pickers.
+			return a, tea.Batch(
+				a.nav.Current().Init(),
+				resource.InitResolver(a.client),
+			)
 		}
 	}
 
