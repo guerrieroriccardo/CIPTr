@@ -16,7 +16,7 @@ type Device struct {
 	AssetTag     *string `json:"asset_tag"`
 
 	// Type and status
-	DeviceType string `json:"device_type"`
+	CategoryID int64  `json:"category_id"`
 	Status     string `json:"status"`
 	IsUp       *bool  `json:"is_up"`
 
@@ -24,15 +24,11 @@ type Device struct {
 	Os           *string `json:"os"`
 	HasRmm       *bool   `json:"has_rmm"`
 	HasAntivirus *bool   `json:"has_antivirus"`
-	Supplier     *string `json:"supplier"`
+	SupplierID   *int64  `json:"supplier_id"`
 
 	// Logistics
 	InstallationDate *string `json:"installation_date"` // DATE as string (YYYY-MM-DD)
 	IsReserved       *bool   `json:"is_reserved"`
-
-	// Ticket / reason
-	TicketRef *string `json:"ticket_ref"`
-	Reason    *string `json:"reason"`
 
 	Notes     *string   `json:"notes"`
 	CreatedAt time.Time `json:"created_at"`
@@ -50,20 +46,17 @@ type DeviceInput struct {
 	SerialNumber *string `json:"serial_number"`
 	AssetTag     *string `json:"asset_tag"`
 
-	DeviceType string  `json:"device_type" binding:"required"`
+	CategoryID int64   `json:"category_id" binding:"required"`
 	Status     *string `json:"status"`
 	IsUp       *bool   `json:"is_up"`
 
 	Os           *string `json:"os"`
 	HasRmm       *bool   `json:"has_rmm"`
 	HasAntivirus *bool   `json:"has_antivirus"`
-	Supplier     *string `json:"supplier"`
+	SupplierID   *int64  `json:"supplier_id"`
 
 	InstallationDate *string `json:"installation_date"`
 	IsReserved       *bool   `json:"is_reserved"`
-
-	TicketRef *string `json:"ticket_ref"`
-	Reason    *string `json:"reason"`
 
 	Notes *string `json:"notes"`
 }

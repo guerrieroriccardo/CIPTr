@@ -26,10 +26,9 @@ func NewDeviceHandler(db *sql.DB) *DeviceHandler {
 // deviceSelectSQL is the base SELECT used by every read operation.
 const deviceSelectSQL = `SELECT id, site_id, location_id, model_id,
 	hostname, dns_name, serial_number, asset_tag,
-	device_type, status, is_up,
-	os, has_rmm, has_antivirus, supplier,
+	category_id, status, is_up,
+	os, has_rmm, has_antivirus, supplier_id,
 	installation_date, is_reserved,
-	ticket_ref, reason,
 	notes, created_at, updated_at
 	FROM devices`
 
@@ -39,17 +38,16 @@ func scanDevice(row interface{ Scan(...any) error }) (models.Device, error) {
 	err := row.Scan(
 		&d.ID, &d.SiteID, &d.LocationID, &d.ModelID,
 		&d.Hostname, &d.DnsName, &d.SerialNumber, &d.AssetTag,
-		&d.DeviceType, &d.Status, &d.IsUp,
-		&d.Os, &d.HasRmm, &d.HasAntivirus, &d.Supplier,
+		&d.CategoryID, &d.Status, &d.IsUp,
+		&d.Os, &d.HasRmm, &d.HasAntivirus, &d.SupplierID,
 		&d.InstallationDate, &d.IsReserved,
-		&d.TicketRef, &d.Reason,
 		&d.Notes, &d.CreatedAt, &d.UpdatedAt,
 	)
 	return d, err
 }
 
 // List handles GET /devices
-// Supports optional query params: ?site_id=, ?status=, ?device_type=, ?search=
+// Supports optional query params: ?site_id=, ?status=, ?category_id=, ?search=
 func (h *DeviceHandler) List(c *gin.Context) {
 	query := deviceSelectSQL
 	var conds []string
@@ -66,9 +64,9 @@ func (h *DeviceHandler) List(c *gin.Context) {
 		args = append(args, status)
 		n++
 	}
-	if deviceType := c.Query("device_type"); deviceType != "" {
-		conds = append(conds, fmt.Sprintf("device_type = $%d", n))
-		args = append(args, deviceType)
+	if catID := c.Query("category_id"); catID != "" {
+		conds = append(conds, fmt.Sprintf("category_id = $%d", n))
+		args = append(args, catID)
 		n++
 	}
 	if search := c.Query("search"); search != "" {
@@ -157,7 +155,7 @@ func (h *DeviceHandler) GetByID(c *gin.Context) {
 }
 
 // Create handles POST /devices
-// site_id, hostname, and device_type are required.
+// site_id, hostname, and category_id are required.
 func (h *DeviceHandler) Create(c *gin.Context) {
 	var input models.DeviceInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -174,24 +172,21 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		`INSERT INTO devices (
 			site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
-			device_type, status, is_up,
-			os, has_rmm, has_antivirus, supplier,
-			installation_date, is_reserved,
-			ticket_ref, reason, notes
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			category_id, status, is_up,
+			os, has_rmm, has_antivirus, supplier_id,
+			installation_date, is_reserved, notes
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
-			device_type, status, is_up,
-			os, has_rmm, has_antivirus, supplier,
+			category_id, status, is_up,
+			os, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
-			ticket_ref, reason,
 			notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
-		input.DeviceType, status, input.IsUp,
-		input.Os, input.HasRmm, input.HasAntivirus, input.Supplier,
-		input.InstallationDate, input.IsReserved,
-		input.TicketRef, input.Reason, input.Notes,
+		input.CategoryID, status, input.IsUp,
+		input.Os, input.HasRmm, input.HasAntivirus, input.SupplierID,
+		input.InstallationDate, input.IsReserved, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -225,24 +220,21 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 		`UPDATE devices SET
 			site_id = $1, location_id = $2, model_id = $3,
 			hostname = $4, dns_name = $5, serial_number = $6, asset_tag = $7,
-			device_type = $8, status = $9, is_up = $10,
-			os = $11, has_rmm = $12, has_antivirus = $13, supplier = $14,
-			installation_date = $15, is_reserved = $16,
-			ticket_ref = $17, reason = $18, notes = $19
-		WHERE id = $20
+			category_id = $8, status = $9, is_up = $10,
+			os = $11, has_rmm = $12, has_antivirus = $13, supplier_id = $14,
+			installation_date = $15, is_reserved = $16, notes = $17
+		WHERE id = $18
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
-			device_type, status, is_up,
-			os, has_rmm, has_antivirus, supplier,
+			category_id, status, is_up,
+			os, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
-			ticket_ref, reason,
 			notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
-		input.DeviceType, status, input.IsUp,
-		input.Os, input.HasRmm, input.HasAntivirus, input.Supplier,
-		input.InstallationDate, input.IsReserved,
-		input.TicketRef, input.Reason, input.Notes, id,
+		input.CategoryID, status, input.IsUp,
+		input.Os, input.HasRmm, input.HasAntivirus, input.SupplierID,
+		input.InstallationDate, input.IsReserved, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("device not found"))
