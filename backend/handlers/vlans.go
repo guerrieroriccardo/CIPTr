@@ -53,6 +53,21 @@ func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput,
 		subnetNet = parsed
 	}
 
+	// Check subnet uniqueness within the site.
+	if subnetNet != nil {
+		var overlapping string
+		err := h.db.QueryRowContext(ctx,
+			`SELECT subnet FROM vlans WHERE site_id = $1 AND id != $2 AND subnet && $3::cidr LIMIT 1`,
+			input.SiteID, excludeID, *input.Subnet,
+		).Scan(&overlapping)
+		if err == nil {
+			return fmt.Errorf("subnet %s overlaps with existing VLAN subnet %s", *input.Subnet, overlapping)
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+
 	// Validate gateway is within subnet.
 	if input.Gateway != nil && *input.Gateway != "" {
 		gw := net.ParseIP(*input.Gateway)
