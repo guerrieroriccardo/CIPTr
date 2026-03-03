@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,6 +23,68 @@ type VLANHandler struct {
 // NewVLANHandler creates a VLANHandler with the given database connection.
 func NewVLANHandler(db *sql.DB) *VLANHandler {
 	return &VLANHandler{db: db}
+}
+
+// validateVLAN checks:
+//  1. If subnet and address_block_id are both set, the subnet must be within the block's network.
+//  2. If gateway and subnet are both set, the gateway must be within the subnet.
+func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput) error {
+	// Parse subnet if provided.
+	var subnetNet *net.IPNet
+	if input.Subnet != nil && *input.Subnet != "" {
+		_, parsed, err := net.ParseCIDR(*input.Subnet)
+		if err != nil {
+			return fmt.Errorf("invalid subnet CIDR: %s", *input.Subnet)
+		}
+		subnetNet = parsed
+	}
+
+	// Validate gateway is within subnet.
+	if input.Gateway != nil && *input.Gateway != "" {
+		gw := net.ParseIP(*input.Gateway)
+		if gw == nil {
+			return fmt.Errorf("invalid gateway IP: %s", *input.Gateway)
+		}
+		if subnetNet != nil && !subnetNet.Contains(gw) {
+			return fmt.Errorf("gateway %s is not within subnet %s", *input.Gateway, *input.Subnet)
+		}
+	}
+
+	// Validate subnet is within address block.
+	if input.AddressBlockID != nil && subnetNet != nil {
+		var blockNetwork string
+		err := h.db.QueryRowContext(ctx,
+			`SELECT network FROM address_blocks WHERE id = $1`, *input.AddressBlockID,
+		).Scan(&blockNetwork)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("address block %d not found", *input.AddressBlockID)
+		}
+		if err != nil {
+			return err
+		}
+
+		_, blockNet, err := net.ParseCIDR(blockNetwork)
+		if err != nil {
+			return fmt.Errorf("address block has invalid network: %s", blockNetwork)
+		}
+
+		// Check that the entire subnet fits within the block:
+		// the block must contain both the subnet's network address and broadcast address.
+		subnetStart := subnetNet.IP
+		if !blockNet.Contains(subnetStart) {
+			return fmt.Errorf("subnet %s is not within address block %s", *input.Subnet, blockNetwork)
+		}
+		// Compute broadcast (last address in the subnet).
+		broadcast := make(net.IP, len(subnetStart))
+		for i := range subnetStart {
+			broadcast[i] = subnetStart[i] | ^subnetNet.Mask[i]
+		}
+		if !blockNet.Contains(broadcast) {
+			return fmt.Errorf("subnet %s is not fully within address block %s", *input.Subnet, blockNetwork)
+		}
+	}
+
+	return nil
 }
 
 // vlanSelectSQL is the base SELECT used by every read operation.
@@ -170,6 +234,11 @@ func (h *VLANHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if err := h.validateVLAN(c.Request.Context(), &input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
 	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
 		`INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway, description)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -196,6 +265,11 @@ func (h *VLANHandler) Update(c *gin.Context) {
 
 	var input models.VLANInput
 	if err := c.ShouldBindJSON(&input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.validateVLAN(c.Request.Context(), &input); err != nil {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
