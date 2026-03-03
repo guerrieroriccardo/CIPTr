@@ -349,12 +349,13 @@ func (f ResourceForm) View() string {
 		if field.Required {
 			label += " *"
 		}
-		// Show resolved name next to picker fields that have a value.
+		// For picker fields with a value, show resolved name as display with ID hint.
+		resolvedName := ""
 		if field.PickerKey != "" && f.inputs[i].Value() != "" && resource.Resolve != nil {
 			if m := resource.Resolve.Lookup(field.PickerKey); m != nil {
 				for id, name := range m {
 					if fmt.Sprintf("%d", id) == f.inputs[i].Value() {
-						label += " (" + name + ")"
+						resolvedName = name
 						break
 					}
 				}
@@ -364,7 +365,11 @@ func (f ResourceForm) View() string {
 		if i == f.focus {
 			cursor = "> "
 		}
-		b.WriteString(fmt.Sprintf("%s%s\n  %s\n\n", cursor, label, f.inputs[i].View()))
+		if resolvedName != "" {
+			b.WriteString(fmt.Sprintf("%s%s\n  %s (ID: %s)\n\n", cursor, label, resolvedName, f.inputs[i].Value()))
+		} else {
+			b.WriteString(fmt.Sprintf("%s%s\n  %s\n\n", cursor, label, f.inputs[i].View()))
+		}
 	}
 
 	// Show scroll indicator if not all fields are visible.
