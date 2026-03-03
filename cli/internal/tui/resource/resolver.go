@@ -14,16 +14,21 @@ var Resolve *Resolver
 
 // Resolver caches id→name mappings for FK columns.
 type Resolver struct {
-	Clients       map[int64]string
-	Sites         map[int64]string
-	Categories    map[int64]string
-	Manufacturers map[int64]string
-	Suppliers     map[int64]string
-	Devices       map[int64]string
-	Interfaces    map[int64]string
-	Switches      map[int64]string
-	PatchPanels   map[int64]string
-	VLANs         map[int64]string
+	Clients        map[int64]string
+	Sites          map[int64]string
+	Categories     map[int64]string
+	Manufacturers  map[int64]string
+	Suppliers      map[int64]string
+	Devices        map[int64]string
+	Interfaces     map[int64]string
+	Switches       map[int64]string
+	PatchPanels    map[int64]string
+	VLANs          map[int64]string
+	AddressBlocks  map[int64]string
+	DeviceModels   map[int64]string
+	Locations      map[int64]string
+	SwitchPorts    map[int64]string
+	PatchPanelPorts map[int64]string
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -33,16 +38,21 @@ type ResolverReadyMsg struct{ R *Resolver }
 func InitResolver(c *apiclient.Client) tea.Cmd {
 	return func() tea.Msg {
 		r := &Resolver{
-			Clients:       make(map[int64]string),
-			Sites:         make(map[int64]string),
-			Categories:    make(map[int64]string),
-			Manufacturers: make(map[int64]string),
-			Suppliers:     make(map[int64]string),
-			Devices:       make(map[int64]string),
-			Interfaces:    make(map[int64]string),
-			Switches:      make(map[int64]string),
-			PatchPanels:   make(map[int64]string),
-			VLANs:         make(map[int64]string),
+			Clients:        make(map[int64]string),
+			Sites:          make(map[int64]string),
+			Categories:     make(map[int64]string),
+			Manufacturers:  make(map[int64]string),
+			Suppliers:      make(map[int64]string),
+			Devices:        make(map[int64]string),
+			Interfaces:     make(map[int64]string),
+			Switches:       make(map[int64]string),
+			PatchPanels:    make(map[int64]string),
+			VLANs:          make(map[int64]string),
+			AddressBlocks:  make(map[int64]string),
+			DeviceModels:   make(map[int64]string),
+			Locations:      make(map[int64]string),
+			SwitchPorts:    make(map[int64]string),
+			PatchPanelPorts: make(map[int64]string),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -117,6 +127,49 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			}
 		}
 
+		var addressBlocks []models.AddressBlock
+		if err := c.Get("/address-blocks", &addressBlocks); err == nil {
+			for _, v := range addressBlocks {
+				r.AddressBlocks[v.ID] = v.Network
+			}
+		}
+
+		var deviceModels []models.DeviceModel
+		if err := c.Get("/device-models", &deviceModels); err == nil {
+			for _, v := range deviceModels {
+				r.DeviceModels[v.ID] = v.ModelName
+			}
+		}
+
+		var locations []models.Location
+		if err := c.Get("/locations", &locations); err == nil {
+			for _, v := range locations {
+				r.Locations[v.ID] = v.Name
+			}
+		}
+
+		var switchPorts []models.SwitchPort
+		if err := c.Get("/switch-ports", &switchPorts); err == nil {
+			for _, v := range switchPorts {
+				label := fmt.Sprintf("Port %d", v.PortNumber)
+				if v.PortLabel != nil && *v.PortLabel != "" {
+					label = *v.PortLabel
+				}
+				r.SwitchPorts[v.ID] = label
+			}
+		}
+
+		var ppPorts []models.PatchPanelPort
+		if err := c.Get("/patch-panel-ports", &ppPorts); err == nil {
+			for _, v := range ppPorts {
+				label := fmt.Sprintf("Port %d", v.PortNumber)
+				if v.PortLabel != nil && *v.PortLabel != "" {
+					label = *v.PortLabel
+				}
+				r.PatchPanelPorts[v.ID] = label
+			}
+		}
+
 		return ResolverReadyMsg{R: r}
 	}
 }
@@ -149,16 +202,53 @@ func SupplierName(id *int64) string    { return lookupOptional(func() map[int64]
 func DeviceName(id int64) string       { return lookupName(func() map[int64]string { return safeLookup().Devices }, id) }
 func InterfaceName(id int64) string    { return lookupName(func() map[int64]string { return safeLookup().Interfaces }, id) }
 func SwitchName(id int64) string       { return lookupName(func() map[int64]string { return safeLookup().Switches }, id) }
-func PatchPanelName(id int64) string   { return lookupName(func() map[int64]string { return safeLookup().PatchPanels }, id) }
-func VLANName(id *int64) string        { return lookupOptional(func() map[int64]string { return safeLookup().VLANs }, id) }
+func PatchPanelName(id int64) string      { return lookupName(func() map[int64]string { return safeLookup().PatchPanels }, id) }
+func VLANName(id *int64) string           { return lookupOptional(func() map[int64]string { return safeLookup().VLANs }, id) }
+func AddressBlockName(id *int64) string   { return lookupOptional(func() map[int64]string { return safeLookup().AddressBlocks }, id) }
+func DeviceModelName(id *int64) string    { return lookupOptional(func() map[int64]string { return safeLookup().DeviceModels }, id) }
+func LocationName(id *int64) string       { return lookupOptional(func() map[int64]string { return safeLookup().Locations }, id) }
+
+// Lookup returns the resolver map for a given key string (e.g. "clients", "sites").
+// Returns nil if the key is unknown or the resolver is not ready.
+func (r *Resolver) Lookup(key string) map[int64]string {
+	switch key {
+	case "clients":
+		return r.Clients
+	case "sites":
+		return r.Sites
+	case "categories":
+		return r.Categories
+	case "manufacturers":
+		return r.Manufacturers
+	case "suppliers":
+		return r.Suppliers
+	case "devices":
+		return r.Devices
+	case "interfaces":
+		return r.Interfaces
+	case "switches":
+		return r.Switches
+	case "patch_panels":
+		return r.PatchPanels
+	case "vlans":
+		return r.VLANs
+	case "address_blocks":
+		return r.AddressBlocks
+	case "device_models":
+		return r.DeviceModels
+	case "locations":
+		return r.Locations
+	case "switch_ports":
+		return r.SwitchPorts
+	case "patch_panel_ports":
+		return r.PatchPanelPorts
+	}
+	return nil
+}
 
 func safeLookup() *Resolver {
 	if Resolve == nil {
-		return &Resolver{
-			Clients: nil, Sites: nil, Categories: nil, Manufacturers: nil,
-			Suppliers: nil, Devices: nil, Interfaces: nil, Switches: nil,
-			PatchPanels: nil, VLANs: nil,
-		}
+		return &Resolver{}
 	}
 	return Resolve
 }

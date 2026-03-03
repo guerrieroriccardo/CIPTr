@@ -38,9 +38,9 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "interface_id", Label: "Interface ID", Required: true},
+			{Key: "interface_id", Label: "Interface", Required: true, PickerKey: "interfaces"},
 			{Key: "ip_address", Label: "IP Address", Required: true},
-			{Key: "vlan_id", Label: "VLAN ID"},
+			{Key: "vlan_id", Label: "VLAN", PickerKey: "vlans"},
 			{Key: "is_primary", Label: "Primary (true/false)"},
 			{Key: "notes", Label: "Notes"},
 		},

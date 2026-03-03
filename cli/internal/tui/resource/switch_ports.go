@@ -38,7 +38,7 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "switch_id", Label: "Switch ID", Required: true},
+			{Key: "switch_id", Label: "Switch", Required: true, PickerKey: "switches"},
 			{Key: "port_number", Label: "Port Number", Required: true},
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "speed", Label: "Speed"},

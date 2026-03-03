@@ -38,8 +38,8 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "site_id", Label: "Site ID", Required: true},
-			{Key: "address_block_id", Label: "Address Block ID"},
+			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
+			{Key: "address_block_id", Label: "Address Block", PickerKey: "address_blocks"},
 			{Key: "vlan_id", Label: "VLAN Tag Number", Required: true},
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "subnet", Label: "Subnet (CIDR)"},

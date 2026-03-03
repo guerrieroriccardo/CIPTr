@@ -38,9 +38,9 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "site_id", Label: "Site ID", Required: true},
+			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
 			{Key: "name", Label: "Name", Required: true},
-			{Key: "model_id", Label: "Model ID"},
+			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
 			{Key: "ip_address", Label: "IP Address"},
 			{Key: "location", Label: "Location"},
 			{Key: "total_ports", Label: "Total Ports"},

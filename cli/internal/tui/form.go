@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
@@ -13,6 +15,12 @@ import (
 
 type formSavedMsg struct{}
 type formErrorMsg struct{ err error }
+
+// pickerItem represents one selectable entry in the FK picker.
+type pickerItem struct {
+	id    string
+	label string
+}
 
 // ResourceForm is a generic create/edit form for any resource.
 type ResourceForm struct {
@@ -23,6 +31,16 @@ type ResourceForm struct {
 	focus  int
 	err    error
 	saving bool
+	height int // terminal height for scrolling
+	scroll int // first visible field index
+
+	// Picker state
+	picking      bool
+	pickerItems  []pickerItem // all items for current picker
+	pickerMatch  []pickerItem // filtered items
+	pickerCursor int
+	pickerFilter string
+	pickerScroll int // scroll offset for picker list
 }
 
 // NewResourceForm creates a form screen. If id is non-empty and item is
@@ -37,9 +55,6 @@ func NewResourceForm(def *resource.Def, client *apiclient.Client, id string, ite
 		}
 		ti.CharLimit = 256
 		ti.Width = 40
-		if i == 0 {
-			ti.Focus()
-		}
 		inputs[i] = ti
 	}
 
@@ -51,13 +66,25 @@ func NewResourceForm(def *resource.Def, client *apiclient.Client, id string, ite
 	}
 
 	// Pre-fill defaults for create mode (used in browse to scope parent IDs).
+	// Also advance focus past any defaulted fields.
 	if item == nil && def.Defaults != nil {
+		firstNonDefault := 0
 		for i, f := range def.Fields {
 			if v, ok := def.Defaults[f.Key]; ok {
 				inputs[i].SetValue(v)
+				if i == firstNonDefault {
+					firstNonDefault = i + 1
+				}
 			}
 		}
+		if firstNonDefault >= len(inputs) {
+			firstNonDefault = 0
+		}
+		form.focus = firstNonDefault
 	}
+
+	// Set focus on the correct field.
+	inputs[form.focus].Focus()
 
 	// Pre-populate for edit mode by reading current row values.
 	if item != nil {
@@ -90,8 +117,113 @@ func (f ResourceForm) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// visibleFields returns how many fields fit on screen.
+// Each field takes 3 lines (label + input + blank), plus title (2) + help (2).
+func (f ResourceForm) visibleFields() int {
+	if f.height <= 0 {
+		return len(f.def.Fields)
+	}
+	available := f.height - 4 // title + help + error margin
+	perField := 3
+	n := available / perField
+	if n < 1 {
+		n = 1
+	}
+	if n > len(f.def.Fields) {
+		n = len(f.def.Fields)
+	}
+	return n
+}
+
+func (f *ResourceForm) ensureVisible() {
+	vis := f.visibleFields()
+	if f.focus < f.scroll {
+		f.scroll = f.focus
+	}
+	if f.focus >= f.scroll+vis {
+		f.scroll = f.focus - vis + 1
+	}
+}
+
+// openPicker populates picker items from the resolver and enters picker mode.
+func (f *ResourceForm) openPicker() {
+	field := f.def.Fields[f.focus]
+	if field.PickerKey == "" || resource.Resolve == nil {
+		return
+	}
+	m := resource.Resolve.Lookup(field.PickerKey)
+	if m == nil {
+		return
+	}
+
+	items := make([]pickerItem, 0, len(m))
+	for id, name := range m {
+		items = append(items, pickerItem{
+			id:    fmt.Sprintf("%d", id),
+			label: name,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].label < items[j].label
+	})
+
+	f.picking = true
+	f.pickerItems = items
+	f.pickerFilter = ""
+	f.pickerCursor = 0
+	f.pickerScroll = 0
+	f.filterPicker()
+}
+
+// filterPicker updates pickerMatch based on pickerFilter.
+func (f *ResourceForm) filterPicker() {
+	if f.pickerFilter == "" {
+		f.pickerMatch = f.pickerItems
+	} else {
+		lower := strings.ToLower(f.pickerFilter)
+		f.pickerMatch = nil
+		for _, item := range f.pickerItems {
+			if strings.Contains(strings.ToLower(item.label), lower) {
+				f.pickerMatch = append(f.pickerMatch, item)
+			}
+		}
+	}
+	if f.pickerCursor >= len(f.pickerMatch) {
+		f.pickerCursor = max(0, len(f.pickerMatch)-1)
+	}
+	f.ensurePickerVisible()
+}
+
+// pickerVisibleRows returns how many picker items fit on screen.
+func (f ResourceForm) pickerVisibleRows() int {
+	if f.height <= 0 {
+		return 10
+	}
+	// Reserve: title(1) + field label(1) + filter(1) + blank(1) + help(1) = 5
+	n := f.height - 5
+	if n < 3 {
+		n = 3
+	}
+	return n
+}
+
+func (f *ResourceForm) ensurePickerVisible() {
+	vis := f.pickerVisibleRows()
+	if f.pickerCursor < f.pickerScroll {
+		f.pickerScroll = f.pickerCursor
+	}
+	if f.pickerCursor >= f.pickerScroll+vis {
+		f.pickerScroll = f.pickerCursor - vis + 1
+	}
+}
+
 func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		f.height = msg.Height
+		f.ensureVisible()
+		return f, nil
+
 	case formSavedMsg:
 		return f, func() tea.Msg { return PopScreenMsg{} }
 
@@ -101,20 +233,33 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return f, nil
 
 	case tea.KeyMsg:
+		// Picker mode — intercept all keys.
+		if f.picking {
+			return f.updatePicker(msg)
+		}
+
 		switch msg.String() {
 		case "tab", "down":
 			f.focus = (f.focus + 1) % len(f.inputs)
+			f.ensureVisible()
 			return f, f.updateFocus()
 		case "shift+tab", "up":
 			f.focus = (f.focus - 1 + len(f.inputs)) % len(f.inputs)
+			f.ensureVisible()
 			return f, f.updateFocus()
 		case "enter":
+			// If current field has a picker, open it.
+			if f.def.Fields[f.focus].PickerKey != "" {
+				f.openPicker()
+				return f, nil
+			}
 			// If on last field, submit
 			if f.focus == len(f.inputs)-1 {
 				return f, f.submit()
 			}
 			// Otherwise move to next field
 			f.focus = (f.focus + 1) % len(f.inputs)
+			f.ensureVisible()
 			return f, f.updateFocus()
 		case "ctrl+s":
 			return f, f.submit()
@@ -127,7 +272,63 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return f, cmd
 }
 
+// updatePicker handles key events while the picker is open.
+func (f ResourceForm) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		f.picking = false
+		return f, nil
+	case "enter":
+		if len(f.pickerMatch) > 0 {
+			selected := f.pickerMatch[f.pickerCursor]
+			f.inputs[f.focus].SetValue(selected.id)
+			f.picking = false
+			// Auto-advance to next field.
+			f.focus = (f.focus + 1) % len(f.inputs)
+			f.ensureVisible()
+			return f, f.updateFocus()
+		}
+		return f, nil
+	case "up", "shift+tab":
+		if f.pickerCursor > 0 {
+			f.pickerCursor--
+			f.ensurePickerVisible()
+		}
+		return f, nil
+	case "down", "tab":
+		if f.pickerCursor < len(f.pickerMatch)-1 {
+			f.pickerCursor++
+			f.ensurePickerVisible()
+		}
+		return f, nil
+	case "backspace":
+		if len(f.pickerFilter) > 0 {
+			f.pickerFilter = f.pickerFilter[:len(f.pickerFilter)-1]
+			f.filterPicker()
+		}
+		return f, nil
+	default:
+		// Type-to-filter: accept printable characters.
+		r := msg.String()
+		if len(r) == 1 && r[0] >= 32 && r[0] < 127 {
+			f.pickerFilter += r
+			f.filterPicker()
+		}
+		return f, nil
+	}
+}
+
+var pickerSelectedStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("229")).
+	Background(lipgloss.Color("57")).
+	Bold(true)
+
 func (f ResourceForm) View() string {
+	// If picker is open, render picker view instead of normal form.
+	if f.picking {
+		return f.viewPicker()
+	}
+
 	var b strings.Builder
 
 	action := "Create"
@@ -136,16 +337,39 @@ func (f ResourceForm) View() string {
 	}
 	b.WriteString(TitleStyle.Render(action+" "+f.def.Name) + "\n")
 
-	for i, field := range f.def.Fields {
+	vis := f.visibleFields()
+	end := f.scroll + vis
+	if end > len(f.def.Fields) {
+		end = len(f.def.Fields)
+	}
+
+	for i := f.scroll; i < end; i++ {
+		field := f.def.Fields[i]
 		label := field.Label
 		if field.Required {
 			label += " *"
+		}
+		// Show resolved name next to picker fields that have a value.
+		if field.PickerKey != "" && f.inputs[i].Value() != "" && resource.Resolve != nil {
+			if m := resource.Resolve.Lookup(field.PickerKey); m != nil {
+				for id, name := range m {
+					if fmt.Sprintf("%d", id) == f.inputs[i].Value() {
+						label += " (" + name + ")"
+						break
+					}
+				}
+			}
 		}
 		cursor := "  "
 		if i == f.focus {
 			cursor = "> "
 		}
-		b.WriteString(fmt.Sprintf("%s%s\n%s  %s\n\n", cursor, label, "  ", f.inputs[i].View()))
+		b.WriteString(fmt.Sprintf("%s%s\n  %s\n\n", cursor, label, f.inputs[i].View()))
+	}
+
+	// Show scroll indicator if not all fields are visible.
+	if len(f.def.Fields) > vis {
+		b.WriteString(HelpStyle.Render(fmt.Sprintf("  [%d/%d fields]", f.focus+1, len(f.def.Fields))) + "\n")
 	}
 
 	if f.err != nil {
@@ -156,8 +380,51 @@ func (f ResourceForm) View() string {
 		b.WriteString("Saving...\n")
 	}
 
-	b.WriteString(HelpStyle.Render("tab next • ctrl+s save • esc cancel"))
+	// Build help text — show picker hint for FK fields.
+	helpParts := []string{"tab next"}
+	if f.def.Fields[f.focus].PickerKey != "" {
+		helpParts = append(helpParts, "enter pick")
+	}
+	helpParts = append(helpParts, "ctrl+s save", "esc cancel")
+	b.WriteString(HelpStyle.Render(strings.Join(helpParts, " • ")))
 
+	return b.String()
+}
+
+// viewPicker renders the full-screen picker overlay.
+func (f ResourceForm) viewPicker() string {
+	var b strings.Builder
+	field := f.def.Fields[f.focus]
+
+	b.WriteString(TitleStyle.Render("Pick "+field.Label) + "\n")
+	if f.pickerFilter != "" {
+		b.WriteString(HelpStyle.Render("Filter: "+f.pickerFilter) + "\n")
+	} else {
+		b.WriteString(HelpStyle.Render("Type to filter...") + "\n")
+	}
+
+	if len(f.pickerMatch) == 0 {
+		b.WriteString("\n  (no matches)\n")
+	} else {
+		vis := f.pickerVisibleRows()
+		end := f.pickerScroll + vis
+		if end > len(f.pickerMatch) {
+			end = len(f.pickerMatch)
+		}
+		for i := f.pickerScroll; i < end; i++ {
+			item := f.pickerMatch[i]
+			line := "  " + item.label
+			if i == f.pickerCursor {
+				line = pickerSelectedStyle.Render("> " + item.label)
+			}
+			b.WriteString(line + "\n")
+		}
+		if len(f.pickerMatch) > vis {
+			b.WriteString(HelpStyle.Render(fmt.Sprintf("  [%d/%d]", f.pickerCursor+1, len(f.pickerMatch))) + "\n")
+		}
+	}
+
+	b.WriteString("\n" + HelpStyle.Render("↑↓ navigate • enter select • esc cancel"))
 	return b.String()
 }
 

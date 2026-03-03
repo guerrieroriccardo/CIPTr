@@ -36,7 +36,7 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "patch_panel_id", Label: "Patch Panel ID", Required: true},
+			{Key: "patch_panel_id", Label: "Patch Panel", Required: true, PickerKey: "patch_panels"},
 			{Key: "port_number", Label: "Port Number", Required: true},
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "notes", Label: "Notes"},

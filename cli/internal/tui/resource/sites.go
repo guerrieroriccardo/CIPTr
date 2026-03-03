@@ -34,7 +34,7 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "client_id", Label: "Client ID", Required: true},
+			{Key: "client_id", Label: "Client", Required: true, PickerKey: "clients"},
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "address", Label: "Address"},
 			{Key: "notes", Label: "Notes"},

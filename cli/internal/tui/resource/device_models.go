@@ -36,9 +36,9 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "manufacturer_id", Label: "Manufacturer ID", Required: true},
+			{Key: "manufacturer_id", Label: "Manufacturer", Required: true, PickerKey: "manufacturers"},
 			{Key: "model_name", Label: "Model Name", Required: true},
-			{Key: "category_id", Label: "Category ID", Required: true},
+			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
 			{Key: "os_default", Label: "OS Default"},
 			{Key: "specs", Label: "Specs"},
 			{Key: "notes", Label: "Notes"},

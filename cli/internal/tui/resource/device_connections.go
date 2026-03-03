@@ -36,9 +36,9 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "interface_id", Label: "Interface ID", Required: true},
-			{Key: "switch_port_id", Label: "Switch Port ID"},
-			{Key: "patch_panel_port_id", Label: "Patch Panel Port ID"},
+			{Key: "interface_id", Label: "Interface", Required: true, PickerKey: "interfaces"},
+			{Key: "switch_port_id", Label: "Switch Port", PickerKey: "switch_ports"},
+			{Key: "patch_panel_port_id", Label: "Patch Panel Port", PickerKey: "patch_panel_ports"},
 			{Key: "connected_at", Label: "Connected At (YYYY-MM-DD)"},
 			{Key: "notes", Label: "Notes"},
 		},
