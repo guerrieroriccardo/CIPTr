@@ -26,9 +26,23 @@ func NewVLANHandler(db *sql.DB) *VLANHandler {
 }
 
 // validateVLAN checks:
-//  1. If subnet and address_block_id are both set, the subnet must be within the block's network.
-//  2. If gateway and subnet are both set, the gateway must be within the subnet.
-func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput) error {
+//  1. VLAN tag number is unique per site.
+//  2. If subnet and address_block_id are both set, the subnet must be within the block's network.
+//  3. If gateway and subnet are both set, the gateway must be within the subnet.
+func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput, excludeID int64) error {
+	// Check VLAN tag uniqueness within the site.
+	var existing int64
+	err := h.db.QueryRowContext(ctx,
+		`SELECT id FROM vlans WHERE site_id = $1 AND vlan_id = $2 AND id != $3 LIMIT 1`,
+		input.SiteID, input.VlanID, excludeID,
+	).Scan(&existing)
+	if err == nil {
+		return fmt.Errorf("VLAN tag %d already exists in this site", input.VlanID)
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
 	// Parse subnet if provided.
 	var subnetNet *net.IPNet
 	if input.Subnet != nil && *input.Subnet != "" {
@@ -234,7 +248,7 @@ func (h *VLANHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.validateVLAN(c.Request.Context(), &input); err != nil {
+	if err := h.validateVLAN(c.Request.Context(), &input, 0); err != nil {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
@@ -269,7 +283,7 @@ func (h *VLANHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.validateVLAN(c.Request.Context(), &input); err != nil {
+	if err := h.validateVLAN(c.Request.Context(), &input, id); err != nil {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
