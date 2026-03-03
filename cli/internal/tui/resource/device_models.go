@@ -16,18 +16,18 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Manufacturer", Width: 14},
+			{Title: "Manufacturer", Width: 16},
 			{Title: "Model Name", Width: 25},
-			{Title: "Category", Width: 10},
+			{Title: "Category", Width: 14},
 			{Title: "OS Default", Width: 15},
 		},
 		ToRow: func(raw any) table.Row {
 			dm := raw.(*models.DeviceModel)
 			return table.Row{
 				fmt.Sprintf("%d", dm.ID),
-				fmt.Sprintf("%d", dm.ManufacturerID),
+				ManufacturerName(dm.ManufacturerID),
 				dm.ModelName,
-				fmt.Sprintf("%d", dm.CategoryID),
+				CategoryName(dm.CategoryID),
 				derefStr(dm.OsDefault),
 			}
 		},

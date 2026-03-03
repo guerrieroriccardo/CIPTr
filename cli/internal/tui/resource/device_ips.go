@@ -16,19 +16,19 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Interface", Width: 10},
+			{Title: "Interface", Width: 14},
 			{Title: "IP Address", Width: 18},
-			{Title: "VLAN ID", Width: 8},
+			{Title: "VLAN", Width: 14},
 			{Title: "Primary", Width: 8},
-			{Title: "Notes", Width: 25},
+			{Title: "Notes", Width: 20},
 		},
 		ToRow: func(raw any) table.Row {
 			ip := raw.(*models.DeviceIP)
 			return table.Row{
 				fmt.Sprintf("%d", ip.ID),
-				fmt.Sprintf("%d", ip.InterfaceID),
+				InterfaceName(ip.InterfaceID),
 				ip.IPAddress,
-				derefInt64(ip.VlanID),
+				VLANName(ip.VlanID),
 				derefBool(ip.IsPrimary),
 				derefStr(ip.Notes),
 			}

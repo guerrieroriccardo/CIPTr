@@ -18,8 +18,8 @@ func init() {
 			{Title: "ID", Width: 6},
 			{Title: "Hostname", Width: 22},
 			{Title: "Status", Width: 10},
-			{Title: "Category", Width: 10},
-			{Title: "Site ID", Width: 8},
+			{Title: "Category", Width: 14},
+			{Title: "Site", Width: 16},
 			{Title: "OS", Width: 14},
 		},
 		ToRow: func(raw any) table.Row {
@@ -28,8 +28,8 @@ func init() {
 				fmt.Sprintf("%d", d.ID),
 				d.Hostname,
 				d.Status,
-				fmt.Sprintf("%d", d.CategoryID),
-				fmt.Sprintf("%d", d.SiteID),
+				CategoryName(d.CategoryID),
+				SiteName(d.SiteID),
 				derefStr(d.Os),
 			}
 		},

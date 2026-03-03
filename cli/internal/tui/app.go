@@ -31,7 +31,10 @@ func NewApp(initial Screen, client *apiclient.Client) App {
 }
 
 func (a App) Init() tea.Cmd {
-	return a.nav.Current().Init()
+	return tea.Batch(
+		a.nav.Current().Init(),
+		resource.InitResolver(a.client),
+	)
 }
 
 func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -61,6 +64,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.nav.Push(msg.Screen)
 		cmd := msg.Screen.Init()
 		return a, cmd
+
+	case resource.ResolverReadyMsg:
+		resource.Resolve = msg.R
+		return a, nil
 
 	case PopScreenMsg:
 		if a.nav.Len() > 1 {

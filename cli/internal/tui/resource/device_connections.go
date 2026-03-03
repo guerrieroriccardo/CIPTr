@@ -16,7 +16,7 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Interface", Width: 10},
+			{Title: "Interface", Width: 14},
 			{Title: "Switch Port", Width: 12},
 			{Title: "Patch Port", Width: 12},
 			{Title: "Connected At", Width: 12},
@@ -25,7 +25,7 @@ func init() {
 			dc := raw.(*models.DeviceConnection)
 			return table.Row{
 				fmt.Sprintf("%d", dc.ID),
-				fmt.Sprintf("%d", dc.InterfaceID),
+				InterfaceName(dc.InterfaceID),
 				derefInt64(dc.SwitchPortID),
 				derefInt64(dc.PatchPanelPortID),
 				derefStr(dc.ConnectedAt),

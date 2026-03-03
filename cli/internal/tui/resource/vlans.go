@@ -16,8 +16,8 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Site ID", Width: 8},
-			{Title: "VLAN ID", Width: 8},
+			{Title: "Site", Width: 16},
+			{Title: "VLAN #", Width: 7},
 			{Title: "Name", Width: 20},
 			{Title: "Subnet", Width: 20},
 			{Title: "Gateway", Width: 16},
@@ -26,7 +26,7 @@ func init() {
 			v := raw.(*models.VLAN)
 			return table.Row{
 				fmt.Sprintf("%d", v.ID),
-				fmt.Sprintf("%d", v.SiteID),
+				SiteName(v.SiteID),
 				fmt.Sprintf("%d", v.VlanID),
 				v.Name,
 				derefStr(v.Subnet),

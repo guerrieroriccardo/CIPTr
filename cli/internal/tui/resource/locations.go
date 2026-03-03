@@ -16,16 +16,16 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Site ID", Width: 8},
+			{Title: "Site", Width: 20},
 			{Title: "Name", Width: 30},
 			{Title: "Floor", Width: 10},
-			{Title: "Notes", Width: 30},
+			{Title: "Notes", Width: 20},
 		},
 		ToRow: func(raw any) table.Row {
 			l := raw.(*models.Location)
 			return table.Row{
 				fmt.Sprintf("%d", l.ID),
-				fmt.Sprintf("%d", l.SiteID),
+				SiteName(l.SiteID),
 				l.Name,
 				derefStr(l.Floor),
 				derefStr(l.Notes),

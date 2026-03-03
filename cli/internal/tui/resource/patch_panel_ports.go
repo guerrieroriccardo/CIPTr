@@ -16,7 +16,7 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Panel ID", Width: 10},
+			{Title: "Panel", Width: 18},
 			{Title: "Port #", Width: 7},
 			{Title: "Label", Width: 15},
 			{Title: "Notes", Width: 25},
@@ -25,7 +25,7 @@ func init() {
 			pp := raw.(*models.PatchPanelPort)
 			return table.Row{
 				fmt.Sprintf("%d", pp.ID),
-				fmt.Sprintf("%d", pp.PatchPanelID),
+				PatchPanelName(pp.PatchPanelID),
 				fmt.Sprintf("%d", pp.PortNumber),
 				derefStr(pp.PortLabel),
 				derefStr(pp.Notes),

@@ -16,7 +16,7 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Client ID", Width: 10},
+			{Title: "Client", Width: 20},
 			{Title: "Name", Width: 30},
 			{Title: "Address", Width: 30},
 		},
@@ -24,7 +24,7 @@ func init() {
 			s := raw.(*models.Site)
 			return table.Row{
 				fmt.Sprintf("%d", s.ID),
-				fmt.Sprintf("%d", s.ClientID),
+				ClientName(s.ClientID),
 				s.Name,
 				derefStr(s.Address),
 			}

@@ -16,7 +16,7 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Site ID", Width: 8},
+			{Title: "Site", Width: 16},
 			{Title: "Name", Width: 22},
 			{Title: "IP Address", Width: 16},
 			{Title: "Ports", Width: 6},
@@ -26,7 +26,7 @@ func init() {
 			s := raw.(*models.Switch)
 			return table.Row{
 				fmt.Sprintf("%d", s.ID),
-				fmt.Sprintf("%d", s.SiteID),
+				SiteName(s.SiteID),
 				s.Name,
 				derefStr(s.IPAddress),
 				fmt.Sprintf("%d", s.TotalPorts),

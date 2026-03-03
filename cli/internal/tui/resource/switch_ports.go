@@ -16,7 +16,7 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Switch ID", Width: 10},
+			{Title: "Switch", Width: 18},
 			{Title: "Port #", Width: 7},
 			{Title: "Label", Width: 15},
 			{Title: "Speed", Width: 10},
@@ -26,7 +26,7 @@ func init() {
 			sp := raw.(*models.SwitchPort)
 			return table.Row{
 				fmt.Sprintf("%d", sp.ID),
-				fmt.Sprintf("%d", sp.SwitchID),
+				SwitchName(sp.SwitchID),
 				fmt.Sprintf("%d", sp.PortNumber),
 				derefStr(sp.PortLabel),
 				derefStr(sp.Speed),
