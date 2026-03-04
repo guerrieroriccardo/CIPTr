@@ -24,12 +24,12 @@ func NewSwitchHandler(db *sql.DB) *SwitchHandler {
 }
 
 // switchSelectSQL is the base SELECT used by every read operation.
-const switchSelectSQL = `SELECT id, site_id, name, model_id, ip_address, location, total_ports, notes FROM switches`
+const switchSelectSQL = `SELECT id, site_id, name, model_id, ip_address, location_id, total_ports, notes FROM switches`
 
 // scanSwitch reads one row into a Switch struct.
 func scanSwitch(row interface{ Scan(...any) error }) (models.Switch, error) {
 	var s models.Switch
-	err := row.Scan(&s.ID, &s.SiteID, &s.Name, &s.ModelID, &s.IPAddress, &s.Location, &s.TotalPorts, &s.Notes)
+	err := row.Scan(&s.ID, &s.SiteID, &s.Name, &s.ModelID, &s.IPAddress, &s.LocationID, &s.TotalPorts, &s.Notes)
 	return s, err
 }
 
@@ -139,10 +139,10 @@ func (h *SwitchHandler) Create(c *gin.Context) {
 	defer tx.Rollback()
 
 	s, err := scanSwitch(tx.QueryRowContext(c.Request.Context(),
-		`INSERT INTO switches (site_id, name, model_id, ip_address, location, total_ports, notes)
+		`INSERT INTO switches (site_id, name, model_id, ip_address, location_id, total_ports, notes)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, site_id, name, model_id, ip_address, location, total_ports, notes`,
-		input.SiteID, input.Name, input.ModelID, input.IPAddress, input.Location, totalPorts, input.Notes,
+		 RETURNING id, site_id, name, model_id, ip_address, location_id, total_ports, notes`,
+		input.SiteID, input.Name, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -194,10 +194,10 @@ func (h *SwitchHandler) Update(c *gin.Context) {
 	}
 
 	s, err := scanSwitch(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE switches SET site_id = $1, name = $2, model_id = $3, ip_address = $4, location = $5, total_ports = $6, notes = $7
+		`UPDATE switches SET site_id = $1, name = $2, model_id = $3, ip_address = $4, location_id = $5, total_ports = $6, notes = $7
 		 WHERE id = $8
-		 RETURNING id, site_id, name, model_id, ip_address, location, total_ports, notes`,
-		input.SiteID, input.Name, input.ModelID, input.IPAddress, input.Location, totalPorts, input.Notes, id,
+		 RETURNING id, site_id, name, model_id, ip_address, location_id, total_ports, notes`,
+		input.SiteID, input.Name, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("switch not found"))

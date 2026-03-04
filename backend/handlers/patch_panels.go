@@ -24,12 +24,12 @@ func NewPatchPanelHandler(db *sql.DB) *PatchPanelHandler {
 }
 
 // patchPanelSelectSQL is the base SELECT used by every read operation.
-const patchPanelSelectSQL = `SELECT id, site_id, name, total_ports, location, notes FROM patch_panels`
+const patchPanelSelectSQL = `SELECT id, site_id, name, total_ports, location_id, notes FROM patch_panels`
 
 // scanPatchPanel reads one row into a PatchPanel struct.
 func scanPatchPanel(row interface{ Scan(...any) error }) (models.PatchPanel, error) {
 	var pp models.PatchPanel
-	err := row.Scan(&pp.ID, &pp.SiteID, &pp.Name, &pp.TotalPorts, &pp.Location, &pp.Notes)
+	err := row.Scan(&pp.ID, &pp.SiteID, &pp.Name, &pp.TotalPorts, &pp.LocationID, &pp.Notes)
 	return pp, err
 }
 
@@ -139,10 +139,10 @@ func (h *PatchPanelHandler) Create(c *gin.Context) {
 	defer tx.Rollback()
 
 	pp, err := scanPatchPanel(tx.QueryRowContext(c.Request.Context(),
-		`INSERT INTO patch_panels (site_id, name, total_ports, location, notes)
+		`INSERT INTO patch_panels (site_id, name, total_ports, location_id, notes)
 		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, site_id, name, total_ports, location, notes`,
-		input.SiteID, input.Name, totalPorts, input.Location, input.Notes,
+		 RETURNING id, site_id, name, total_ports, location_id, notes`,
+		input.SiteID, input.Name, totalPorts, input.LocationID, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -194,10 +194,10 @@ func (h *PatchPanelHandler) Update(c *gin.Context) {
 	}
 
 	pp, err := scanPatchPanel(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE patch_panels SET site_id = $1, name = $2, total_ports = $3, location = $4, notes = $5
+		`UPDATE patch_panels SET site_id = $1, name = $2, total_ports = $3, location_id = $4, notes = $5
 		 WHERE id = $6
-		 RETURNING id, site_id, name, total_ports, location, notes`,
-		input.SiteID, input.Name, totalPorts, input.Location, input.Notes, id,
+		 RETURNING id, site_id, name, total_ports, location_id, notes`,
+		input.SiteID, input.Name, totalPorts, input.LocationID, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("patch panel not found"))

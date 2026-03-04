@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS switches (
     name            TEXT NOT NULL,      -- e.g. "SW006", "CORE-SW01"
     model_id        BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
     ip_address      INET,               -- management IP
-    location        TEXT,               -- e.g. "Rack A, Cabinet 3"
+    location_id     BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     total_ports     INTEGER NOT NULL DEFAULT 24,
     notes           TEXT,
     UNIQUE(site_id, name)
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS patch_panels (
     site_id         BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,      -- e.g. "PP-RACK1-A"
     total_ports     INTEGER NOT NULL DEFAULT 24,
-    location        TEXT,
+    location_id     BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     notes           TEXT,
     UNIQUE(site_id, name)
 );

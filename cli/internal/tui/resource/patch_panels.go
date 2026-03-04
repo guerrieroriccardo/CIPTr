@@ -28,7 +28,7 @@ func init() {
 				SiteName(pp.SiteID),
 				pp.Name,
 				fmt.Sprintf("%d", pp.TotalPorts),
-				derefStr(pp.Location),
+				LocationName(pp.LocationID),
 			}
 		},
 		GetID: func(raw any) string {
@@ -39,8 +39,26 @@ func init() {
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "total_ports", Label: "Total Ports"},
-			{Key: "location", Label: "Location"},
+			{Key: "location_id", Label: "Location", PickerKey: "locations"},
 			{Key: "notes", Label: "Notes"},
+		},
+
+		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
+			if Resolve == nil || values["site_id"] == "" {
+				return items
+			}
+			siteID := mustInt64(values["site_id"])
+			switch key {
+			case "location_id":
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.LocationSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+			}
+			return items
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
@@ -59,7 +77,7 @@ func init() {
 				SiteID:     mustInt64(data["site_id"]),
 				Name:       data["name"],
 				TotalPorts: intPtr(data["total_ports"]),
-				Location:   strPtr(data["location"]),
+				LocationID: int64Ptr(data["location_id"]),
 				Notes:      strPtr(data["notes"]),
 			}
 			var created models.PatchPanel
@@ -71,7 +89,7 @@ func init() {
 				SiteID:     mustInt64(data["site_id"]),
 				Name:       data["name"],
 				TotalPorts: intPtr(data["total_ports"]),
-				Location:   strPtr(data["location"]),
+				LocationID: int64Ptr(data["location_id"]),
 				Notes:      strPtr(data["notes"]),
 			}
 			var updated models.PatchPanel

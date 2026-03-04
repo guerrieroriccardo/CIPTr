@@ -6,7 +6,7 @@ type PatchPanel struct {
 	SiteID     int64   `json:"site_id"`
 	Name       string  `json:"name"`
 	TotalPorts int     `json:"total_ports"`
-	Location   *string `json:"location"`
+	LocationID *int64  `json:"location_id"`
 	Notes      *string `json:"notes"`
 }
 
@@ -15,6 +15,6 @@ type PatchPanelInput struct {
 	SiteID     int64   `json:"site_id"     binding:"required"`
 	Name       string  `json:"name"        binding:"required"`
 	TotalPorts *int    `json:"total_ports"`
-	Location   *string `json:"location"`
+	LocationID *int64  `json:"location_id"`
 	Notes      *string `json:"notes"`
 }

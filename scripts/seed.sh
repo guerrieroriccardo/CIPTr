@@ -121,15 +121,15 @@ post /vlans '{"site_id":6,"address_block_id":5,"vlan_id":1,"name":"LAN","subnet"
 
 # ── Switches (ports auto-created by API) ──
 echo "==> Switches..."
-post /switches '{"site_id":1,"name":"SW-CORE-01","model_id":5,"ip_address":"10.10.0.10","location":"Sala Server - Rack A","total_ports":48,"notes":"Core switch"}'
-post /switches '{"site_id":1,"name":"SW-FLOOR1-01","model_id":6,"ip_address":"10.10.0.11","location":"Sala Server - Rack A","total_ports":24,"notes":"Floor 1 access switch"}'
-post /switches '{"site_id":3,"name":"SW-OMP-01","model_id":6,"ip_address":"10.20.0.10","location":"Sala CED","total_ports":24}'
-post /switches '{"site_id":4,"name":"SW-ROSSI-01","model_id":6,"ip_address":"192.168.1.2","location":"Ufficio","total_ports":24}'
+post /switches '{"site_id":1,"name":"SW-CORE-01","model_id":5,"ip_address":"10.10.0.10","location_id":1,"total_ports":48,"notes":"Core switch"}'
+post /switches '{"site_id":1,"name":"SW-FLOOR1-01","model_id":6,"ip_address":"10.10.0.11","location_id":1,"total_ports":24,"notes":"Floor 1 access switch"}'
+post /switches '{"site_id":3,"name":"SW-OMP-01","model_id":6,"ip_address":"10.20.0.10","location_id":4,"total_ports":24}'
+post /switches '{"site_id":4,"name":"SW-ROSSI-01","model_id":6,"ip_address":"192.168.1.2","location_id":5,"total_ports":24}'
 
 # ── Patch Panels (ports auto-created by API) ──
 echo "==> Patch Panels..."
-post /patch-panels '{"site_id":1,"name":"PP-RACK-A-1","total_ports":24,"location":"Sala Server - Rack A - 1U","notes":"Top of rack"}'
-post /patch-panels '{"site_id":1,"name":"PP-RACK-A-2","total_ports":24,"location":"Sala Server - Rack A - 2U"}'
+post /patch-panels '{"site_id":1,"name":"PP-RACK-A-1","total_ports":24,"location_id":1,"notes":"Top of rack"}'
+post /patch-panels '{"site_id":1,"name":"PP-RACK-A-2","total_ports":24,"location_id":1}'
 
 # ── Devices ──
 echo "==> Devices..."

@@ -30,7 +30,7 @@ func init() {
 				s.Name,
 				derefStr(s.IPAddress),
 				fmt.Sprintf("%d", s.TotalPorts),
-				derefStr(s.Location),
+				LocationName(s.LocationID),
 			}
 		},
 		GetID: func(raw any) string {
@@ -42,9 +42,27 @@ func init() {
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
 			{Key: "ip_address", Label: "IP Address"},
-			{Key: "location", Label: "Location"},
+			{Key: "location_id", Label: "Location", PickerKey: "locations"},
 			{Key: "total_ports", Label: "Total Ports"},
 			{Key: "notes", Label: "Notes"},
+		},
+
+		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
+			if Resolve == nil || values["site_id"] == "" {
+				return items
+			}
+			siteID := mustInt64(values["site_id"])
+			switch key {
+			case "location_id":
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.LocationSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+			}
+			return items
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
@@ -64,7 +82,7 @@ func init() {
 				Name:       data["name"],
 				ModelID:    int64Ptr(data["model_id"]),
 				IPAddress:  strPtr(data["ip_address"]),
-				Location:   strPtr(data["location"]),
+				LocationID: int64Ptr(data["location_id"]),
 				TotalPorts: intPtr(data["total_ports"]),
 				Notes:      strPtr(data["notes"]),
 			}
@@ -78,7 +96,7 @@ func init() {
 				Name:       data["name"],
 				ModelID:    int64Ptr(data["model_id"]),
 				IPAddress:  strPtr(data["ip_address"]),
-				Location:   strPtr(data["location"]),
+				LocationID: int64Ptr(data["location_id"]),
 				TotalPorts: intPtr(data["total_ports"]),
 				Notes:      strPtr(data["notes"]),
 			}
