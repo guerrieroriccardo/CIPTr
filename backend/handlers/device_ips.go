@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,6 +33,43 @@ func scanDeviceIP(row interface{ Scan(...any) error }) (models.DeviceIP, error) 
 	var d models.DeviceIP
 	err := row.Scan(&d.ID, &d.InterfaceID, &d.IPAddress, &d.VlanID, &d.IsPrimary, &d.Notes)
 	return d, err
+}
+
+func (h *DeviceIPHandler) validateDeviceIP(ctx context.Context, input *models.DeviceIPInput) error {
+	if input.VlanID == nil {
+		return nil
+	}
+
+	var subnet *string
+	err := h.db.QueryRowContext(ctx,
+		`SELECT subnet FROM vlans WHERE id = $1`, *input.VlanID,
+	).Scan(&subnet)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("VLAN %d not found", *input.VlanID)
+	}
+	if err != nil {
+		return err
+	}
+
+	if subnet == nil || *subnet == "" {
+		return nil
+	}
+
+	_, subnetNet, err := net.ParseCIDR(*subnet)
+	if err != nil {
+		return fmt.Errorf("VLAN has invalid subnet: %s", *subnet)
+	}
+
+	ip := net.ParseIP(input.IPAddress)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", input.IPAddress)
+	}
+
+	if !subnetNet.Contains(ip) {
+		return fmt.Errorf("IP %s is not within VLAN subnet %s", input.IPAddress, *subnet)
+	}
+
+	return nil
 }
 
 // List handles GET /device-ips
@@ -141,6 +180,11 @@ func (h *DeviceIPHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if err := h.validateDeviceIP(c.Request.Context(), &input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
 	d, err := scanDeviceIP(h.db.QueryRowContext(c.Request.Context(),
 		`INSERT INTO device_ips (interface_id, ip_address, vlan_id, is_primary, notes)
 		 VALUES ($1, $2, $3, $4, $5)
@@ -166,6 +210,11 @@ func (h *DeviceIPHandler) Update(c *gin.Context) {
 
 	var input models.DeviceIPInput
 	if err := c.ShouldBindJSON(&input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.validateDeviceIP(c.Request.Context(), &input); err != nil {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
