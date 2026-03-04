@@ -38,6 +38,11 @@ type Def struct {
 	// Example: typing a client name auto-generates the short_code.
 	DeriveField func(key, value string) map[string]string
 
+	// FieldHint returns an optional hint string to display next to a field label.
+	// Called with the field key and current form values (key→value map).
+	// Example: showing "Subnet: 10.10.0.0/24" next to IP address when a VLAN is selected.
+	FieldHint func(key string, values map[string]string) string
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)

@@ -378,6 +378,15 @@ func (f ResourceForm) View() string {
 
 	pickerHintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 
+	// Collect current values for FieldHint callback.
+	var currentValues map[string]string
+	if f.def.FieldHint != nil {
+		currentValues = make(map[string]string, len(f.def.Fields))
+		for j, fld := range f.def.Fields {
+			currentValues[fld.Key] = f.inputs[j].Value()
+		}
+	}
+
 	for i := f.scroll; i < end; i++ {
 		field := f.def.Fields[i]
 		label := field.Label
@@ -386,6 +395,11 @@ func (f ResourceForm) View() string {
 		}
 		if field.PickerKey != "" || len(field.PickerOptions) > 0 {
 			label += " " + pickerHintStyle.Render("[enter to pick]")
+		}
+		if f.def.FieldHint != nil {
+			if hint := f.def.FieldHint(field.Key, currentValues); hint != "" {
+				label += " " + pickerHintStyle.Render("["+hint+"]")
+			}
 		}
 		// For picker fields with a value, show resolved name as display with ID hint.
 		resolvedName := ""

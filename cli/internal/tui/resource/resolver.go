@@ -27,8 +27,9 @@ type Resolver struct {
 	AddressBlocks  map[int64]string
 	DeviceModels   map[int64]string
 	Locations      map[int64]string
-	SwitchPorts    map[int64]string
+	SwitchPorts     map[int64]string
 	PatchPanelPorts map[int64]string
+	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -51,8 +52,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			AddressBlocks:  make(map[int64]string),
 			DeviceModels:   make(map[int64]string),
 			Locations:      make(map[int64]string),
-			SwitchPorts:    make(map[int64]string),
+			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
+			VLANSubnets:     make(map[int64]string),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -128,6 +130,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/vlans", &vlans); err == nil {
 			for _, v := range vlans {
 				r.VLANs[v.ID] = v.Name
+				if v.Subnet != nil && *v.Subnet != "" {
+					r.VLANSubnets[v.ID] = *v.Subnet
+				}
 			}
 		}
 

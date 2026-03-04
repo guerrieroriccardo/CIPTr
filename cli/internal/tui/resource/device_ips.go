@@ -39,10 +39,20 @@ func init() {
 
 		Fields: []Field{
 			{Key: "interface_id", Label: "Interface", Required: true, PickerKey: "interfaces"},
-			{Key: "ip_address", Label: "IP Address", Required: true},
 			{Key: "vlan_id", Label: "VLAN", PickerKey: "vlans"},
-			{Key: "is_primary", Label: "Primary (true/false)"},
+			{Key: "ip_address", Label: "IP Address", Required: true},
+			{Key: "is_primary", Label: "Primary", PickerOptions: []string{"true", "false"}},
 			{Key: "notes", Label: "Notes"},
+		},
+
+		FieldHint: func(key string, values map[string]string) string {
+			if key == "ip_address" && values["vlan_id"] != "" && Resolve != nil {
+				id := mustInt64(values["vlan_id"])
+				if subnet, ok := Resolve.VLANSubnets[id]; ok {
+					return "Subnet: " + subnet
+				}
+			}
+			return ""
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
