@@ -137,7 +137,11 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		var deviceModels []models.DeviceModel
 		if err := c.Get("/device-models", &deviceModels); err == nil {
 			for _, v := range deviceModels {
-				r.DeviceModels[v.ID] = v.ModelName
+				label := v.ModelName
+				if mfr, ok := r.Manufacturers[v.ManufacturerID]; ok {
+					label = mfr + " " + label
+				}
+				r.DeviceModels[v.ID] = label
 			}
 		}
 
