@@ -35,6 +35,8 @@ func (sm ScopeMenu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "esc":
+			return sm, func() tea.Msg { return PopScreenMsg{} }
 		case "up", "k":
 			if sm.cursor > 0 {
 				sm.cursor--

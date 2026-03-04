@@ -99,6 +99,8 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "esc":
+			return rt, func() tea.Msg { return PopScreenMsg{} }
 		case "n":
 			// New: push create form
 			return rt, func() tea.Msg {

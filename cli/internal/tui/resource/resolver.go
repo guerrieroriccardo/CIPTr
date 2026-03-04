@@ -30,6 +30,11 @@ type Resolver struct {
 	SwitchPorts     map[int64]string
 	PatchPanelPorts map[int64]string
 	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
+
+	// Reverse lookups for contextual filtering.
+	InterfaceSite map[int64]int64 // interface ID → site ID (via device)
+	VLANSite      map[int64]int64 // VLAN ID → site ID
+	DeviceSite    map[int64]int64 // device ID → site ID
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -55,6 +60,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
 			VLANSubnets:     make(map[int64]string),
+			InterfaceSite:   make(map[int64]int64),
+			VLANSite:        make(map[int64]int64),
+			DeviceSite:      make(map[int64]int64),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -102,13 +110,21 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/devices", &devices); err == nil {
 			for _, v := range devices {
 				r.Devices[v.ID] = v.Hostname
+				r.DeviceSite[v.ID] = v.SiteID
 			}
 		}
 
 		var ifaces []models.DeviceInterface
 		if err := c.Get("/device-interfaces", &ifaces); err == nil {
 			for _, v := range ifaces {
-				r.Interfaces[v.ID] = v.Name
+				label := v.Name
+				if hostname, ok := r.Devices[v.DeviceID]; ok {
+					label = hostname + " - " + label
+				}
+				r.Interfaces[v.ID] = label
+				if siteID, ok := r.DeviceSite[v.DeviceID]; ok {
+					r.InterfaceSite[v.ID] = siteID
+				}
 			}
 		}
 
@@ -130,6 +146,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/vlans", &vlans); err == nil {
 			for _, v := range vlans {
 				r.VLANs[v.ID] = v.Name
+				r.VLANSite[v.ID] = v.SiteID
 				if v.Subnet != nil && *v.Subnet != "" {
 					r.VLANSubnets[v.ID] = *v.Subnet
 				}

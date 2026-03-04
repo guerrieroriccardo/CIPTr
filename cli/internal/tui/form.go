@@ -164,6 +164,14 @@ func (f *ResourceForm) openPicker() {
 		if m == nil {
 			return
 		}
+		// Apply contextual filter if defined.
+		if f.def.PickerFilter != nil {
+			currentValues := make(map[string]string, len(f.def.Fields))
+			for j, fld := range f.def.Fields {
+				currentValues[fld.Key] = f.inputs[j].Value()
+			}
+			m = f.def.PickerFilter(field.Key, currentValues, m)
+		}
 		items = make([]pickerItem, 0, len(m))
 		for id, name := range m {
 			items = append(items, pickerItem{
@@ -250,6 +258,8 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "esc":
+			return f, func() tea.Msg { return PopScreenMsg{} }
 		case "tab", "down":
 			f.focus = (f.focus + 1) % len(f.inputs)
 			f.ensureVisible()

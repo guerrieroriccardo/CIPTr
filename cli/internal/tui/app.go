@@ -48,13 +48,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return a, tea.Quit
-		case "esc":
-			if a.nav.Len() > 1 {
-				a.nav.Pop()
-				// Re-init the screen we're returning to (refresh data).
-				cmd := a.nav.Current().Init()
-				return a, cmd
-			}
 		}
 
 	case MenuItemSelected:
