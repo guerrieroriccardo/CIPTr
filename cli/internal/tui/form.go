@@ -368,11 +368,16 @@ func (f ResourceForm) View() string {
 		end = len(f.def.Fields)
 	}
 
+	pickerHintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+
 	for i := f.scroll; i < end; i++ {
 		field := f.def.Fields[i]
 		label := field.Label
 		if field.Required {
 			label += " *"
+		}
+		if field.PickerKey != "" {
+			label += " " + pickerHintStyle.Render("[enter to pick]")
 		}
 		// For picker fields with a value, show resolved name as display with ID hint.
 		resolvedName := ""
