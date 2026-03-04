@@ -41,6 +41,9 @@ type ResourceForm struct {
 	pickerCursor int
 	pickerFilter string
 	pickerScroll int // scroll offset for picker list
+
+	// Tracks fields manually edited by the user (not auto-derived).
+	manuallyEdited map[int]bool
 }
 
 // NewResourceForm creates a form screen. If id is non-empty and item is
@@ -267,8 +270,30 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Update the focused input.
+	oldVal := f.inputs[f.focus].Value()
 	var cmd tea.Cmd
 	f.inputs[f.focus], cmd = f.inputs[f.focus].Update(msg)
+	newVal := f.inputs[f.focus].Value()
+
+	// Track manual edits and apply derived field values.
+	if oldVal != newVal {
+		if f.manuallyEdited == nil {
+			f.manuallyEdited = map[int]bool{}
+		}
+		f.manuallyEdited[f.focus] = true
+
+		if f.def.DeriveField != nil {
+			derived := f.def.DeriveField(f.def.Fields[f.focus].Key, newVal)
+			for k, v := range derived {
+				for i, field := range f.def.Fields {
+					if field.Key == k && !f.manuallyEdited[i] {
+						f.inputs[i].SetValue(v)
+					}
+				}
+			}
+		}
+	}
+
 	return f, cmd
 }
 

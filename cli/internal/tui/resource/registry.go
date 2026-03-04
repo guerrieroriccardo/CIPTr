@@ -32,6 +32,11 @@ type Def struct {
 	// Keys match Field.Key values.
 	Defaults map[string]string
 
+	// DeriveField is called when a field value changes. Given the changed
+	// field key and its new value, it returns derived values for other fields.
+	// Example: typing a client name auto-generates the short_code.
+	DeriveField func(key, value string) map[string]string
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)
