@@ -16,7 +16,7 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Interface", Width: 14},
+			{Title: "Interface", Width: 36},
 			{Title: "IP Address", Width: 18},
 			{Title: "VLAN", Width: 14},
 			{Title: "Primary", Width: 8},
