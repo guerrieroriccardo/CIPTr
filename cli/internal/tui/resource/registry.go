@@ -43,6 +43,11 @@ type Def struct {
 	// Example: showing "Subnet: 10.10.0.0/24" next to IP address when a VLAN is selected.
 	FieldHint func(key string, values map[string]string) string
 
+	// PickerFilter narrows picker items based on current form values.
+	// Called with the field key, current form values, and all picker items.
+	// Returns a filtered subset. If nil, all items are shown.
+	PickerFilter func(key string, values map[string]string, items map[int64]string) map[int64]string
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)

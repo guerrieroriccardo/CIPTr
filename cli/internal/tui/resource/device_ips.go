@@ -45,6 +45,24 @@ func init() {
 			{Key: "notes", Label: "Notes"},
 		},
 
+		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
+			if key != "vlan_id" || values["interface_id"] == "" || Resolve == nil {
+				return items
+			}
+			ifaceID := mustInt64(values["interface_id"])
+			siteID, ok := Resolve.InterfaceSite[ifaceID]
+			if !ok {
+				return items
+			}
+			filtered := make(map[int64]string)
+			for id, name := range items {
+				if Resolve.VLANSite[id] == siteID {
+					filtered[id] = name
+				}
+			}
+			return filtered
+		},
+
 		FieldHint: func(key string, values map[string]string) string {
 			if key == "ip_address" && values["vlan_id"] != "" && Resolve != nil {
 				id := mustInt64(values["vlan_id"])
