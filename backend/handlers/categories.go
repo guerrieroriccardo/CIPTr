@@ -21,11 +21,11 @@ func NewCategoryHandler(db *sql.DB) *CategoryHandler {
 	return &CategoryHandler{db: db}
 }
 
-const categorySelectSQL = `SELECT id, name, created_at FROM categories`
+const categorySelectSQL = `SELECT id, name, short_code, created_at FROM categories`
 
 func scanCategory(row interface{ Scan(...any) error }) (models.Category, error) {
 	var cat models.Category
-	err := row.Scan(&cat.ID, &cat.Name, &cat.CreatedAt)
+	err := row.Scan(&cat.ID, &cat.Name, &cat.ShortCode, &cat.CreatedAt)
 	return cat, err
 }
 
@@ -84,9 +84,9 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	}
 
 	cat, err := scanCategory(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO categories (name) VALUES ($1)
-		 RETURNING id, name, created_at`,
-		input.Name,
+		`INSERT INTO categories (name, short_code) VALUES ($1, $2)
+		 RETURNING id, name, short_code, created_at`,
+		input.Name, input.ShortCode,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -111,9 +111,9 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	}
 
 	cat, err := scanCategory(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE categories SET name = $1 WHERE id = $2
-		 RETURNING id, name, created_at`,
-		input.Name, id,
+		`UPDATE categories SET name = $1, short_code = $2 WHERE id = $3
+		 RETURNING id, name, short_code, created_at`,
+		input.Name, input.ShortCode, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("category not found"))

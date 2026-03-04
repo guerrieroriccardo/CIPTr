@@ -16,13 +16,15 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Name", Width: 40},
+			{Title: "Name", Width: 30},
+			{Title: "Short Code", Width: 12},
 		},
 		ToRow: func(raw any) table.Row {
 			c := raw.(*models.Category)
 			return table.Row{
 				fmt.Sprintf("%d", c.ID),
 				c.Name,
+				derefStr(c.ShortCode),
 			}
 		},
 		GetID: func(raw any) string {
@@ -31,6 +33,7 @@ func init() {
 
 		Fields: []Field{
 			{Key: "name", Label: "Name", Required: true},
+			{Key: "short_code", Label: "Short Code"},
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
@@ -45,13 +48,13 @@ func init() {
 			return result, nil
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
-			input := models.CategoryInput{Name: data["name"]}
+			input := models.CategoryInput{Name: data["name"], ShortCode: strPtr(data["short_code"])}
 			var created models.Category
 			err := client.Post("/categories", input, &created)
 			return &created, err
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
-			input := models.CategoryInput{Name: data["name"]}
+			input := models.CategoryInput{Name: data["name"], ShortCode: strPtr(data["short_code"])}
 			var updated models.Category
 			err := client.Put("/categories/"+id, input, &updated)
 			return &updated, err

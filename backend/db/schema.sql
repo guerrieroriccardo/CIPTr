@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS manufacturers (
 CREATE TABLE IF NOT EXISTS categories (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,   -- e.g. "Server", "PC", "Switch", "Printer"
+    short_code  TEXT,                   -- e.g. "SRV", "NB", "SW" (variable length)
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 

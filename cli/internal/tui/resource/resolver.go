@@ -74,7 +74,11 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		var categories []models.Category
 		if err := c.Get("/categories", &categories); err == nil {
 			for _, v := range categories {
-				r.Categories[v.ID] = v.Name
+				label := v.Name
+				if v.ShortCode != nil && *v.ShortCode != "" {
+					label = *v.ShortCode + " - " + label
+				}
+				r.Categories[v.ID] = label
 			}
 		}
 
