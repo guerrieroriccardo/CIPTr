@@ -148,27 +148,35 @@ func (f *ResourceForm) ensureVisible() {
 	}
 }
 
-// openPicker populates picker items from the resolver and enters picker mode.
+// openPicker populates picker items from the resolver or static options and enters picker mode.
 func (f *ResourceForm) openPicker() {
 	field := f.def.Fields[f.focus]
-	if field.PickerKey == "" || resource.Resolve == nil {
-		return
-	}
-	m := resource.Resolve.Lookup(field.PickerKey)
-	if m == nil {
-		return
-	}
 
-	items := make([]pickerItem, 0, len(m))
-	for id, name := range m {
-		items = append(items, pickerItem{
-			id:    fmt.Sprintf("%d", id),
-			label: name,
+	var items []pickerItem
+
+	if len(field.PickerOptions) > 0 {
+		// Static option list — id and label are the same value.
+		for _, opt := range field.PickerOptions {
+			items = append(items, pickerItem{id: opt, label: opt})
+		}
+	} else if field.PickerKey != "" && resource.Resolve != nil {
+		m := resource.Resolve.Lookup(field.PickerKey)
+		if m == nil {
+			return
+		}
+		items = make([]pickerItem, 0, len(m))
+		for id, name := range m {
+			items = append(items, pickerItem{
+				id:    fmt.Sprintf("%d", id),
+				label: name,
+			})
+		}
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].label < items[j].label
 		})
+	} else {
+		return
 	}
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].label < items[j].label
-	})
 
 	f.picking = true
 	f.pickerItems = items
@@ -252,7 +260,7 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, f.updateFocus()
 		case "enter":
 			// If current field has a picker, open it.
-			if f.def.Fields[f.focus].PickerKey != "" {
+			if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 {
 				f.openPicker()
 				return f, nil
 			}
@@ -376,7 +384,7 @@ func (f ResourceForm) View() string {
 		if field.Required {
 			label += " *"
 		}
-		if field.PickerKey != "" {
+		if field.PickerKey != "" || len(field.PickerOptions) > 0 {
 			label += " " + pickerHintStyle.Render("[enter to pick]")
 		}
 		// For picker fields with a value, show resolved name as display with ID hint.
@@ -417,7 +425,7 @@ func (f ResourceForm) View() string {
 
 	// Build help text — show picker hint for FK fields.
 	helpParts := []string{"tab next"}
-	if f.def.Fields[f.focus].PickerKey != "" {
+	if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 {
 		helpParts = append(helpParts, "enter pick")
 	}
 	helpParts = append(helpParts, "ctrl+s save", "esc cancel")

@@ -7,10 +7,11 @@ import (
 
 // Field describes a single form field for create/edit.
 type Field struct {
-	Key       string // JSON key (e.g. "name")
-	Label     string // Human label (e.g. "Name")
-	Required  bool
-	PickerKey string // If set, enables FK picker using this resolver key (e.g. "clients", "sites")
+	Key           string   // JSON key (e.g. "name")
+	Label         string   // Human label (e.g. "Name")
+	Required      bool
+	PickerKey     string   // If set, enables FK picker using this resolver key (e.g. "clients", "sites")
+	PickerOptions []string // If set, enables picker with static options (e.g. ["active", "planned"])
 }
 
 // Def defines how to list, display, and manage a resource in the TUI.
