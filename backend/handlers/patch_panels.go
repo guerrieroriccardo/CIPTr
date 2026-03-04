@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -116,6 +118,7 @@ func (h *PatchPanelHandler) GetByID(c *gin.Context) {
 }
 
 // Create handles POST /patch-panels
+// Automatically creates N patch_panel_port rows based on total_ports.
 func (h *PatchPanelHandler) Create(c *gin.Context) {
 	var input models.PatchPanelInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -128,13 +131,42 @@ func (h *PatchPanelHandler) Create(c *gin.Context) {
 		totalPorts = *input.TotalPorts
 	}
 
-	pp, err := scanPatchPanel(h.db.QueryRowContext(c.Request.Context(),
+	tx, err := h.db.BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer tx.Rollback()
+
+	pp, err := scanPatchPanel(tx.QueryRowContext(c.Request.Context(),
 		`INSERT INTO patch_panels (site_id, name, total_ports, location, notes)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, site_id, name, total_ports, location, notes`,
 		input.SiteID, input.Name, totalPorts, input.Location, input.Notes,
 	))
 	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Auto-create port rows.
+	if totalPorts > 0 {
+		var vals []string
+		var args []any
+		for i := 1; i <= totalPorts; i++ {
+			vals = append(vals, fmt.Sprintf("($%d, $%d)", i*2-1, i*2))
+			args = append(args, pp.ID, i)
+		}
+		_, err = tx.ExecContext(c.Request.Context(),
+			`INSERT INTO patch_panel_ports (patch_panel_id, port_number) VALUES `+strings.Join(vals, ", "),
+			args...)
+		if err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
