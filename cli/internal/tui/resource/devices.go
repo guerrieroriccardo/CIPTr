@@ -57,6 +57,24 @@ func init() {
 			{Key: "notes", Label: "Notes"},
 		},
 
+		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
+			if Resolve == nil || values["site_id"] == "" {
+				return items
+			}
+			siteID := mustInt64(values["site_id"])
+			switch key {
+			case "location_id":
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.LocationSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+			}
+			return items
+		},
+
 		List: func(client *apiclient.Client) ([]any, error) {
 			var items []models.Device
 			if err := client.Get("/devices", &items); err != nil {

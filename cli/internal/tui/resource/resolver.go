@@ -43,6 +43,7 @@ type Resolver struct {
 	SwitchPortSwitch   map[int64]int64  // switch port ID → switch ID
 	PatchPanelSite     map[int64]int64  // patch panel ID → site ID
 	PatchPanelPortPanel map[int64]int64 // patch panel port ID → panel ID
+	LocationSite        map[int64]int64  // location ID → site ID
 	DeviceIPs           map[int64]string // device IP ID → "10.0.0.1 (hostname - eth0)"
 	DeviceIPVLAN        map[int64]int64  // device IP ID → VLAN ID
 	DeviceIPInterface   map[int64]int64  // device IP ID → interface ID
@@ -82,6 +83,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			SwitchPortSwitch:   make(map[int64]int64),
 			PatchPanelSite:     make(map[int64]int64),
 			PatchPanelPortPanel: make(map[int64]int64),
+			LocationSite:        make(map[int64]int64),
 			DeviceIPs:           make(map[int64]string),
 			DeviceIPVLAN:        make(map[int64]int64),
 			DeviceIPInterface:   make(map[int64]int64),
@@ -222,6 +224,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/locations", &locations); err == nil {
 			for _, v := range locations {
 				r.Locations[v.ID] = v.Name
+				r.LocationSite[v.ID] = v.SiteID
 			}
 		}
 
