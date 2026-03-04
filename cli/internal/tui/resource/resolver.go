@@ -32,9 +32,17 @@ type Resolver struct {
 	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
 
 	// Reverse lookups for contextual filtering.
-	InterfaceSite map[int64]int64 // interface ID → site ID (via device)
-	VLANSite      map[int64]int64 // VLAN ID → site ID
-	DeviceSite    map[int64]int64 // device ID → site ID
+	InterfaceSite      map[int64]int64  // interface ID → site ID (via device)
+	InterfaceDevice    map[int64]int64  // interface ID → device ID
+	VLANSite           map[int64]int64  // VLAN ID → site ID
+	DeviceSite         map[int64]int64  // device ID → site ID
+	AddressBlockSite   map[int64]int64  // address block ID → site ID
+	SiteClient         map[int64]int64  // site ID → client ID
+	ClientShortCode    map[int64]string // client ID → short code
+	SwitchSite         map[int64]int64  // switch ID → site ID
+	SwitchPortSwitch   map[int64]int64  // switch port ID → switch ID
+	PatchPanelSite     map[int64]int64  // patch panel ID → site ID
+	PatchPanelPortPanel map[int64]int64 // patch panel port ID → panel ID
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -60,9 +68,17 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
 			VLANSubnets:     make(map[int64]string),
-			InterfaceSite:   make(map[int64]int64),
-			VLANSite:        make(map[int64]int64),
-			DeviceSite:      make(map[int64]int64),
+			InterfaceSite:      make(map[int64]int64),
+			InterfaceDevice:    make(map[int64]int64),
+			VLANSite:           make(map[int64]int64),
+			DeviceSite:         make(map[int64]int64),
+			AddressBlockSite:   make(map[int64]int64),
+			SiteClient:         make(map[int64]int64),
+			ClientShortCode:    make(map[int64]string),
+			SwitchSite:         make(map[int64]int64),
+			SwitchPortSwitch:   make(map[int64]int64),
+			PatchPanelSite:     make(map[int64]int64),
+			PatchPanelPortPanel: make(map[int64]int64),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -71,6 +87,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/clients", &clients); err == nil {
 			for _, v := range clients {
 				r.Clients[v.ID] = v.Name
+				r.ClientShortCode[v.ID] = v.ShortCode
 			}
 		}
 
@@ -78,6 +95,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/sites", &sites); err == nil {
 			for _, v := range sites {
 				r.Sites[v.ID] = v.Name
+				r.SiteClient[v.ID] = v.ClientID
 			}
 		}
 
@@ -117,14 +135,34 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		var ifaces []models.DeviceInterface
 		if err := c.Get("/device-interfaces", &ifaces); err == nil {
 			for _, v := range ifaces {
-				label := v.Name
-				if hostname, ok := r.Devices[v.DeviceID]; ok {
-					label = hostname + " - " + label
-				}
-				r.Interfaces[v.ID] = label
+				// Build label: CLIENTSHORTCODE-SITE-HOSTNAME - ifaceName
+				prefix := ""
 				if siteID, ok := r.DeviceSite[v.DeviceID]; ok {
 					r.InterfaceSite[v.ID] = siteID
+					if clientID, ok2 := r.SiteClient[siteID]; ok2 {
+						if code, ok3 := r.ClientShortCode[clientID]; ok3 {
+							prefix = code
+						}
+					}
+					if siteName, ok2 := r.Sites[siteID]; ok2 {
+						if prefix != "" {
+							prefix += "-"
+						}
+						prefix += siteName
+					}
 				}
+				if hostname, ok := r.Devices[v.DeviceID]; ok {
+					if prefix != "" {
+						prefix += "-"
+					}
+					prefix += hostname
+				}
+				label := v.Name
+				if prefix != "" {
+					label = prefix + " - " + label
+				}
+				r.Interfaces[v.ID] = label
+				r.InterfaceDevice[v.ID] = v.DeviceID
 			}
 		}
 
@@ -132,6 +170,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/switches", &switches); err == nil {
 			for _, v := range switches {
 				r.Switches[v.ID] = v.Name
+				r.SwitchSite[v.ID] = v.SiteID
 			}
 		}
 
@@ -139,6 +178,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/patch-panels", &panels); err == nil {
 			for _, v := range panels {
 				r.PatchPanels[v.ID] = v.Name
+				r.PatchPanelSite[v.ID] = v.SiteID
 			}
 		}
 
@@ -157,6 +197,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		if err := c.Get("/address-blocks", &addressBlocks); err == nil {
 			for _, v := range addressBlocks {
 				r.AddressBlocks[v.ID] = v.Network
+				r.AddressBlockSite[v.ID] = v.SiteID
 			}
 		}
 
@@ -185,7 +226,11 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				if v.PortLabel != nil && *v.PortLabel != "" {
 					label = *v.PortLabel
 				}
+				if swName, ok := r.Switches[v.SwitchID]; ok {
+					label = swName + " - " + label
+				}
 				r.SwitchPorts[v.ID] = label
+				r.SwitchPortSwitch[v.ID] = v.SwitchID
 			}
 		}
 
@@ -196,7 +241,11 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				if v.PortLabel != nil && *v.PortLabel != "" {
 					label = *v.PortLabel
 				}
+				if panelName, ok := r.PatchPanels[v.PatchPanelID]; ok {
+					label = panelName + " - " + label
+				}
 				r.PatchPanelPorts[v.ID] = label
+				r.PatchPanelPortPanel[v.ID] = v.PatchPanelID
 			}
 		}
 

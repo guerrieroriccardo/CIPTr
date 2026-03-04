@@ -47,6 +47,20 @@ func init() {
 			{Key: "description", Label: "Description"},
 		},
 
+		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
+			if key != "address_block_id" || values["site_id"] == "" || Resolve == nil {
+				return items
+			}
+			siteID := mustInt64(values["site_id"])
+			filtered := make(map[int64]string)
+			for id, name := range items {
+				if Resolve.AddressBlockSite[id] == siteID {
+					filtered[id] = name
+				}
+			}
+			return filtered
+		},
+
 		List: func(client *apiclient.Client) ([]any, error) {
 			var items []models.VLAN
 			if err := client.Get("/vlans", &items); err != nil {
