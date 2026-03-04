@@ -178,7 +178,8 @@ CREATE TABLE IF NOT EXISTS devices (
 
     notes               TEXT,
     created_at          TIMESTAMPTZ DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ DEFAULT NOW()
+    updated_at          TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(site_id, hostname)
 );
 
 -- Trigger function to auto-update updated_at on any UPDATE.

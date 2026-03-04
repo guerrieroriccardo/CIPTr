@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -44,6 +45,21 @@ func scanDevice(row interface{ Scan(...any) error }) (models.Device, error) {
 		&d.Notes, &d.CreatedAt, &d.UpdatedAt,
 	)
 	return d, err
+}
+
+func (h *DeviceHandler) validateDevice(ctx context.Context, input *models.DeviceInput, excludeID int64) error {
+	var existing int64
+	err := h.db.QueryRowContext(ctx,
+		`SELECT id FROM devices WHERE site_id = $1 AND hostname = $2 AND id != $3 LIMIT 1`,
+		input.SiteID, input.Hostname, excludeID,
+	).Scan(&existing)
+	if err == nil {
+		return fmt.Errorf("hostname %q already exists in this site", input.Hostname)
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	return nil
 }
 
 // List handles GET /devices
@@ -163,6 +179,11 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if err := h.validateDevice(c.Request.Context(), &input, 0); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
 	status := "active"
 	if input.Status != nil {
 		status = *input.Status
@@ -207,6 +228,11 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 
 	var input models.DeviceInput
 	if err := c.ShouldBindJSON(&input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.validateDevice(c.Request.Context(), &input, id); err != nil {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
