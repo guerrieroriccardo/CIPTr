@@ -20,7 +20,7 @@ func init() {
 			{Title: "VLAN #", Width: 7},
 			{Title: "Name", Width: 20},
 			{Title: "Subnet", Width: 20},
-			{Title: "Gateway", Width: 16},
+			{Title: "Gateway", Width: 24},
 		},
 		ToRow: func(raw any) table.Row {
 			v := raw.(*models.VLAN)
@@ -30,7 +30,7 @@ func init() {
 				fmt.Sprintf("%d", v.VlanID),
 				v.Name,
 				derefStr(v.Subnet),
-				derefStr(v.Gateway),
+				lookupOptional(func() map[int64]string { return safeLookup().DeviceIPs }, v.GatewayDeviceIPID),
 			}
 		},
 		GetID: func(raw any) string {
@@ -43,22 +43,49 @@ func init() {
 			{Key: "vlan_id", Label: "VLAN Tag Number", Required: true},
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "subnet", Label: "Subnet (CIDR)"},
-			{Key: "gateway", Label: "Gateway"},
+			{Key: "gateway_device_ip_id", Label: "Gateway", PickerKey: "device_ips"},
 			{Key: "description", Label: "Description"},
 		},
 
 		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
-			if key != "address_block_id" || values["site_id"] == "" || Resolve == nil {
+			if Resolve == nil {
 				return items
 			}
-			siteID := mustInt64(values["site_id"])
-			filtered := make(map[int64]string)
-			for id, name := range items {
-				if Resolve.AddressBlockSite[id] == siteID {
-					filtered[id] = name
+			switch key {
+			case "address_block_id":
+				if values["site_id"] == "" {
+					return items
 				}
+				siteID := mustInt64(values["site_id"])
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.AddressBlockSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+
+			case "gateway_device_ip_id":
+				// Show only device IPs assigned to this VLAN.
+				// When editing, the VLAN ID is available via GetID context.
+				// Filter by VlanID FK on device_ips matching the current VLAN's DB id.
+				// We need the VLAN's own DB id — but during edit we don't have it in values.
+				// Instead, filter by site: show IPs from the same site.
+				if values["site_id"] == "" {
+					return items
+				}
+				siteID := mustInt64(values["site_id"])
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if ifaceID, ok := Resolve.DeviceIPInterface[id]; ok {
+						if Resolve.InterfaceSite[ifaceID] == siteID {
+							filtered[id] = name
+						}
+					}
+				}
+				return filtered
 			}
-			return filtered
+			return items
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
@@ -74,13 +101,13 @@ func init() {
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
 			input := models.VLANInput{
-				SiteID:         mustInt64(data["site_id"]),
-				AddressBlockID: int64Ptr(data["address_block_id"]),
-				VlanID:         mustInt64(data["vlan_id"]),
-				Name:           data["name"],
-				Subnet:         strPtr(data["subnet"]),
-				Gateway:        strPtr(data["gateway"]),
-				Description:    strPtr(data["description"]),
+				SiteID:            mustInt64(data["site_id"]),
+				AddressBlockID:    int64Ptr(data["address_block_id"]),
+				VlanID:            mustInt64(data["vlan_id"]),
+				Name:              data["name"],
+				Subnet:            strPtr(data["subnet"]),
+				GatewayDeviceIPID: int64Ptr(data["gateway_device_ip_id"]),
+				Description:       strPtr(data["description"]),
 			}
 			var created models.VLAN
 			err := client.Post("/vlans", input, &created)
@@ -88,13 +115,13 @@ func init() {
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
 			input := models.VLANInput{
-				SiteID:         mustInt64(data["site_id"]),
-				AddressBlockID: int64Ptr(data["address_block_id"]),
-				VlanID:         mustInt64(data["vlan_id"]),
-				Name:           data["name"],
-				Subnet:         strPtr(data["subnet"]),
-				Gateway:        strPtr(data["gateway"]),
-				Description:    strPtr(data["description"]),
+				SiteID:            mustInt64(data["site_id"]),
+				AddressBlockID:    int64Ptr(data["address_block_id"]),
+				VlanID:            mustInt64(data["vlan_id"]),
+				Name:              data["name"],
+				Subnet:            strPtr(data["subnet"]),
+				GatewayDeviceIPID: int64Ptr(data["gateway_device_ip_id"]),
+				Description:       strPtr(data["description"]),
 			}
 			var updated models.VLAN
 			err := client.Put("/vlans/"+id, input, &updated)

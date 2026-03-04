@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS vlans (
     vlan_id          INTEGER NOT NULL,  -- VLAN tag number, e.g. 10, 20, 100
     name             TEXT NOT NULL,     -- e.g. "Users LAN", "VOIP"
     subnet           CIDR,              -- e.g. '10.10.0.0/24'
-    gateway          INET,              -- e.g. '10.10.0.1'
+    gateway_device_ip_id BIGINT REFERENCES device_ips(id) ON DELETE SET NULL,
     description      TEXT,
     UNIQUE(site_id, vlan_id)
 );

@@ -43,6 +43,9 @@ type Resolver struct {
 	SwitchPortSwitch   map[int64]int64  // switch port ID → switch ID
 	PatchPanelSite     map[int64]int64  // patch panel ID → site ID
 	PatchPanelPortPanel map[int64]int64 // patch panel port ID → panel ID
+	DeviceIPs           map[int64]string // device IP ID → "10.0.0.1 (hostname - eth0)"
+	DeviceIPVLAN        map[int64]int64  // device IP ID → VLAN ID
+	DeviceIPInterface   map[int64]int64  // device IP ID → interface ID
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -79,6 +82,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			SwitchPortSwitch:   make(map[int64]int64),
 			PatchPanelSite:     make(map[int64]int64),
 			PatchPanelPortPanel: make(map[int64]int64),
+			DeviceIPs:           make(map[int64]string),
+			DeviceIPVLAN:        make(map[int64]int64),
+			DeviceIPInterface:   make(map[int64]int64),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -249,6 +255,21 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			}
 		}
 
+		var deviceIPs []models.DeviceIP
+		if err := c.Get("/device-ips", &deviceIPs); err == nil {
+			for _, v := range deviceIPs {
+				label := v.IPAddress
+				if ifaceName, ok := r.Interfaces[v.InterfaceID]; ok {
+					label = v.IPAddress + " (" + ifaceName + ")"
+				}
+				r.DeviceIPs[v.ID] = label
+				r.DeviceIPInterface[v.ID] = v.InterfaceID
+				if v.VlanID != nil {
+					r.DeviceIPVLAN[v.ID] = *v.VlanID
+				}
+			}
+		}
+
 		return ResolverReadyMsg{R: r}
 	}
 }
@@ -321,6 +342,8 @@ func (r *Resolver) Lookup(key string) map[int64]string {
 		return r.SwitchPorts
 	case "patch_panel_ports":
 		return r.PatchPanelPorts
+	case "device_ips":
+		return r.DeviceIPs
 	}
 	return nil
 }

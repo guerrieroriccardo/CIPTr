@@ -79,24 +79,24 @@ INSERT INTO address_blocks (site_id, network, description, notes) VALUES
   (6, '192.168.11.0/24', 'Farmacia 2', NULL);
 
 -- VLANs
-INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway, description) VALUES
+INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, description) VALUES
   -- Berpa HQ
-  (1, 1, 1,   'Management',    '10.10.0.0/24',  '10.10.0.1',  'Network devices management'),
-  (1, 1, 10,  'Servers',       '10.10.1.0/24',  '10.10.1.1',  'Server VLAN'),
-  (1, 1, 20,  'Users',         '10.10.2.0/24',  '10.10.2.1',  'Workstations'),
-  (1, 1, 30,  'VoIP',          '10.10.3.0/24',  '10.10.3.1',  'IP phones'),
-  (1, 1, 40,  'Guest WiFi',    '10.10.4.0/24',  '10.10.4.1',  'Guest wireless network'),
-  (1, 1, 99,  'Printers',      '10.10.9.0/24',  '10.10.9.1',  'Printers and MFPs'),
+  (1, 1, 1,   'Management',    '10.10.0.0/24',  'Network devices management'),
+  (1, 1, 10,  'Servers',       '10.10.1.0/24',  'Server VLAN'),
+  (1, 1, 20,  'Users',         '10.10.2.0/24',  'Workstations'),
+  (1, 1, 30,  'VoIP',          '10.10.3.0/24',  'IP phones'),
+  (1, 1, 40,  'Guest WiFi',    '10.10.4.0/24',  'Guest wireless network'),
+  (1, 1, 99,  'Printers',      '10.10.9.0/24',  'Printers and MFPs'),
   -- OMP factory
-  (3, 2, 1,   'Management',    '10.20.0.0/24',  '10.20.0.1',  NULL),
-  (3, 2, 10,  'Servers',       '10.20.1.0/24',  '10.20.1.1',  NULL),
-  (3, 2, 20,  'Office',        '10.20.2.0/24',  '10.20.2.1',  'Office workstations'),
-  (3, 2, 30,  'Production',    '10.20.3.0/24',  '10.20.3.1',  'Factory floor devices'),
+  (3, 2, 1,   'Management',    '10.20.0.0/24',  NULL),
+  (3, 2, 10,  'Servers',       '10.20.1.0/24',  NULL),
+  (3, 2, 20,  'Office',        '10.20.2.0/24',  'Office workstations'),
+  (3, 2, 30,  'Production',    '10.20.3.0/24',  'Factory floor devices'),
   -- Studio Rossi (flat)
-  (4, 3, 1,   'LAN',           '192.168.1.0/24', '192.168.1.1', 'Single flat network'),
+  (4, 3, 1,   'LAN',           '192.168.1.0/24', 'Single flat network'),
   -- Farmacie
-  (5, 4, 1,   'LAN',           '192.168.10.0/24', '192.168.10.1', NULL),
-  (6, 5, 1,   'LAN',           '192.168.11.0/24', '192.168.11.1', NULL);
+  (5, 4, 1,   'LAN',           '192.168.10.0/24', NULL),
+  (6, 5, 1,   'LAN',           '192.168.11.0/24', NULL);
 
 -- Switches
 INSERT INTO switches (site_id, name, model_id, ip_address, location, total_ports, notes) VALUES

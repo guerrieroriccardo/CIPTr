@@ -28,7 +28,6 @@ func NewVLANHandler(db *sql.DB) *VLANHandler {
 // validateVLAN checks:
 //  1. VLAN tag number is unique per site.
 //  2. If subnet and address_block_id are both set, the subnet must be within the block's network.
-//  3. If gateway and subnet are both set, the gateway must be within the subnet.
 func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput, excludeID int64) error {
 	// Check VLAN tag uniqueness within the site.
 	var existing int64
@@ -65,17 +64,6 @@ func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput,
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
-		}
-	}
-
-	// Validate gateway is within subnet.
-	if input.Gateway != nil && *input.Gateway != "" {
-		gw := net.ParseIP(*input.Gateway)
-		if gw == nil {
-			return fmt.Errorf("invalid gateway IP: %s", *input.Gateway)
-		}
-		if subnetNet != nil && !subnetNet.Contains(gw) {
-			return fmt.Errorf("gateway %s is not within subnet %s", *input.Gateway, *input.Subnet)
 		}
 	}
 
@@ -117,12 +105,12 @@ func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput,
 }
 
 // vlanSelectSQL is the base SELECT used by every read operation.
-const vlanSelectSQL = `SELECT id, site_id, address_block_id, vlan_id, name, subnet, gateway, description FROM vlans`
+const vlanSelectSQL = `SELECT id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description FROM vlans`
 
 // scanVLAN reads one row into a VLAN struct.
 func scanVLAN(row interface{ Scan(...any) error }) (models.VLAN, error) {
 	var v models.VLAN
-	err := row.Scan(&v.ID, &v.SiteID, &v.AddressBlockID, &v.VlanID, &v.Name, &v.Subnet, &v.Gateway, &v.Description)
+	err := row.Scan(&v.ID, &v.SiteID, &v.AddressBlockID, &v.VlanID, &v.Name, &v.Subnet, &v.GatewayDeviceIPID, &v.Description)
 	return v, err
 }
 
@@ -269,11 +257,11 @@ func (h *VLANHandler) Create(c *gin.Context) {
 	}
 
 	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway, description)
+		`INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway, description`,
+		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description`,
 		input.SiteID, input.AddressBlockID, input.VlanID, input.Name,
-		input.Subnet, input.Gateway, input.Description,
+		input.Subnet, input.GatewayDeviceIPID, input.Description,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -305,10 +293,10 @@ func (h *VLANHandler) Update(c *gin.Context) {
 
 	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
 		`UPDATE vlans SET site_id = $1, address_block_id = $2, vlan_id = $3, name = $4,
-		 subnet = $5, gateway = $6, description = $7 WHERE id = $8
-		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway, description`,
+		 subnet = $5, gateway_device_ip_id = $6, description = $7 WHERE id = $8
+		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description`,
 		input.SiteID, input.AddressBlockID, input.VlanID, input.Name,
-		input.Subnet, input.Gateway, input.Description, id,
+		input.Subnet, input.GatewayDeviceIPID, input.Description, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("vlan not found"))

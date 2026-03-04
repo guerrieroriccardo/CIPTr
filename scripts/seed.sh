@@ -102,22 +102,22 @@ post /address-blocks '{"site_id":6,"network":"192.168.11.0/24","description":"Fa
 # ── VLANs ──
 echo "==> VLANs..."
 # Berpa HQ
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":1,"name":"Management","subnet":"10.10.0.0/24","gateway":"10.10.0.1","description":"Network devices management"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":10,"name":"Servers","subnet":"10.10.1.0/24","gateway":"10.10.1.1","description":"Server VLAN"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":20,"name":"Users","subnet":"10.10.2.0/24","gateway":"10.10.2.1","description":"Workstations"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":30,"name":"VoIP","subnet":"10.10.3.0/24","gateway":"10.10.3.1","description":"IP phones"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":40,"name":"Guest WiFi","subnet":"10.10.4.0/24","gateway":"10.10.4.1","description":"Guest wireless network"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":99,"name":"Printers","subnet":"10.10.9.0/24","gateway":"10.10.9.1","description":"Printers and MFPs"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":1,"name":"Management","subnet":"10.10.0.0/24","description":"Network devices management"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":10,"name":"Servers","subnet":"10.10.1.0/24","description":"Server VLAN"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":20,"name":"Users","subnet":"10.10.2.0/24","description":"Workstations"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":30,"name":"VoIP","subnet":"10.10.3.0/24","description":"IP phones"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":40,"name":"Guest WiFi","subnet":"10.10.4.0/24","description":"Guest wireless network"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":99,"name":"Printers","subnet":"10.10.9.0/24","description":"Printers and MFPs"}'
 # OMP factory
-post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":1,"name":"Management","subnet":"10.20.0.0/24","gateway":"10.20.0.1"}'
-post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":10,"name":"Servers","subnet":"10.20.1.0/24","gateway":"10.20.1.1"}'
-post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":20,"name":"Office","subnet":"10.20.2.0/24","gateway":"10.20.2.1","description":"Office workstations"}'
-post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":30,"name":"Production","subnet":"10.20.3.0/24","gateway":"10.20.3.1","description":"Factory floor devices"}'
+post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":1,"name":"Management","subnet":"10.20.0.0/24"}'
+post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":10,"name":"Servers","subnet":"10.20.1.0/24"}'
+post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":20,"name":"Office","subnet":"10.20.2.0/24","description":"Office workstations"}'
+post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":30,"name":"Production","subnet":"10.20.3.0/24","description":"Factory floor devices"}'
 # Studio Rossi
-post /vlans '{"site_id":4,"address_block_id":3,"vlan_id":1,"name":"LAN","subnet":"192.168.1.0/24","gateway":"192.168.1.1","description":"Single flat network"}'
+post /vlans '{"site_id":4,"address_block_id":3,"vlan_id":1,"name":"LAN","subnet":"192.168.1.0/24","description":"Single flat network"}'
 # Farmacie
-post /vlans '{"site_id":5,"address_block_id":4,"vlan_id":1,"name":"LAN","subnet":"192.168.10.0/24","gateway":"192.168.10.1"}'
-post /vlans '{"site_id":6,"address_block_id":5,"vlan_id":1,"name":"LAN","subnet":"192.168.11.0/24","gateway":"192.168.11.1"}'
+post /vlans '{"site_id":5,"address_block_id":4,"vlan_id":1,"name":"LAN","subnet":"192.168.10.0/24"}'
+post /vlans '{"site_id":6,"address_block_id":5,"vlan_id":1,"name":"LAN","subnet":"192.168.11.0/24"}'
 
 # ── Switches (ports auto-created by API) ──
 echo "==> Switches..."
