@@ -123,14 +123,13 @@
 1. VLAN tag must be unique within the site
 2. Subnet must be valid CIDR
 3. Subnet must not overlap with other VLANs in the same site
-4. Gateway must be within subnet (if both provided)
-5. Subnet must fit entirely within address block (if both provided)
+4. Subnet must fit entirely within address block (if both provided)
 
 ```json
 {
   "site_id": 1, "address_block_id": 1, "vlan_id": 10,
-  "name": "Users", "subnet": "10.10.0.0/24", "gateway": "10.10.0.1",
-  "description": null
+  "name": "Users", "subnet": "10.10.0.0/24",
+  "gateway_device_ip_id": 7, "description": null
 }
 ```
 
@@ -142,7 +141,7 @@ Standard CRUD at `/manufacturers`. **Required:** `name` (globally unique).
 
 ### Categories
 
-Standard CRUD at `/categories`. **Required:** `name` (globally unique).
+Standard CRUD at `/categories`. **Required:** `name` (globally unique). Optional: `short_code`.
 
 ### Suppliers
 
@@ -271,6 +270,7 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
 **Required:** `site_id`, `name`
 **Unique:** `(site_id, name)`
 **Default:** `total_ports` = `24` if omitted
+**Auto:** Creating a switch auto-creates `total_ports` port rows (Port 1 … Port N)
 
 ```json
 {
@@ -309,6 +309,7 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
 **Required:** `site_id`, `name`
 **Unique:** `(site_id, name)`
 **Default:** `total_ports` = `24` if omitted
+**Auto:** Creating a patch panel auto-creates `total_ports` port rows (Port 1 … Port N)
 
 ---
 
@@ -349,7 +350,7 @@ These fields should use select/dropdown components instead of free text:
 | Site | `client_id` | GET /clients |
 | Location | `site_id` | GET /sites |
 | Address block | `site_id` | GET /sites |
-| VLAN | `site_id`, `address_block_id` | GET /sites, GET /address-blocks |
+| VLAN | `site_id`, `address_block_id`, `gateway_device_ip_id` | GET /sites, GET /address-blocks, GET /device-ips |
 | Device model | `manufacturer_id`, `category_id` | GET /manufacturers, GET /categories |
 | Device | `site_id`, `category_id`, `location_id`, `model_id`, `supplier_id` | respective endpoints |
 | Device | `status` | static: active, planned, inactive, decommissioned, storage |

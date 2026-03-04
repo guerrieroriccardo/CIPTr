@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS vlans (
     vlan_id          INTEGER NOT NULL,  -- VLAN tag number, e.g. 10, 20, 100
     name             TEXT NOT NULL,     -- e.g. "Users LAN", "VOIP"
     subnet           CIDR,              -- e.g. '10.10.0.0/24'
-    gateway_device_ip_id BIGINT REFERENCES device_ips(id) ON DELETE SET NULL,
+    gateway_device_ip_id BIGINT,          -- FK added after device_ips table exists
     description      TEXT,
     UNIQUE(site_id, vlan_id)
 );
@@ -226,6 +226,20 @@ CREATE TABLE IF NOT EXISTS device_ips (
     is_primary      BOOLEAN DEFAULT FALSE,  -- primary IP of the whole device
     notes           TEXT
 );
+
+-- Deferred FK: vlans.gateway_device_ip_id → device_ips (circular dep with device_ips.vlan_id → vlans).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_vlans_gateway_device_ip' AND table_name = 'vlans'
+    ) THEN
+        ALTER TABLE vlans
+            ADD CONSTRAINT fk_vlans_gateway_device_ip
+            FOREIGN KEY (gateway_device_ip_id) REFERENCES device_ips(id) ON DELETE SET NULL;
+    END IF;
+END
+$$;
 
 -- ============================================================
 -- PHYSICAL CONNECTIONS (NIC → switch port / patch panel port)
