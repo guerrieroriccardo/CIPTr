@@ -124,12 +124,15 @@
 2. Subnet must be valid CIDR
 3. Subnet must not overlap with other VLANs in the same site
 4. Subnet must fit entirely within address block (if both provided)
+5. DHCP start/end must be valid IPs within the subnet (if provided)
 
 ```json
 {
   "site_id": 1, "address_block_id": 1, "vlan_id": 10,
   "name": "Users", "subnet": "10.10.0.0/24",
-  "gateway_device_ip_id": 7, "description": null
+  "gateway_device_ip_id": 7,
+  "dhcp_start": "10.10.0.100", "dhcp_end": "10.10.0.200",
+  "description": null
 }
 ```
 

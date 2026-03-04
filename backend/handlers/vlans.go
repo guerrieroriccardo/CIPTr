@@ -101,16 +101,41 @@ func (h *VLANHandler) validateVLAN(ctx context.Context, input *models.VLANInput,
 		}
 	}
 
+	// Validate DHCP range is within subnet.
+	if subnetNet != nil {
+		if input.DHCPStart != nil && *input.DHCPStart != "" {
+			startIP := net.ParseIP(*input.DHCPStart)
+			if startIP == nil {
+				return fmt.Errorf("invalid DHCP start IP: %s", *input.DHCPStart)
+			}
+			if !subnetNet.Contains(startIP) {
+				return fmt.Errorf("DHCP start %s is not within subnet %s", *input.DHCPStart, *input.Subnet)
+			}
+		}
+		if input.DHCPEnd != nil && *input.DHCPEnd != "" {
+			endIP := net.ParseIP(*input.DHCPEnd)
+			if endIP == nil {
+				return fmt.Errorf("invalid DHCP end IP: %s", *input.DHCPEnd)
+			}
+			if !subnetNet.Contains(endIP) {
+				return fmt.Errorf("DHCP end %s is not within subnet %s", *input.DHCPEnd, *input.Subnet)
+			}
+		}
+	}
+
 	return nil
 }
 
+// vlanColumns lists the columns read by scanVLAN (used in SELECT and RETURNING).
+const vlanColumns = `id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, dhcp_start, dhcp_end, description`
+
 // vlanSelectSQL is the base SELECT used by every read operation.
-const vlanSelectSQL = `SELECT id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description FROM vlans`
+const vlanSelectSQL = `SELECT ` + vlanColumns + ` FROM vlans`
 
 // scanVLAN reads one row into a VLAN struct.
 func scanVLAN(row interface{ Scan(...any) error }) (models.VLAN, error) {
 	var v models.VLAN
-	err := row.Scan(&v.ID, &v.SiteID, &v.AddressBlockID, &v.VlanID, &v.Name, &v.Subnet, &v.GatewayDeviceIPID, &v.Description)
+	err := row.Scan(&v.ID, &v.SiteID, &v.AddressBlockID, &v.VlanID, &v.Name, &v.Subnet, &v.GatewayDeviceIPID, &v.DHCPStart, &v.DHCPEnd, &v.Description)
 	return v, err
 }
 
@@ -257,11 +282,11 @@ func (h *VLANHandler) Create(c *gin.Context) {
 	}
 
 	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description`,
+		`INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, dhcp_start, dhcp_end, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING `+vlanColumns,
 		input.SiteID, input.AddressBlockID, input.VlanID, input.Name,
-		input.Subnet, input.GatewayDeviceIPID, input.Description,
+		input.Subnet, input.GatewayDeviceIPID, input.DHCPStart, input.DHCPEnd, input.Description,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -293,10 +318,11 @@ func (h *VLANHandler) Update(c *gin.Context) {
 
 	v, err := scanVLAN(h.db.QueryRowContext(c.Request.Context(),
 		`UPDATE vlans SET site_id = $1, address_block_id = $2, vlan_id = $3, name = $4,
-		 subnet = $5, gateway_device_ip_id = $6, description = $7 WHERE id = $8
-		 RETURNING id, site_id, address_block_id, vlan_id, name, subnet, gateway_device_ip_id, description`,
+		 subnet = $5, gateway_device_ip_id = $6, dhcp_start = $7, dhcp_end = $8, description = $9
+		 WHERE id = $10
+		 RETURNING `+vlanColumns,
 		input.SiteID, input.AddressBlockID, input.VlanID, input.Name,
-		input.Subnet, input.GatewayDeviceIPID, input.Description, id,
+		input.Subnet, input.GatewayDeviceIPID, input.DHCPStart, input.DHCPEnd, input.Description, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("vlan not found"))

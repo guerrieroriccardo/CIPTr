@@ -10,6 +10,8 @@ type VLAN struct {
 	Name              string  `json:"name"`
 	Subnet            *string `json:"subnet"`               // e.g. "10.10.0.0/24"
 	GatewayDeviceIPID *int64  `json:"gateway_device_ip_id"` // FK to device_ips
+	DHCPStart         *string `json:"dhcp_start"`           // e.g. "10.10.0.100"
+	DHCPEnd           *string `json:"dhcp_end"`             // e.g. "10.10.0.200"
 	Description       *string `json:"description"`          // nullable
 }
 
@@ -21,5 +23,7 @@ type VLANInput struct {
 	Name              string  `json:"name"    binding:"required"`
 	Subnet            *string `json:"subnet"`
 	GatewayDeviceIPID *int64  `json:"gateway_device_ip_id"`
+	DHCPStart         *string `json:"dhcp_start"`
+	DHCPEnd           *string `json:"dhcp_end"`
 	Description       *string `json:"description"`
 }

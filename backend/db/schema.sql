@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS vlans (
     name             TEXT NOT NULL,     -- e.g. "Users LAN", "VOIP"
     subnet           CIDR,              -- e.g. '10.10.0.0/24'
     gateway_device_ip_id BIGINT,          -- FK added after device_ips table exists
+    dhcp_start       INET,               -- e.g. '10.10.0.100'
+    dhcp_end         INET,               -- e.g. '10.10.0.200'
     description      TEXT,
     UNIQUE(site_id, vlan_id)
 );

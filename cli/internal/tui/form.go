@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -89,19 +90,24 @@ func NewResourceForm(def *resource.Def, client *apiclient.Client, id string, ite
 	// Set focus on the correct field.
 	inputs[form.focus].Focus()
 
-	// Pre-populate for edit mode by reading current row values.
+	// Pre-populate for edit mode by marshaling the item to JSON and extracting
+	// values by field key. This avoids fragile column-title matching.
 	if item != nil {
-		row := def.ToRow(item)
-		// Row has ID as first column, fields start from index 1.
+		raw, _ := json.Marshal(item)
+		var m map[string]json.RawMessage
+		_ = json.Unmarshal(raw, &m)
 		for i, f := range def.Fields {
-			// Find matching column by checking field key against column titles.
-			for colIdx, col := range def.Columns {
-				if strings.EqualFold(col.Title, f.Label) || strings.EqualFold(col.Title, f.Key) {
-					if colIdx < len(row) {
-						inputs[i].SetValue(row[colIdx])
-					}
-					break
-				}
+			v, ok := m[f.Key]
+			if !ok || string(v) == "null" {
+				continue
+			}
+			// Try string first, then fall back to raw number/bool.
+			var s string
+			if json.Unmarshal(v, &s) == nil {
+				inputs[i].SetValue(s)
+			} else {
+				// Numeric or boolean — use raw JSON text (e.g. "42", "true").
+				inputs[i].SetValue(strings.Trim(string(v), `"`))
 			}
 		}
 	}

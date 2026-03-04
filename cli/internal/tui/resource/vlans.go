@@ -18,12 +18,20 @@ func init() {
 			{Title: "ID", Width: 6},
 			{Title: "Site", Width: 16},
 			{Title: "VLAN #", Width: 7},
-			{Title: "Name", Width: 20},
-			{Title: "Subnet", Width: 20},
-			{Title: "Gateway", Width: 24},
+			{Title: "Name", Width: 16},
+			{Title: "Subnet", Width: 18},
+			{Title: "Gateway", Width: 16},
+			{Title: "DHCP Range", Width: 22},
 		},
 		ToRow: func(raw any) table.Row {
 			v := raw.(*models.VLAN)
+			dhcp := ""
+			if v.DHCPStart != nil && *v.DHCPStart != "" {
+				dhcp = *v.DHCPStart
+				if v.DHCPEnd != nil && *v.DHCPEnd != "" {
+					dhcp += " - " + *v.DHCPEnd
+				}
+			}
 			return table.Row{
 				fmt.Sprintf("%d", v.ID),
 				SiteName(v.SiteID),
@@ -31,6 +39,7 @@ func init() {
 				v.Name,
 				derefStr(v.Subnet),
 				lookupOptional(func() map[int64]string { return safeLookup().DeviceIPs }, v.GatewayDeviceIPID),
+				dhcp,
 			}
 		},
 		GetID: func(raw any) string {
@@ -44,6 +53,8 @@ func init() {
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "subnet", Label: "Subnet (CIDR)"},
 			{Key: "gateway_device_ip_id", Label: "Gateway", PickerKey: "device_ips"},
+			{Key: "dhcp_start", Label: "DHCP Start"},
+			{Key: "dhcp_end", Label: "DHCP End"},
 			{Key: "description", Label: "Description"},
 		},
 
@@ -107,6 +118,8 @@ func init() {
 				Name:              data["name"],
 				Subnet:            strPtr(data["subnet"]),
 				GatewayDeviceIPID: int64Ptr(data["gateway_device_ip_id"]),
+				DHCPStart:         strPtr(data["dhcp_start"]),
+				DHCPEnd:           strPtr(data["dhcp_end"]),
 				Description:       strPtr(data["description"]),
 			}
 			var created models.VLAN
@@ -121,6 +134,8 @@ func init() {
 				Name:              data["name"],
 				Subnet:            strPtr(data["subnet"]),
 				GatewayDeviceIPID: int64Ptr(data["gateway_device_ip_id"]),
+				DHCPStart:         strPtr(data["dhcp_start"]),
+				DHCPEnd:           strPtr(data["dhcp_end"]),
 				Description:       strPtr(data["description"]),
 			}
 			var updated models.VLAN
