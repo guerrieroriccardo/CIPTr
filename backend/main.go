@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"os"
 
@@ -26,7 +28,18 @@ func main() {
 
 	log.Printf("database connected")
 
-	r := setupRouter(database)
+	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
+	if len(jwtSecret) == 0 {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			log.Fatalf("failed to generate JWT secret: %v", err)
+		}
+		jwtSecret = b
+		log.Printf("WARNING: no JWT_SECRET set, generated random secret: %s", hex.EncodeToString(b))
+		log.Printf("Set JWT_SECRET env var to persist tokens across restarts")
+	}
+
+	r := setupRouter(database, jwtSecret)
 
 	log.Printf("starting server on :%s", port)
 	if err := r.Run(":" + port); err != nil {

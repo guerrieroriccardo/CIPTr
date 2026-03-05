@@ -9,7 +9,7 @@ import (
 	"github.com/guerrieroriccardo/CIPTr/backend/handlers"
 )
 
-func setupRouter(database *sql.DB) *gin.Engine {
+func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	r := gin.Default()
 
 	// Trust only the loopback interface (reverse proxy runs on same host or Docker network).
@@ -19,9 +19,11 @@ func setupRouter(database *sql.DB) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: false,
 	}))
+
+	authHandler := handlers.NewAuthHandler(database, jwtSecret)
 
 	clientHandler      := handlers.NewClientHandler(database)
 	siteHandler        := handlers.NewSiteHandler(database)
@@ -43,6 +45,12 @@ func setupRouter(database *sql.DB) *gin.Engine {
 
 	api := r.Group("/api/v1")
 	api.GET("/health", handlers.Health)
+	api.POST("/login", authHandler.Login)
+	api.POST("/register", authHandler.Register)
+
+	// All routes below require authentication.
+	api.Use(handlers.AuthRequired(jwtSecret))
+	api.GET("/me", authHandler.Me)
 
 	clients := api.Group("/clients")
 	{
