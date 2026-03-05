@@ -42,7 +42,7 @@ func init() {
 			{Key: "port_number", Label: "Port Number", Required: true},
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "speed", Label: "Speed"},
-			{Key: "is_uplink", Label: "Uplink (true/false)"},
+			{Key: "is_uplink", Label: "Uplink", PickerOptions: []string{"true", "false"}},
 			{Key: "notes", Label: "Notes"},
 		},
 

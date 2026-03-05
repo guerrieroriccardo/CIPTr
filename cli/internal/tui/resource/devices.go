@@ -58,15 +58,30 @@ func init() {
 		},
 
 		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
-			if Resolve == nil || values["site_id"] == "" {
+			if Resolve == nil {
 				return items
 			}
-			siteID := mustInt64(values["site_id"])
 			switch key {
 			case "location_id":
+				if values["site_id"] == "" {
+					return items
+				}
+				siteID := mustInt64(values["site_id"])
 				filtered := make(map[int64]string)
 				for id, name := range items {
 					if Resolve.LocationSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+			case "model_id":
+				if values["category_id"] == "" {
+					return items
+				}
+				catID := mustInt64(values["category_id"])
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.DeviceModelCategory[id] == catID {
 						filtered[id] = name
 					}
 				}

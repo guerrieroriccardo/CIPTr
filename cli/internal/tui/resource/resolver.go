@@ -47,6 +47,7 @@ type Resolver struct {
 	DeviceIPs           map[int64]string // device IP ID → "10.0.0.1 (hostname - eth0)"
 	DeviceIPVLAN        map[int64]int64  // device IP ID → VLAN ID
 	DeviceIPInterface   map[int64]int64  // device IP ID → interface ID
+	DeviceModelCategory map[int64]int64  // device model ID → category ID
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -87,6 +88,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceIPs:           make(map[int64]string),
 			DeviceIPVLAN:        make(map[int64]int64),
 			DeviceIPInterface:   make(map[int64]int64),
+			DeviceModelCategory: make(map[int64]int64),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -217,6 +219,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 					label = mfr + " " + label
 				}
 				r.DeviceModels[v.ID] = label
+				r.DeviceModelCategory[v.ID] = v.CategoryID
 			}
 		}
 
