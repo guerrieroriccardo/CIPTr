@@ -31,10 +31,12 @@ func NewApp(initial Screen, client *apiclient.Client) App {
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(
-		a.nav.Current().Init(),
-		resource.InitResolver(a.client),
-	)
+	cmds := []tea.Cmd{a.nav.Current().Init()}
+	// Only init resolver if we're already authenticated (not on login screen).
+	if a.client.Token != "" {
+		cmds = append(cmds, resource.InitResolver(a.client))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -60,6 +62,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 		}
 		return a, tea.Batch(msg.Screen.Init(), sizeCmd)
+
+	case loginSuccessMsg:
+		// Replace login screen with main menu and init resolver.
+		a.nav = NavStack{}
+		menu := NewMenu()
+		a.nav.Push(menu)
+		return a, tea.Batch(menu.Init(), resource.InitResolver(a.client))
 
 	case resource.ResolverReadyMsg:
 		resource.Resolve = msg.R

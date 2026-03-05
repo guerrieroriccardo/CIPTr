@@ -1,0 +1,132 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/auth"
+)
+
+type loginSuccessMsg struct{}
+type loginErrorMsg struct{ err error }
+
+type LoginScreen struct {
+	client   *apiclient.Client
+	username textinput.Model
+	password textinput.Model
+	focus    int // 0=username, 1=password
+	err      error
+	loading  bool
+}
+
+func NewLoginScreen(client *apiclient.Client) *LoginScreen {
+	u := textinput.New()
+	u.Placeholder = "username"
+	u.Focus()
+	u.CharLimit = 64
+	u.Width = 30
+
+	p := textinput.New()
+	p.Placeholder = "password"
+	p.EchoMode = textinput.EchoPassword
+	p.EchoCharacter = '*'
+	p.CharLimit = 128
+	p.Width = 30
+
+	return &LoginScreen{
+		client:   client,
+		username: u,
+		password: p,
+	}
+}
+
+func (l *LoginScreen) Title() string { return "Login" }
+
+func (l *LoginScreen) Init() tea.Cmd { return textinput.Blink }
+
+func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "tab", "down":
+			if l.focus == 0 {
+				l.focus = 1
+				l.username.Blur()
+				l.password.Focus()
+			}
+			return l, nil
+		case "shift+tab", "up":
+			if l.focus == 1 {
+				l.focus = 0
+				l.password.Blur()
+				l.username.Focus()
+			}
+			return l, nil
+		case "enter":
+			if l.loading {
+				return l, nil
+			}
+			u := strings.TrimSpace(l.username.Value())
+			p := l.password.Value()
+			if u == "" || p == "" {
+				l.err = fmt.Errorf("username and password are required")
+				return l, nil
+			}
+			l.loading = true
+			l.err = nil
+			client := l.client
+			return l, func() tea.Msg {
+				token, err := client.Login(u, p)
+				if err != nil {
+					return loginErrorMsg{err: err}
+				}
+				client.Token = token
+				_ = auth.SaveToken(token)
+				return loginSuccessMsg{}
+			}
+		}
+
+	case loginSuccessMsg:
+		l.loading = false
+		return l, func() tea.Msg {
+			return PushScreenMsg{Screen: NewMenu()}
+		}
+
+	case loginErrorMsg:
+		l.loading = false
+		l.err = msg.err
+		return l, nil
+	}
+
+	var cmd tea.Cmd
+	if l.focus == 0 {
+		l.username, cmd = l.username.Update(msg)
+	} else {
+		l.password, cmd = l.password.Update(msg)
+	}
+	return l, cmd
+}
+
+func (l *LoginScreen) View() string {
+	var b strings.Builder
+	b.WriteString(TitleStyle.Render("CIPTr Login"))
+	b.WriteString("\n\n")
+	b.WriteString("Username: " + l.username.View())
+	b.WriteString("\n")
+	b.WriteString("Password: " + l.password.View())
+	b.WriteString("\n\n")
+
+	if l.loading {
+		b.WriteString("Authenticating...")
+	} else if l.err != nil {
+		b.WriteString(ErrorStyle.Render(l.err.Error()))
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(HelpStyle.Render("tab: next field • enter: login • ctrl+c: quit"))
+	return b.String()
+}

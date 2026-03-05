@@ -11,6 +11,7 @@ import (
 // Client wraps net/http to call the CIPTr REST API.
 type Client struct {
 	BaseURL    string
+	Token      string
 	HTTPClient *http.Client
 }
 
@@ -69,6 +70,9 @@ func (c *Client) do(method, path string, body any, result any) error {
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -97,4 +101,19 @@ func (c *Client) do(method, path string, body any, result any) error {
 	}
 
 	return nil
+}
+
+// Login authenticates and returns the JWT token.
+func (c *Client) Login(username, password string) (string, error) {
+	var result struct {
+		Token string `json:"token"`
+	}
+	err := c.do(http.MethodPost, "/login", map[string]string{
+		"username": username,
+		"password": password,
+	}, &result)
+	if err != nil {
+		return "", err
+	}
+	return result.Token, nil
 }

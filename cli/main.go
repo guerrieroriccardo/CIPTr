@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/auth"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui"
 
 	// Register resource definitions.
@@ -21,8 +22,15 @@ func main() {
 
 	client := apiclient.New(apiURL)
 
-	menu := tui.NewMenu()
-	app := tui.NewApp(menu, client)
+	// Load saved token. If valid, go straight to menu; otherwise show login.
+	var initial tui.Screen
+	if token := auth.LoadToken(); token != "" {
+		client.Token = token
+		initial = tui.NewMenu()
+	} else {
+		initial = tui.NewLoginScreen(client)
+	}
+	app := tui.NewApp(initial, client)
 
 	p := tea.NewProgram(app, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
