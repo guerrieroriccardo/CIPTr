@@ -102,6 +102,9 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			return rt, func() tea.Msg { return PopScreenMsg{} }
 		case "n":
+			if rt.def.Create == nil {
+				break
+			}
 			// New: push create form
 			return rt, func() tea.Msg {
 				return PushScreenMsg{Screen: NewResourceForm(rt.def, rt.client, "", nil)}
@@ -115,6 +118,9 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if rt.onSelect != nil {
 						return rt, rt.onSelect(item)
 					}
+					if rt.def.Update == nil {
+						break
+					}
 					id := rt.def.GetID(item)
 					return rt, func() tea.Msg {
 						return PushScreenMsg{Screen: NewResourceForm(rt.def, rt.client, id, item)}
@@ -122,6 +128,9 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "e":
+			if rt.def.Update == nil {
+				break
+			}
 			// Edit selected item (always available, needed in browse mode)
 			if len(rt.items) > 0 {
 				idx := rt.table.Cursor()
@@ -134,6 +143,9 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "d":
+			if rt.def.Delete == nil {
+				break
+			}
 			// Delete selected item
 			if len(rt.items) > 0 {
 				idx := rt.table.Cursor()

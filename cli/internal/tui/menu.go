@@ -55,6 +55,7 @@ func NewMenu() Menu {
 		MenuItem{name: "All Switch Ports", desc: "List all switch ports", key: "switch_ports"},
 		MenuItem{name: "All Patch Panels", desc: "List all patch panels", key: "patch_panels"},
 		MenuItem{name: "All Patch Panel Ports", desc: "List all patch panel ports", key: "patch_panel_ports"},
+		MenuItem{name: "Audit Logs", desc: "View recent activity log", key: "audit_logs"},
 	}
 
 	delegate := list.NewDefaultDelegate()
