@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -123,6 +124,7 @@ func (h *DeviceModelHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "device_models", dm.ID, fmt.Sprintf("Created device model '%s'", dm.ModelName))
 	ok(c, http.StatusCreated, dm)
 }
 
@@ -157,6 +159,7 @@ func (h *DeviceModelHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "device_models", id, fmt.Sprintf("Updated device model '%s'", dm.ModelName))
 	ok(c, http.StatusOK, dm)
 }
 
@@ -182,5 +185,6 @@ func (h *DeviceModelHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "device_models", id, fmt.Sprintf("Deleted device model #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

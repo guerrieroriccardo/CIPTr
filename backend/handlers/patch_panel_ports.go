@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -134,6 +135,7 @@ func (h *PatchPanelPortHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "patch_panel_ports", ppp.ID, fmt.Sprintf("Created patch panel port #%d", ppp.PortNumber))
 	ok(c, http.StatusCreated, ppp)
 }
 
@@ -166,6 +168,7 @@ func (h *PatchPanelPortHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "patch_panel_ports", id, fmt.Sprintf("Updated patch panel port #%d", ppp.PortNumber))
 	ok(c, http.StatusOK, ppp)
 }
 
@@ -190,5 +193,6 @@ func (h *PatchPanelPortHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "patch_panel_ports", id, fmt.Sprintf("Deleted patch panel port #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

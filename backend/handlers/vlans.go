@@ -293,6 +293,7 @@ func (h *VLANHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "vlans", v.ID, fmt.Sprintf("Created VLAN '%s'", v.Name))
 	ok(c, http.StatusCreated, v)
 }
 
@@ -333,6 +334,7 @@ func (h *VLANHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "vlans", id, fmt.Sprintf("Updated VLAN '%s'", v.Name))
 	ok(c, http.StatusOK, v)
 }
 
@@ -358,5 +360,6 @@ func (h *VLANHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "vlans", id, fmt.Sprintf("Deleted VLAN #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

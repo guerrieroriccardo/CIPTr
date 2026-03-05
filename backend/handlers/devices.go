@@ -214,6 +214,7 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "devices", d.ID, fmt.Sprintf("Created device '%s'", d.Hostname))
 	ok(c, http.StatusCreated, d)
 }
 
@@ -271,6 +272,7 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "devices", id, fmt.Sprintf("Updated device '%s'", d.Hostname))
 	ok(c, http.StatusOK, d)
 }
 
@@ -296,5 +298,6 @@ func (h *DeviceHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "devices", id, fmt.Sprintf("Deleted device #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

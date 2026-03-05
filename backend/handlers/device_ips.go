@@ -196,6 +196,7 @@ func (h *DeviceIPHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "device_ips", d.ID, fmt.Sprintf("Created device IP '%s'", d.IPAddress))
 	ok(c, http.StatusCreated, d)
 }
 
@@ -234,6 +235,7 @@ func (h *DeviceIPHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "device_ips", id, fmt.Sprintf("Updated device IP '%s'", d.IPAddress))
 	ok(c, http.StatusOK, d)
 }
 
@@ -258,5 +260,6 @@ func (h *DeviceIPHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "device_ips", id, fmt.Sprintf("Deleted device IP #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

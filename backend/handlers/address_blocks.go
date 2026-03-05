@@ -162,6 +162,7 @@ func (h *AddressBlockHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "address_blocks", ab.ID, fmt.Sprintf("Created address block '%s'", ab.Network))
 	ok(c, http.StatusCreated, ab)
 }
 
@@ -199,6 +200,7 @@ func (h *AddressBlockHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "address_blocks", id, fmt.Sprintf("Updated address block '%s'", ab.Network))
 	ok(c, http.StatusOK, ab)
 }
 
@@ -224,5 +226,6 @@ func (h *AddressBlockHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "address_blocks", id, fmt.Sprintf("Deleted address block #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

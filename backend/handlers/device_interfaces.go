@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -137,6 +138,7 @@ func (h *DeviceInterfaceHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "device_interfaces", di.ID, fmt.Sprintf("Created interface '%s'", di.Name))
 	ok(c, http.StatusCreated, di)
 }
 
@@ -170,6 +172,7 @@ func (h *DeviceInterfaceHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "device_interfaces", id, fmt.Sprintf("Updated interface '%s'", di.Name))
 	ok(c, http.StatusOK, di)
 }
 
@@ -195,5 +198,6 @@ func (h *DeviceInterfaceHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "device_interfaces", id, fmt.Sprintf("Deleted interface #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

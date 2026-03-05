@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -93,6 +94,7 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "categories", cat.ID, fmt.Sprintf("Created category '%s'", cat.Name))
 	ok(c, http.StatusCreated, cat)
 }
 
@@ -124,6 +126,7 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "categories", id, fmt.Sprintf("Updated category '%s'", cat.Name))
 	ok(c, http.StatusOK, cat)
 }
 
@@ -148,5 +151,6 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "categories", id, fmt.Sprintf("Deleted category #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

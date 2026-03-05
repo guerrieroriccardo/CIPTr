@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -136,6 +137,7 @@ func (h *LocationHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "locations", l.ID, fmt.Sprintf("Created location '%s'", l.Name))
 	ok(c, http.StatusCreated, l)
 }
 
@@ -168,6 +170,7 @@ func (h *LocationHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "locations", id, fmt.Sprintf("Updated location '%s'", l.Name))
 	ok(c, http.StatusOK, l)
 }
 
@@ -193,5 +196,6 @@ func (h *LocationHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "locations", id, fmt.Sprintf("Deleted location #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

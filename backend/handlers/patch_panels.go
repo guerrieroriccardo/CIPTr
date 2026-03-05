@@ -171,6 +171,7 @@ func (h *PatchPanelHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "patch_panels", pp.ID, fmt.Sprintf("Created patch panel '%s'", pp.Name))
 	ok(c, http.StatusCreated, pp)
 }
 
@@ -208,6 +209,7 @@ func (h *PatchPanelHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "patch_panels", id, fmt.Sprintf("Updated patch panel '%s'", pp.Name))
 	ok(c, http.StatusOK, pp)
 }
 
@@ -233,5 +235,6 @@ func (h *PatchPanelHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "patch_panels", id, fmt.Sprintf("Deleted patch panel #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

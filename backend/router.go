@@ -42,6 +42,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	switchPortHandler       := handlers.NewSwitchPortHandler(database)
 	patchPanelHandler      := handlers.NewPatchPanelHandler(database)
 	patchPanelPortHandler  := handlers.NewPatchPanelPortHandler(database)
+	auditHandler           := handlers.NewAuditHandler(database)
 
 	api := r.Group("/api/v1")
 	api.GET("/health", handlers.Health)
@@ -217,6 +218,8 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		vlans.PUT("/:id", vlanHandler.Update)
 		vlans.DELETE("/:id", vlanHandler.Delete)
 	}
+
+	api.GET("/audit-logs", auditHandler.List)
 
 	return r
 }

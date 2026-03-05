@@ -272,6 +272,24 @@ CREATE TABLE IF NOT EXISTS device_connections (
 );
 
 -- ============================================================
+-- AUDIT LOG
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    username    TEXT NOT NULL,
+    action      TEXT NOT NULL,
+    resource    TEXT NOT NULL,
+    resource_id BIGINT,
+    detail      TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user     ON audit_logs(user_id);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 

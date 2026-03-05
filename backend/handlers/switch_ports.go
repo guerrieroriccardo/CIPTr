@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -134,6 +135,7 @@ func (h *SwitchPortHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "switch_ports", sp.ID, fmt.Sprintf("Created switch port #%d", sp.PortNumber))
 	ok(c, http.StatusCreated, sp)
 }
 
@@ -166,6 +168,7 @@ func (h *SwitchPortHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "switch_ports", id, fmt.Sprintf("Updated switch port #%d", sp.PortNumber))
 	ok(c, http.StatusOK, sp)
 }
 
@@ -190,5 +193,6 @@ func (h *SwitchPortHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "switch_ports", id, fmt.Sprintf("Deleted switch port #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -109,6 +110,7 @@ func (h *ClientHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "clients", cl.ID, fmt.Sprintf("Created client '%s'", cl.Name))
 	ok(c, http.StatusCreated, cl)
 }
 
@@ -143,6 +145,7 @@ func (h *ClientHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "clients", id, fmt.Sprintf("Updated client '%s'", cl.Name))
 	ok(c, http.StatusOK, cl)
 }
 
@@ -170,5 +173,6 @@ func (h *ClientHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "clients", id, fmt.Sprintf("Deleted client #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

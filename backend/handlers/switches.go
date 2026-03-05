@@ -171,6 +171,7 @@ func (h *SwitchHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "switches", s.ID, fmt.Sprintf("Created switch '%s'", s.Name))
 	ok(c, http.StatusCreated, s)
 }
 
@@ -208,6 +209,7 @@ func (h *SwitchHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "switches", id, fmt.Sprintf("Updated switch '%s'", s.Name))
 	ok(c, http.StatusOK, s)
 }
 
@@ -233,5 +235,6 @@ func (h *SwitchHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "switches", id, fmt.Sprintf("Deleted switch #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }

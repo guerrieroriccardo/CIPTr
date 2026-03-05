@@ -157,6 +157,7 @@ func (h *DeviceConnectionHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "create", "device_connections", dc.ID, fmt.Sprintf("Created connection #%d", dc.ID))
 	ok(c, http.StatusCreated, dc)
 }
 
@@ -190,6 +191,7 @@ func (h *DeviceConnectionHandler) Update(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "update", "device_connections", id, fmt.Sprintf("Updated connection #%d", id))
 	ok(c, http.StatusOK, dc)
 }
 
@@ -214,5 +216,6 @@ func (h *DeviceConnectionHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "delete", "device_connections", id, fmt.Sprintf("Deleted connection #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
 }
