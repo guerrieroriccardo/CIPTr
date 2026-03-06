@@ -16,11 +16,12 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Hostname", Width: 22},
+			{Title: "Hostname", Width: 20},
 			{Title: "Status", Width: 10},
 			{Title: "Category", Width: 14},
-			{Title: "Site", Width: 16},
-			{Title: "OS", Width: 14},
+			{Title: "Site", Width: 14},
+			{Title: "Location", Width: 14},
+			{Title: "OS", Width: 12},
 		},
 		ToRow: func(raw any) table.Row {
 			d := raw.(*models.Device)
@@ -30,6 +31,7 @@ func init() {
 				d.Status,
 				CategoryName(d.CategoryID),
 				SiteName(d.SiteID),
+				LocationName(d.LocationID),
 				derefStr(d.Os),
 			}
 		},
