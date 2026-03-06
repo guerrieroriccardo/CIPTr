@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"errors"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/auth"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
 )
 
@@ -62,6 +65,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 		}
 		return a, tea.Batch(msg.Screen.Init(), sizeCmd)
+
+	case dataErrorMsg:
+		if errors.Is(msg.err, apiclient.ErrUnauthorized) {
+			return a.forceLogin()
+		}
+		return a.updateCurrent(msg)
+
+	case formErrorMsg:
+		if errors.Is(msg.err, apiclient.ErrUnauthorized) {
+			return a.forceLogin()
+		}
+		return a.updateCurrent(msg)
 
 	case loginSuccessMsg:
 		// Replace login screen with main menu and init resolver.
@@ -126,6 +141,16 @@ func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
 	return a, func() tea.Msg {
 		return PushScreenMsg{Screen: screen}
 	}
+}
+
+// forceLogin clears the expired token and replaces the nav stack with the login screen.
+func (a App) forceLogin() (tea.Model, tea.Cmd) {
+	a.client.Token = ""
+	_ = auth.ClearToken()
+	a.nav = NavStack{}
+	login := NewLoginScreen(a.client)
+	a.nav.Push(login)
+	return a, login.Init()
 }
 
 // updateCurrent forwards a message to the current screen and returns the result.

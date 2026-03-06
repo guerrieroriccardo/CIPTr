@@ -3,10 +3,14 @@ package apiclient
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 )
+
+// ErrUnauthorized is returned when the API responds with 401.
+var ErrUnauthorized = errors.New("unauthorized")
 
 // Client wraps net/http to call the CIPTr REST API.
 type Client struct {
@@ -83,6 +87,10 @@ func (c *Client) do(method, path string, body any, result any) error {
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return ErrUnauthorized
 	}
 
 	var env envelope
