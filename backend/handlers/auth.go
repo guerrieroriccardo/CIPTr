@@ -95,3 +95,43 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	username, _ := c.Get("username")
 	ok(c, http.StatusOK, gin.H{"id": userID, "username": username})
 }
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var input models.ChangePasswordInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+
+	var hash string
+	err := h.db.QueryRowContext(c.Request.Context(),
+		`SELECT password_hash FROM users WHERE id = $1`, userID,
+	).Scan(&hash)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(input.OldPassword)); err != nil {
+		fail(c, http.StatusUnauthorized, fmt.Errorf("old password is incorrect"))
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	_, err = h.db.ExecContext(c.Request.Context(),
+		`UPDATE users SET password_hash = $1 WHERE id = $2`, string(newHash), userID,
+	)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	ok(c, http.StatusOK, gin.H{"message": "password changed"})
+}

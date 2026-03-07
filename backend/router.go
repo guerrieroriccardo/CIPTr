@@ -52,6 +52,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	// All routes below require authentication.
 	api.Use(handlers.AuthRequired(jwtSecret))
 	api.GET("/me", authHandler.Me)
+	api.PUT("/change-password", authHandler.ChangePassword)
 
 	clients := api.Group("/clients")
 	{

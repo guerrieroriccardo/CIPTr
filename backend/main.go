@@ -2,9 +2,13 @@ package main
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"log"
+	"math/big"
 	"os"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/guerrieroriccardo/CIPTr/backend/db"
 )
@@ -28,6 +32,8 @@ func main() {
 
 	log.Printf("database connected")
 
+	ensureDefaultAdmin(database)
+
 	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
 	if len(jwtSecret) == 0 {
 		b := make([]byte, 32)
@@ -45,4 +51,48 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+// ensureDefaultAdmin creates an admin user with random credentials if no users exist.
+func ensureDefaultAdmin(database *sql.DB) {
+	var count int
+	if err := database.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil {
+		log.Printf("WARNING: could not check users table: %v", err)
+		return
+	}
+	if count > 0 {
+		return
+	}
+
+	password := randomPassword(16)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatalf("failed to hash default admin password: %v", err)
+	}
+
+	_, err = database.Exec(
+		`INSERT INTO users (username, password_hash, is_admin) VALUES ($1, $2, true)`,
+		"admin", string(hash),
+	)
+	if err != nil {
+		log.Printf("WARNING: could not create default admin: %v", err)
+		return
+	}
+
+	log.Println("══════════════════════════════════════════════════")
+	log.Println("  FIRST BOOT — default admin account created")
+	log.Printf("  Username: admin")
+	log.Printf("  Password: %s", password)
+	log.Println("  Change this password after first login!")
+	log.Println("══════════════════════════════════════════════════")
+}
+
+func randomPassword(length int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		result[i] = chars[n.Int64()]
+	}
+	return string(result)
 }
