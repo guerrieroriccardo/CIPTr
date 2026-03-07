@@ -278,6 +278,95 @@ func scopedPatchPanelPorts(panelID string) *resource.Def {
 }
 
 // ---------------------------------------------------------------------------
+// Scoped Defs for "All" tables — show associated items on enter
+// ---------------------------------------------------------------------------
+
+func scopedDevicesByCategory(catID string) *resource.Def {
+	base := *resource.Registry["devices"]
+	base.Defaults = map[string]string{"category_id": catID, "status": "planned"}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.Device
+		if err := c.Get("/devices?category_id="+catID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
+func scopedDevicesBySupplier(supplierID string) *resource.Def {
+	base := *resource.Registry["devices"]
+	base.Defaults = map[string]string{"supplier_id": supplierID, "status": "planned"}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.Device
+		if err := c.Get("/devices?supplier_id="+supplierID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
+func scopedDevicesByModel(modelID string) *resource.Def {
+	base := *resource.Registry["devices"]
+	base.Defaults = map[string]string{"model_id": modelID, "status": "planned"}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.Device
+		if err := c.Get("/devices?model_id="+modelID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
+func scopedDevicesByLocation(locationID string) *resource.Def {
+	base := *resource.Registry["devices"]
+	base.Defaults = map[string]string{"location_id": locationID, "status": "planned"}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.Device
+		if err := c.Get("/devices?location_id="+locationID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
+func scopedModelsByManufacturer(mfgID string) *resource.Def {
+	base := *resource.Registry["device_models"]
+	base.Defaults = map[string]string{"manufacturer_id": mfgID}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.DeviceModel
+		if err := c.Get("/device-models?manufacturer_id="+mfgID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
+// ---------------------------------------------------------------------------
 // OnSelect callback factories — define what happens on enter at each level
 // ---------------------------------------------------------------------------
 
@@ -397,6 +486,70 @@ func newDeviceScopeMenu(device *models.Device, apiClient *apiclient.Client) Scop
 				return NewResourceTableWithSelect(scopedInterfaces(deviceID), apiClient, interfaceDrillDown(apiClient))
 			}},
 		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// OnSelect callbacks for "All" lookup tables
+// ---------------------------------------------------------------------------
+
+func categoryDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		cat := raw.(*models.Category)
+		catID := fmt.Sprintf("%d", cat.ID)
+		def := scopedDevicesByCategory(catID)
+		screen := NewResourceTable(def, apiClient)
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, cat.Name + " Devices"}}
+		}
+	}
+}
+
+func supplierDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		sup := raw.(*models.Supplier)
+		supID := fmt.Sprintf("%d", sup.ID)
+		def := scopedDevicesBySupplier(supID)
+		screen := NewResourceTable(def, apiClient)
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, sup.Name + " Devices"}}
+		}
+	}
+}
+
+func deviceModelDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		dm := raw.(*models.DeviceModel)
+		dmID := fmt.Sprintf("%d", dm.ID)
+		def := scopedDevicesByModel(dmID)
+		screen := NewResourceTable(def, apiClient)
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, dm.ModelName + " Devices"}}
+		}
+	}
+}
+
+func manufacturerDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		mfg := raw.(*models.Manufacturer)
+		mfgID := fmt.Sprintf("%d", mfg.ID)
+		def := scopedModelsByManufacturer(mfgID)
+		screen := NewResourceTableWithSelect(def, apiClient, deviceModelDrillDown(apiClient))
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, mfg.Name + " Models"}}
+		}
+	}
+}
+
+func locationDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		loc := raw.(*models.Location)
+		locID := fmt.Sprintf("%d", loc.ID)
+		def := scopedDevicesByLocation(locID)
+		screen := NewResourceTable(def, apiClient)
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, loc.Name + " Devices"}}
+		}
 	}
 }
 

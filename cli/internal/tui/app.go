@@ -140,7 +140,22 @@ func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	screen := NewResourceTable(def, a.client)
+	// For lookup tables, enter drills down to show associated entries.
+	var screen ResourceTable
+	switch key {
+	case "categories":
+		screen = NewResourceTableWithSelect(def, a.client, categoryDrillDown(a.client))
+	case "suppliers":
+		screen = NewResourceTableWithSelect(def, a.client, supplierDrillDown(a.client))
+	case "device_models":
+		screen = NewResourceTableWithSelect(def, a.client, deviceModelDrillDown(a.client))
+	case "manufacturers":
+		screen = NewResourceTableWithSelect(def, a.client, manufacturerDrillDown(a.client))
+	case "locations":
+		screen = NewResourceTableWithSelect(def, a.client, locationDrillDown(a.client))
+	default:
+		screen = NewResourceTable(def, a.client)
+	}
 	return a, func() tea.Msg {
 		return PushScreenMsg{Screen: screen}
 	}

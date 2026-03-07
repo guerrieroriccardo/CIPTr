@@ -85,6 +85,21 @@ func (h *DeviceHandler) List(c *gin.Context) {
 		args = append(args, catID)
 		n++
 	}
+	if supplierID := c.Query("supplier_id"); supplierID != "" {
+		conds = append(conds, fmt.Sprintf("supplier_id = $%d", n))
+		args = append(args, supplierID)
+		n++
+	}
+	if modelID := c.Query("model_id"); modelID != "" {
+		conds = append(conds, fmt.Sprintf("model_id = $%d", n))
+		args = append(args, modelID)
+		n++
+	}
+	if locationID := c.Query("location_id"); locationID != "" {
+		conds = append(conds, fmt.Sprintf("location_id = $%d", n))
+		args = append(args, locationID)
+		n++
+	}
 	if search := c.Query("search"); search != "" {
 		conds = append(conds, fmt.Sprintf("(hostname ILIKE $%d OR dns_name ILIKE $%d)", n, n))
 		args = append(args, "%"+search+"%")
