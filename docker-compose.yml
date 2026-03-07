@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ciptr
       POSTGRES_PASSWORD: ciptr
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ciptr"]
       interval: 5s
@@ -29,5 +29,3 @@ services:
 
   # frontend service will be added in a later step
 
-volumes:
-  db_data:
