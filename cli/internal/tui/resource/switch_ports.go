@@ -49,8 +49,19 @@ func init() {
 				if Resolve == nil {
 					return nil
 				}
+				// Determine site from the selected switch.
+				var siteID int64
+				if switchID := mustInt64(values["switch_id"]); switchID != 0 {
+					siteID = Resolve.SwitchSite[switchID]
+				}
 				var entries []PickerEntry
 				for ifaceID, mac := range Resolve.InterfaceMAC {
+					// Filter by site if we know it.
+					if siteID != 0 {
+						if ifaceSite, ok := Resolve.InterfaceSite[ifaceID]; ok && ifaceSite != siteID {
+							continue
+						}
+					}
 					label := mac
 					if name, ok := Resolve.Interfaces[ifaceID]; ok {
 						label = mac + " (" + name + ")"
