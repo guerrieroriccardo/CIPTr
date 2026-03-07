@@ -15,7 +15,7 @@ post() {
   local path="$1"
   local data="$2"
   local result
-  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI3ODcwNjcsInVzZXJfaWQiOjEsInVzZXJuYW1lIjoiZ3VlcnJvIn0.lnhkvPDZ3NuiAUNkgLqqTefGxIbzeJXlUj9URJNL1DU" -d "$data" 2>&1) || {
+  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI5NzkyNjEsInVzZXJfaWQiOjIsInVzZXJuYW1lIjoiZ3VlcnJvIn0.ZrCGayGgM-a4Nu72p9fUocgZOl04h9T0EC-W9hwT1fQ" -d "$data" 2>&1) || {
     echo "  FAILED: POST $path"
     echo "  Data: $data"
     echo "  Response: $result"
