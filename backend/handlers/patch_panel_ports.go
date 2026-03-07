@@ -23,12 +23,12 @@ func NewPatchPanelPortHandler(db *sql.DB) *PatchPanelPortHandler {
 }
 
 // patchPanelPortSelectSQL is the base SELECT used by every read operation.
-const patchPanelPortSelectSQL = `SELECT id, patch_panel_id, port_number, port_label, notes FROM patch_panel_ports`
+const patchPanelPortSelectSQL = `SELECT id, patch_panel_id, port_number, port_label, linked_port_id, notes FROM patch_panel_ports`
 
 // scanPatchPanelPort reads one row into a PatchPanelPort struct.
 func scanPatchPanelPort(row interface{ Scan(...any) error }) (models.PatchPanelPort, error) {
 	var ppp models.PatchPanelPort
-	err := row.Scan(&ppp.ID, &ppp.PatchPanelID, &ppp.PortNumber, &ppp.PortLabel, &ppp.Notes)
+	err := row.Scan(&ppp.ID, &ppp.PatchPanelID, &ppp.PortNumber, &ppp.PortLabel, &ppp.LinkedPortID, &ppp.Notes)
 	return ppp, err
 }
 
@@ -125,14 +125,21 @@ func (h *PatchPanelPortHandler) Create(c *gin.Context) {
 	}
 
 	ppp, err := scanPatchPanelPort(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO patch_panel_ports (patch_panel_id, port_number, port_label, notes)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, patch_panel_id, port_number, port_label, notes`,
-		input.PatchPanelID, input.PortNumber, input.PortLabel, input.Notes,
+		`INSERT INTO patch_panel_ports (patch_panel_id, port_number, port_label, linked_port_id, notes)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, patch_panel_id, port_number, port_label, linked_port_id, notes`,
+		input.PatchPanelID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	// Maintain bidirectional link: if we linked to another port, link it back.
+	if ppp.LinkedPortID != nil {
+		h.db.ExecContext(c.Request.Context(),
+			`UPDATE patch_panel_ports SET linked_port_id = $1 WHERE id = $2`,
+			ppp.ID, *ppp.LinkedPortID)
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "create", "patch_panel_ports", ppp.ID, fmt.Sprintf("Created patch panel port #%d", ppp.PortNumber))
@@ -153,11 +160,17 @@ func (h *PatchPanelPortHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Get old linked_port_id before update so we can unlink the old partner.
+	var oldLinkedPortID *int64
+	_ = h.db.QueryRowContext(c.Request.Context(),
+		`SELECT linked_port_id FROM patch_panel_ports WHERE id = $1`, id,
+	).Scan(&oldLinkedPortID)
+
 	ppp, err := scanPatchPanelPort(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE patch_panel_ports SET patch_panel_id = $1, port_number = $2, port_label = $3, notes = $4
-		 WHERE id = $5
-		 RETURNING id, patch_panel_id, port_number, port_label, notes`,
-		input.PatchPanelID, input.PortNumber, input.PortLabel, input.Notes, id,
+		`UPDATE patch_panel_ports SET patch_panel_id = $1, port_number = $2, port_label = $3, linked_port_id = $4, notes = $5
+		 WHERE id = $6
+		 RETURNING id, patch_panel_id, port_number, port_label, linked_port_id, notes`,
+		input.PatchPanelID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("patch panel port not found"))
@@ -166,6 +179,20 @@ func (h *PatchPanelPortHandler) Update(c *gin.Context) {
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	ctx := c.Request.Context()
+	// Unlink old partner if it changed.
+	if oldLinkedPortID != nil && (ppp.LinkedPortID == nil || *oldLinkedPortID != *ppp.LinkedPortID) {
+		h.db.ExecContext(ctx,
+			`UPDATE patch_panel_ports SET linked_port_id = NULL WHERE id = $1 AND linked_port_id = $2`,
+			*oldLinkedPortID, id)
+	}
+	// Link new partner back.
+	if ppp.LinkedPortID != nil {
+		h.db.ExecContext(ctx,
+			`UPDATE patch_panel_ports SET linked_port_id = $1 WHERE id = $2`,
+			ppp.ID, *ppp.LinkedPortID)
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "update", "patch_panel_ports", id, fmt.Sprintf("Updated patch panel port #%d", ppp.PortNumber))
@@ -179,6 +206,11 @@ func (h *PatchPanelPortHandler) Delete(c *gin.Context) {
 		fail(c, http.StatusBadRequest, errors.New("invalid id"))
 		return
 	}
+
+	// Unlink partner before deleting (ON DELETE SET NULL handles the FK,
+	// but we also need to clear the partner's linked_port_id).
+	h.db.ExecContext(c.Request.Context(),
+		`UPDATE patch_panel_ports SET linked_port_id = NULL WHERE linked_port_id = $1`, id)
 
 	var deletedID int64
 	err = h.db.QueryRowContext(c.Request.Context(),

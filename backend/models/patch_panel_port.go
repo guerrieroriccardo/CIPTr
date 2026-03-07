@@ -6,6 +6,7 @@ type PatchPanelPort struct {
 	PatchPanelID int64   `json:"patch_panel_id"`
 	PortNumber   int     `json:"port_number"`
 	PortLabel    *string `json:"port_label"`
+	LinkedPortID *int64  `json:"linked_port_id"`
 	Notes        *string `json:"notes"`
 }
 
@@ -14,5 +15,6 @@ type PatchPanelPortInput struct {
 	PatchPanelID int64   `json:"patch_panel_id" binding:"required"`
 	PortNumber   int     `json:"port_number"    binding:"required"`
 	PortLabel    *string `json:"port_label"`
+	LinkedPortID *int64  `json:"linked_port_id"`
 	Notes        *string `json:"notes"`
 }

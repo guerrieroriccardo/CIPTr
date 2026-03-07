@@ -327,6 +327,11 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
 
 **Required:** `patch_panel_id`, `port_number`
 **Unique:** `(patch_panel_id, port_number)`
+**Optional:** `linked_port_id` — links to another patch panel port (bidirectional: setting A→B also sets B→A)
+
+```json
+{ "patch_panel_id": 1, "port_number": 1, "port_label": "A1-01", "linked_port_id": 5, "notes": null }
+```
 
 ---
 
@@ -366,7 +371,7 @@ These fields should use select/dropdown components instead of free text:
 | Switch | `site_id`, `model_id` | GET /sites, GET /device-models |
 | Switch port | `switch_id` | GET /switches |
 | Patch panel | `site_id` | GET /sites |
-| Patch panel port | `patch_panel_id` | GET /patch-panels |
+| Patch panel port | `patch_panel_id`, `linked_port_id` | GET /patch-panels, GET /patch-panel-ports |
 
 **Display hints:**
 - Device models: show as "Manufacturer ModelName" (e.g. "HP ProLiant DL380")

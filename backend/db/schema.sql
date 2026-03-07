@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS patch_panel_ports (
     patch_panel_id      BIGINT NOT NULL REFERENCES patch_panels(id) ON DELETE CASCADE,
     port_number         INTEGER NOT NULL,
     port_label          TEXT,
+    linked_port_id      BIGINT REFERENCES patch_panel_ports(id) ON DELETE SET NULL,
     notes               TEXT,
     UNIQUE(patch_panel_id, port_number)
 );

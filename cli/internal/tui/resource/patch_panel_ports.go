@@ -19,7 +19,8 @@ func init() {
 			{Title: "Panel", Width: 18},
 			{Title: "Port #", Width: 7},
 			{Title: "Label", Width: 15},
-			{Title: "Notes", Width: 25},
+			{Title: "Linked To", Width: 20},
+			{Title: "Notes", Width: 20},
 		},
 		ToRow: func(raw any) table.Row {
 			pp := raw.(*models.PatchPanelPort)
@@ -28,6 +29,7 @@ func init() {
 				PatchPanelName(pp.PatchPanelID),
 				fmt.Sprintf("%d", pp.PortNumber),
 				derefStr(pp.PortLabel),
+				lookupOptional(func() map[int64]string { return safeLookup().PatchPanelPorts }, pp.LinkedPortID),
 				derefStr(pp.Notes),
 			}
 		},
@@ -39,6 +41,7 @@ func init() {
 			{Key: "patch_panel_id", Label: "Patch Panel", Required: true, PickerKey: "patch_panels"},
 			{Key: "port_number", Label: "Port Number", Required: true},
 			{Key: "port_label", Label: "Port Label"},
+			{Key: "linked_port_id", Label: "Linked Port", PickerKey: "patch_panel_ports"},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -58,6 +61,7 @@ func init() {
 				PatchPanelID: mustInt64(data["patch_panel_id"]),
 				PortNumber:   mustInt(data["port_number"]),
 				PortLabel:    strPtr(data["port_label"]),
+				LinkedPortID: int64Ptr(data["linked_port_id"]),
 				Notes:        strPtr(data["notes"]),
 			}
 			var created models.PatchPanelPort
@@ -69,6 +73,7 @@ func init() {
 				PatchPanelID: mustInt64(data["patch_panel_id"]),
 				PortNumber:   mustInt(data["port_number"]),
 				PortLabel:    strPtr(data["port_label"]),
+				LinkedPortID: int64Ptr(data["linked_port_id"]),
 				Notes:        strPtr(data["notes"]),
 			}
 			var updated models.PatchPanelPort
