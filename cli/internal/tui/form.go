@@ -200,6 +200,15 @@ func (f *ResourceForm) openPicker() {
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].label < items[j].label
 		})
+	} else if field.PickerFunc != nil {
+		currentValues := make(map[string]string, len(f.def.Fields))
+		for j, fld := range f.def.Fields {
+			currentValues[fld.Key] = f.inputs[j].Value()
+		}
+		entries := field.PickerFunc(currentValues)
+		for _, e := range entries {
+			items = append(items, pickerItem{id: e.Value, label: e.Label})
+		}
 	} else {
 		return
 	}
@@ -298,7 +307,7 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, f.updateFocus()
 		case "enter":
 			// If current field has a picker, open it.
-			if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 {
+			if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 || f.def.Fields[f.focus].PickerFunc != nil {
 				f.openPicker()
 				return f, nil
 			}
@@ -436,7 +445,7 @@ func (f ResourceForm) View() string {
 		if field.Required {
 			label += " *"
 		}
-		if field.PickerKey != "" || len(field.PickerOptions) > 0 {
+		if field.PickerKey != "" || len(field.PickerOptions) > 0 || field.PickerFunc != nil {
 			label += " " + pickerHintStyle.Render("[enter to pick]")
 		}
 		if f.def.FieldHint != nil {
@@ -482,7 +491,7 @@ func (f ResourceForm) View() string {
 
 	// Build help text — show picker hint for FK fields.
 	helpParts := []string{"tab next"}
-	if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 {
+	if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 || f.def.Fields[f.focus].PickerFunc != nil {
 		helpParts = append(helpParts, "enter pick")
 	}
 	helpParts = append(helpParts, "ctrl+s save", "esc cancel")

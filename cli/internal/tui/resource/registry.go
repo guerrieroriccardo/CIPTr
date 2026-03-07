@@ -5,6 +5,12 @@ import (
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
 )
 
+// PickerEntry represents a single option in a dynamic picker.
+type PickerEntry struct {
+	Value string // stored value when selected
+	Label string // display label
+}
+
 // Field describes a single form field for create/edit.
 type Field struct {
 	Key           string   // JSON key (e.g. "name")
@@ -12,6 +18,7 @@ type Field struct {
 	Required      bool
 	PickerKey     string   // If set, enables FK picker using this resolver key (e.g. "clients", "sites")
 	PickerOptions []string // If set, enables picker with static options (e.g. ["active", "planned"])
+	PickerFunc    func(values map[string]string) []PickerEntry // Dynamic picker items (value differs from label)
 }
 
 // Def defines how to list, display, and manage a resource in the TUI.

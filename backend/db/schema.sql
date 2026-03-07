@@ -139,6 +139,7 @@ CREATE TABLE IF NOT EXISTS switch_ports (
     port_label      TEXT,               -- optional label
     speed           TEXT,               -- e.g. "1G", "10G"
     is_uplink       BOOLEAN DEFAULT FALSE,
+    mac_restriction MACADDR,            -- restrict port to this MAC address
     notes           TEXT,
     UNIQUE(switch_id, port_number)
 );

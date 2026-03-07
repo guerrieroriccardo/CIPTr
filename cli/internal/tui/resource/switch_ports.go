@@ -21,6 +21,7 @@ func init() {
 			{Title: "Label", Width: 15},
 			{Title: "Speed", Width: 10},
 			{Title: "Uplink", Width: 7},
+			{Title: "MAC Restrict", Width: 18},
 		},
 		ToRow: func(raw any) table.Row {
 			sp := raw.(*models.SwitchPort)
@@ -31,6 +32,7 @@ func init() {
 				derefStr(sp.PortLabel),
 				derefStr(sp.Speed),
 				derefBool(sp.IsUplink),
+				derefStr(sp.MacRestriction),
 			}
 		},
 		GetID: func(raw any) string {
@@ -43,6 +45,20 @@ func init() {
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "speed", Label: "Speed"},
 			{Key: "is_uplink", Label: "Uplink", PickerOptions: []string{"true", "false"}},
+			{Key: "mac_restriction", Label: "MAC Restriction", PickerFunc: func(values map[string]string) []PickerEntry {
+				if Resolve == nil {
+					return nil
+				}
+				var entries []PickerEntry
+				for ifaceID, mac := range Resolve.InterfaceMAC {
+					label := mac
+					if name, ok := Resolve.Interfaces[ifaceID]; ok {
+						label = mac + " (" + name + ")"
+					}
+					entries = append(entries, PickerEntry{Value: mac, Label: label})
+				}
+				return entries
+			}},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -59,12 +75,13 @@ func init() {
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
 			input := models.SwitchPortInput{
-				SwitchID:   mustInt64(data["switch_id"]),
-				PortNumber: mustInt(data["port_number"]),
-				PortLabel:  strPtr(data["port_label"]),
-				Speed:      strPtr(data["speed"]),
-				IsUplink:   boolPtr(data["is_uplink"]),
-				Notes:      strPtr(data["notes"]),
+				SwitchID:       mustInt64(data["switch_id"]),
+				PortNumber:     mustInt(data["port_number"]),
+				PortLabel:      strPtr(data["port_label"]),
+				Speed:          strPtr(data["speed"]),
+				IsUplink:       boolPtr(data["is_uplink"]),
+				MacRestriction: strPtr(data["mac_restriction"]),
+				Notes:          strPtr(data["notes"]),
 			}
 			var created models.SwitchPort
 			err := client.Post("/switch-ports", input, &created)
@@ -72,12 +89,13 @@ func init() {
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
 			input := models.SwitchPortInput{
-				SwitchID:   mustInt64(data["switch_id"]),
-				PortNumber: mustInt(data["port_number"]),
-				PortLabel:  strPtr(data["port_label"]),
-				Speed:      strPtr(data["speed"]),
-				IsUplink:   boolPtr(data["is_uplink"]),
-				Notes:      strPtr(data["notes"]),
+				SwitchID:       mustInt64(data["switch_id"]),
+				PortNumber:     mustInt(data["port_number"]),
+				PortLabel:      strPtr(data["port_label"]),
+				Speed:          strPtr(data["speed"]),
+				IsUplink:       boolPtr(data["is_uplink"]),
+				MacRestriction: strPtr(data["mac_restriction"]),
+				Notes:          strPtr(data["notes"]),
 			}
 			var updated models.SwitchPort
 			err := client.Put("/switch-ports/"+id, input, &updated)
