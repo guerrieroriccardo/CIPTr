@@ -124,7 +124,18 @@ func (f ResourceForm) Title() string {
 }
 
 func (f ResourceForm) Init() tea.Cmd {
-	return textinput.Blink
+	cmds := []tea.Cmd{textinput.Blink}
+	// Fire AsyncDerive for any pre-filled defaults so derived fields get populated.
+	if f.id == "" && f.def.AsyncDerive != nil && f.def.Defaults != nil {
+		for _, field := range f.def.Fields {
+			if _, ok := f.def.Defaults[field.Key]; ok {
+				if cmd := f.fireAsyncDerive(field.Key); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			}
+		}
+	}
+	return tea.Batch(cmds...)
 }
 
 // visibleFields returns how many fields fit on screen.
