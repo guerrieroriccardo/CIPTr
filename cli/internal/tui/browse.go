@@ -143,7 +143,7 @@ func scopedVLANs(siteID string) *resource.Def {
 
 func scopedDevices(siteID string) *resource.Def {
 	base := *resource.Registry["devices"]
-	base.Defaults = map[string]string{"site_id": siteID}
+	base.Defaults = map[string]string{"site_id": siteID, "status": "planned"}
 	base.List = func(c *apiclient.Client) ([]any, error) {
 		var items []models.Device
 		if err := c.Get("/devices?site_id="+siteID, &items); err != nil {

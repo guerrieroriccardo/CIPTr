@@ -39,6 +39,8 @@ func init() {
 			return fmt.Sprintf("%d", raw.(*models.Device).ID)
 		},
 
+		Defaults: map[string]string{"status": "planned"},
+
 		Fields: []Field{
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
@@ -48,7 +50,7 @@ func init() {
 			{Key: "dns_name", Label: "DNS Name"},
 			{Key: "serial_number", Label: "Serial Number"},
 			{Key: "asset_tag", Label: "Asset Tag"},
-			{Key: "status", Label: "Status", PickerOptions: []string{"active", "planned", "inactive", "decommissioned", "storage"}},
+			{Key: "status", Label: "Status", PickerOptions: []string{"planned", "active", "inactive", "decommissioned", "storage"}},
 			{Key: "is_up", Label: "Is Up", PickerOptions: []string{"true", "false"}},
 			{Key: "os", Label: "OS"},
 			{Key: "has_rmm", Label: "Has RMM", PickerOptions: []string{"true", "false"}},
