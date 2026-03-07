@@ -90,3 +90,15 @@ func logAudit(ctx context.Context, db *sql.DB, c *gin.Context, action, resource 
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
 		uid, uname, action, resource, resourceID, detail)
 }
+
+// logAuditManual inserts an audit log entry with explicit user info (for pre-auth actions like login/register).
+func logAuditManual(ctx context.Context, db *sql.DB, userID int64, username, action, resource string, resourceID int64, detail string) {
+	var uid *int64
+	if userID != 0 {
+		uid = &userID
+	}
+	_, _ = db.ExecContext(ctx,
+		`INSERT INTO audit_logs (user_id, username, action, resource, resource_id, detail)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		uid, username, action, resource, resourceID, detail)
+}

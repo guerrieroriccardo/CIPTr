@@ -35,6 +35,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		input.Username,
 	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.IsAdmin, &user.CreatedAt)
 	if err == sql.ErrNoRows {
+		logAuditManual(c.Request.Context(), h.db, 0, input.Username, "login_failed", "users", 0, "Invalid credentials (unknown user)")
 		fail(c, http.StatusUnauthorized, fmt.Errorf("invalid credentials"))
 		return
 	}
@@ -44,6 +45,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
+		logAuditManual(c.Request.Context(), h.db, user.ID, user.Username, "login_failed", "users", user.ID, "Invalid credentials (wrong password)")
 		fail(c, http.StatusUnauthorized, fmt.Errorf("invalid credentials"))
 		return
 	}
@@ -60,6 +62,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	logAuditManual(c.Request.Context(), h.db, user.ID, user.Username, "login", "users", user.ID, fmt.Sprintf("User '%s' logged in", user.Username))
 	ok(c, http.StatusOK, gin.H{"token": signed})
 }
 
@@ -87,6 +90,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	logAuditManual(c.Request.Context(), h.db, user.ID, user.Username, "register", "users", user.ID, fmt.Sprintf("User '%s' registered", user.Username))
 	ok(c, http.StatusCreated, user)
 }
 
@@ -133,5 +137,6 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	logAudit(c.Request.Context(), h.db, c, "change_password", "users", userID.(int64), "Password changed")
 	ok(c, http.StatusOK, gin.H{"message": "password changed"})
 }
