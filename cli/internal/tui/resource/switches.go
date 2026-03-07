@@ -17,7 +17,7 @@ func init() {
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
 			{Title: "Site", Width: 16},
-			{Title: "Name", Width: 22},
+			{Title: "Hostname", Width: 22},
 			{Title: "IP Address", Width: 16},
 			{Title: "Ports", Width: 6},
 			{Title: "Location", Width: 18},
@@ -27,7 +27,7 @@ func init() {
 			return table.Row{
 				fmt.Sprintf("%d", s.ID),
 				SiteName(s.SiteID),
-				s.Name,
+				s.Hostname,
 				derefStr(s.IPAddress),
 				fmt.Sprintf("%d", s.TotalPorts),
 				LocationName(s.LocationID),
@@ -39,7 +39,7 @@ func init() {
 
 		Fields: []Field{
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
-			{Key: "name", Label: "Name", Required: true},
+			{Key: "hostname", Label: "Hostname", Required: true},
 			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
 			{Key: "ip_address", Label: "IP Address"},
 			{Key: "location_id", Label: "Location", PickerKey: "locations"},
@@ -65,6 +65,20 @@ func init() {
 			return items
 		},
 
+		AsyncDerive: func(client *apiclient.Client, key string, values map[string]string) map[string]string {
+			if key != "site_id" || values["site_id"] == "" {
+				return nil
+			}
+			var result struct {
+				Hostname string `json:"hostname"`
+			}
+			err := client.Get(fmt.Sprintf("/switches/next-name?site_id=%s", values["site_id"]), &result)
+			if err != nil || result.Hostname == "" {
+				return nil
+			}
+			return map[string]string{"hostname": result.Hostname}
+		},
+
 		List: func(client *apiclient.Client) ([]any, error) {
 			var items []models.Switch
 			if err := client.Get("/switches", &items); err != nil {
@@ -79,7 +93,7 @@ func init() {
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
 			input := models.SwitchInput{
 				SiteID:     mustInt64(data["site_id"]),
-				Name:       data["name"],
+				Hostname:   data["hostname"],
 				ModelID:    int64Ptr(data["model_id"]),
 				IPAddress:  strPtr(data["ip_address"]),
 				LocationID: int64Ptr(data["location_id"]),
@@ -93,7 +107,7 @@ func init() {
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
 			input := models.SwitchInput{
 				SiteID:     mustInt64(data["site_id"]),
-				Name:       data["name"],
+				Hostname:   data["hostname"],
 				ModelID:    int64Ptr(data["model_id"]),
 				IPAddress:  strPtr(data["ip_address"]),
 				LocationID: int64Ptr(data["location_id"]),

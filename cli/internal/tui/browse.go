@@ -341,7 +341,7 @@ func switchDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 		switchID := fmt.Sprintf("%d", sw.ID)
 		screen := NewResourceTable(scopedSwitchPorts(switchID), apiClient)
 		return func() tea.Msg {
-			return PushScreenMsg{Screen: titledScreen{screen, sw.Name}}
+			return PushScreenMsg{Screen: titledScreen{screen, sw.Hostname}}
 		}
 	}
 }

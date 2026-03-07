@@ -121,10 +121,10 @@ post /vlans '{"site_id":6,"address_block_id":5,"vlan_id":1,"name":"LAN","subnet"
 
 # ── Switches (ports auto-created by API) ──
 echo "==> Switches..."
-post /switches '{"site_id":1,"name":"SW-CORE-01","model_id":5,"ip_address":"10.10.0.10","location_id":1,"total_ports":48,"notes":"Core switch"}'
-post /switches '{"site_id":1,"name":"SW-FLOOR1-01","model_id":6,"ip_address":"10.10.0.11","location_id":1,"total_ports":24,"notes":"Floor 1 access switch"}'
-post /switches '{"site_id":3,"name":"SW-OMP-01","model_id":6,"ip_address":"10.20.0.10","location_id":4,"total_ports":24}'
-post /switches '{"site_id":4,"name":"SW-ROSSI-01","model_id":6,"ip_address":"192.168.1.2","location_id":5,"total_ports":24}'
+post /switches '{"site_id":1,"hostname":"SW001","model_id":5,"ip_address":"10.10.0.10","location_id":1,"total_ports":48,"notes":"Core switch"}'
+post /switches '{"site_id":1,"hostname":"SW002","model_id":6,"ip_address":"10.10.0.11","location_id":1,"total_ports":24,"notes":"Floor 1 access switch"}'
+post /switches '{"site_id":3,"hostname":"SW001","model_id":6,"ip_address":"10.20.0.10","location_id":4,"total_ports":24}'
+post /switches '{"site_id":4,"hostname":"SW001","model_id":6,"ip_address":"192.168.1.2","location_id":5,"total_ports":24}'
 
 # ── Patch Panels (ports auto-created by API) ──
 echo "==> Patch Panels..."

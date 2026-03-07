@@ -127,6 +127,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	switches := api.Group("/switches")
 	{
 		switches.GET("", switchHandler.List)
+		switches.GET("/next-name", switchHandler.NextName)
 		switches.POST("", switchHandler.Create)
 		switches.GET("/:id", switchHandler.GetByID)
 		switches.PUT("/:id", switchHandler.Update)

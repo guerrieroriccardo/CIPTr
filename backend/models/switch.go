@@ -4,7 +4,7 @@ package models
 type Switch struct {
 	ID         int64   `json:"id"`
 	SiteID     int64   `json:"site_id"`
-	Name       string  `json:"name"`
+	Hostname   string  `json:"hostname"`
 	ModelID    *int64  `json:"model_id"`
 	IPAddress  *string `json:"ip_address"`
 	LocationID *int64  `json:"location_id"`
@@ -15,7 +15,7 @@ type Switch struct {
 // SwitchInput is used for create and update requests.
 type SwitchInput struct {
 	SiteID     int64   `json:"site_id"     binding:"required"`
-	Name       string  `json:"name"        binding:"required"`
+	Hostname   string  `json:"hostname"    binding:"required"`
 	ModelID    *int64  `json:"model_id"`
 	IPAddress  *string `json:"ip_address"`
 	LocationID *int64  `json:"location_id"`

@@ -99,11 +99,11 @@ INSERT INTO vlans (site_id, address_block_id, vlan_id, name, subnet, description
   (6, 5, 1,   'LAN',           '192.168.11.0/24', NULL);
 
 -- Switches
-INSERT INTO switches (site_id, name, model_id, ip_address, location, total_ports, notes) VALUES
-  (1, 'SW-CORE-01', 5, '10.10.0.10', 'Sala Server - Rack A', 48, 'Core switch'),
-  (1, 'SW-FLOOR1-01', 6, '10.10.0.11', 'Sala Server - Rack A', 24, 'Floor 1 access switch'),
-  (3, 'SW-OMP-01', 6, '10.20.0.10', 'Sala CED', 24, NULL),
-  (4, 'SW-ROSSI-01', 6, '192.168.1.2', 'Ufficio', 24, NULL);
+INSERT INTO switches (site_id, hostname, model_id, ip_address, location_id, total_ports, notes) VALUES
+  (1, 'SW001', 5, '10.10.0.10', 1, 48, 'Core switch'),
+  (1, 'SW002', 6, '10.10.0.11', 1, 24, 'Floor 1 access switch'),
+  (3, 'SW001', 6, '10.20.0.10', 4, 24, NULL),
+  (4, 'SW001', 6, '192.168.1.2', 5, 24, NULL);
 
 -- Switch Ports (auto-created in real usage, but seed some for completeness)
 -- SW-CORE-01 (48 ports)

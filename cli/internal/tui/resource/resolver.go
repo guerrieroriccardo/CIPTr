@@ -176,7 +176,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 		var switches []models.Switch
 		if err := c.Get("/switches", &switches); err == nil {
 			for _, v := range switches {
-				r.Switches[v.ID] = v.Name
+				r.Switches[v.ID] = v.Hostname
 				r.SwitchSite[v.ID] = v.SiteID
 			}
 		}

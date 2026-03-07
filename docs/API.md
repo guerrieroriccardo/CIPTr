@@ -269,18 +269,19 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
 | Method | Path | Notes |
 |--------|------|-------|
 | GET | `/switches` | `?site_id=` filter |
+| GET | `/switches/next-name?site_id=` | returns next available hostname (e.g. `SW001`) |
 | POST/PUT/DELETE | `/switches/:id` | |
 | GET | `/switches/:id/ports` | |
 
-**Required:** `site_id`, `name`
-**Unique:** `(site_id, name)`
+**Required:** `site_id`, `hostname`
+**Unique:** `(site_id, hostname)`
 **Default:** `total_ports` = `24` if omitted
-**Auto:** Creating a switch auto-creates `total_ports` port rows (Port 1 … Port N)
+**Auto:** Creating a switch auto-creates `total_ports` port rows (Port 1 … Port N). Hostname auto-generated as SW001, SW002, etc.
 
 ```json
 {
-  "site_id": 1, "name": "SW-CORE-01", "model_id": 1,
-  "ip_address": "10.10.0.254", "location": "Rack A",
+  "site_id": 1, "hostname": "SW001", "model_id": 1,
+  "ip_address": "10.10.0.254", "location_id": 1,
   "total_ports": 48, "notes": null
 }
 ```

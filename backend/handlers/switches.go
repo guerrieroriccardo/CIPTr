@@ -24,12 +24,12 @@ func NewSwitchHandler(db *sql.DB) *SwitchHandler {
 }
 
 // switchSelectSQL is the base SELECT used by every read operation.
-const switchSelectSQL = `SELECT id, site_id, name, model_id, ip_address, location_id, total_ports, notes FROM switches`
+const switchSelectSQL = `SELECT id, site_id, hostname, model_id, ip_address, location_id, total_ports, notes FROM switches`
 
 // scanSwitch reads one row into a Switch struct.
 func scanSwitch(row interface{ Scan(...any) error }) (models.Switch, error) {
 	var s models.Switch
-	err := row.Scan(&s.ID, &s.SiteID, &s.Name, &s.ModelID, &s.IPAddress, &s.LocationID, &s.TotalPorts, &s.Notes)
+	err := row.Scan(&s.ID, &s.SiteID, &s.Hostname, &s.ModelID, &s.IPAddress, &s.LocationID, &s.TotalPorts, &s.Notes)
 	return s, err
 }
 
@@ -43,7 +43,7 @@ func (h *SwitchHandler) List(c *gin.Context) {
 		query += ` WHERE site_id = $1`
 		args = append(args, siteID)
 	}
-	query += ` ORDER BY name`
+	query += ` ORDER BY hostname`
 
 	rows, err := h.db.QueryContext(c.Request.Context(), query, args...)
 	if err != nil {
@@ -74,7 +74,7 @@ func (h *SwitchHandler) ListBySite(c *gin.Context) {
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		switchSelectSQL+` WHERE site_id = $1 ORDER BY name`, siteID)
+		switchSelectSQL+` WHERE site_id = $1 ORDER BY hostname`, siteID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -117,6 +117,60 @@ func (h *SwitchHandler) GetByID(c *gin.Context) {
 	ok(c, http.StatusOK, s)
 }
 
+// NextName handles GET /switches/next-name?site_id=X
+// Returns the next available switch name for the given site (e.g. SW001, SW002).
+func (h *SwitchHandler) NextName(c *gin.Context) {
+	siteIDStr := c.Query("site_id")
+	if siteIDStr == "" {
+		fail(c, http.StatusBadRequest, errors.New("site_id is required"))
+		return
+	}
+	siteID, err := strconv.ParseInt(siteIDStr, 10, 64)
+	if err != nil {
+		fail(c, http.StatusBadRequest, errors.New("invalid site_id"))
+		return
+	}
+
+	const prefix = "SW"
+
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT hostname FROM switches WHERE site_id = $1 AND hostname LIKE $2`,
+		siteID, prefix+"%",
+	)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer rows.Close()
+
+	taken := make(map[int]bool)
+	for rows.Next() {
+		var hostname string
+		if err := rows.Scan(&hostname); err != nil {
+			continue
+		}
+		suffix := hostname[len(prefix):]
+		if num, err := strconv.Atoi(suffix); err == nil && num >= 1 && num <= 999 {
+			taken[num] = true
+		}
+	}
+
+	next := 0
+	for i := 1; i <= 999; i++ {
+		if !taken[i] {
+			next = i
+			break
+		}
+	}
+	if next == 0 {
+		fail(c, http.StatusConflict, errors.New("all 999 switch names are taken"))
+		return
+	}
+
+	hostname := fmt.Sprintf("%s%03d", prefix, next)
+	ok(c, http.StatusOK, gin.H{"hostname": hostname})
+}
+
 // Create handles POST /switches
 // Automatically creates N switch_port rows based on total_ports.
 func (h *SwitchHandler) Create(c *gin.Context) {
@@ -139,10 +193,10 @@ func (h *SwitchHandler) Create(c *gin.Context) {
 	defer tx.Rollback()
 
 	s, err := scanSwitch(tx.QueryRowContext(c.Request.Context(),
-		`INSERT INTO switches (site_id, name, model_id, ip_address, location_id, total_ports, notes)
+		`INSERT INTO switches (site_id, hostname, model_id, ip_address, location_id, total_ports, notes)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, site_id, name, model_id, ip_address, location_id, total_ports, notes`,
-		input.SiteID, input.Name, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes,
+		 RETURNING id, site_id, hostname, model_id, ip_address, location_id, total_ports, notes`,
+		input.SiteID, input.Hostname, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -171,7 +225,7 @@ func (h *SwitchHandler) Create(c *gin.Context) {
 		return
 	}
 
-	logAudit(c.Request.Context(), h.db, c, "create", "switches", s.ID, fmt.Sprintf("Created switch '%s'", s.Name))
+	logAudit(c.Request.Context(), h.db, c, "create", "switches", s.ID, fmt.Sprintf("Created switch '%s'", s.Hostname))
 	ok(c, http.StatusCreated, s)
 }
 
@@ -195,10 +249,10 @@ func (h *SwitchHandler) Update(c *gin.Context) {
 	}
 
 	s, err := scanSwitch(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE switches SET site_id = $1, name = $2, model_id = $3, ip_address = $4, location_id = $5, total_ports = $6, notes = $7
+		`UPDATE switches SET site_id = $1, hostname = $2, model_id = $3, ip_address = $4, location_id = $5, total_ports = $6, notes = $7
 		 WHERE id = $8
-		 RETURNING id, site_id, name, model_id, ip_address, location_id, total_ports, notes`,
-		input.SiteID, input.Name, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes, id,
+		 RETURNING id, site_id, hostname, model_id, ip_address, location_id, total_ports, notes`,
+		input.SiteID, input.Hostname, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("switch not found"))
@@ -209,7 +263,7 @@ func (h *SwitchHandler) Update(c *gin.Context) {
 		return
 	}
 
-	logAudit(c.Request.Context(), h.db, c, "update", "switches", id, fmt.Sprintf("Updated switch '%s'", s.Name))
+	logAudit(c.Request.Context(), h.db, c, "update", "switches", id, fmt.Sprintf("Updated switch '%s'", s.Hostname))
 	ok(c, http.StatusOK, s)
 }
 

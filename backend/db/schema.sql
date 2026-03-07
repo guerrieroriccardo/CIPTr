@@ -123,13 +123,13 @@ CREATE TABLE IF NOT EXISTS device_models (
 CREATE TABLE IF NOT EXISTS switches (
     id              BIGSERIAL PRIMARY KEY,
     site_id         BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    name            TEXT NOT NULL,      -- e.g. "SW006", "CORE-SW01"
+    hostname        TEXT NOT NULL,      -- e.g. "SW001", "SW002"
     model_id        BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
     ip_address      INET,               -- management IP
     location_id     BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     total_ports     INTEGER NOT NULL DEFAULT 24,
     notes           TEXT,
-    UNIQUE(site_id, name)
+    UNIQUE(site_id, hostname)
 );
 
 CREATE TABLE IF NOT EXISTS switch_ports (
