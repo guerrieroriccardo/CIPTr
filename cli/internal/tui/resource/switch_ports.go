@@ -54,6 +54,8 @@ func init() {
 				if switchID := mustInt64(values["switch_id"]); switchID != 0 {
 					siteID = Resolve.SwitchSite[switchID]
 				}
+				// Allow the current value through (editing keeps own MAC).
+				currentMAC := values["mac_restriction"]
 				var entries []PickerEntry
 				for ifaceID, mac := range Resolve.InterfaceMAC {
 					// Filter by site if we know it.
@@ -61,6 +63,10 @@ func init() {
 						if ifaceSite, ok := Resolve.InterfaceSite[ifaceID]; ok && ifaceSite != siteID {
 							continue
 						}
+					}
+					// Skip MACs already used on another port.
+					if mac != currentMAC && Resolve.UsedMACs[mac] {
+						continue
 					}
 					label := mac
 					if name, ok := Resolve.Interfaces[ifaceID]; ok {

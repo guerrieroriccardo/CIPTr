@@ -301,6 +301,7 @@ CREATE INDEX IF NOT EXISTS idx_devices_site             ON devices(site_id);
 CREATE INDEX IF NOT EXISTS idx_devices_hostname         ON devices(hostname);
 CREATE INDEX IF NOT EXISTS idx_device_interfaces_device ON device_interfaces(device_id);
 CREATE INDEX IF NOT EXISTS idx_device_ips_address       ON device_ips(ip_address);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_switch_ports_mac    ON switch_ports(mac_restriction) WHERE mac_restriction IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_switch_ports_sw          ON switch_ports(switch_id);
 CREATE INDEX IF NOT EXISTS idx_address_blocks_site      ON address_blocks(site_id);
 CREATE INDEX IF NOT EXISTS idx_vlans_block              ON vlans(address_block_id);

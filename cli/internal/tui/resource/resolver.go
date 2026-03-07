@@ -49,6 +49,7 @@ type Resolver struct {
 	DeviceIPInterface   map[int64]int64  // device IP ID → interface ID
 	DeviceModelCategory map[int64]int64  // device model ID → category ID
 	InterfaceMAC        map[int64]string // interface ID → MAC address
+	UsedMACs            map[string]bool  // MAC addresses already restricted on a switch port
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -91,6 +92,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceIPInterface:   make(map[int64]int64),
 			DeviceModelCategory: make(map[int64]int64),
 			InterfaceMAC:        make(map[int64]string),
+			UsedMACs:            make(map[string]bool),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -245,6 +247,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				}
 				r.SwitchPorts[v.ID] = label
 				r.SwitchPortSwitch[v.ID] = v.SwitchID
+				if v.MacRestriction != nil && *v.MacRestriction != "" {
+					r.UsedMACs[*v.MacRestriction] = true
+				}
 			}
 		}
 
