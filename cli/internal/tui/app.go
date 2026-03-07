@@ -83,7 +83,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.nav = NavStack{}
 		menu := NewMenu()
 		a.nav.Push(menu)
-		return a, tea.Batch(menu.Init(), resource.InitResolver(a.client))
+		sizeCmd := func() tea.Msg {
+			return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+		}
+		return a, tea.Batch(menu.Init(), resource.InitResolver(a.client), sizeCmd)
 
 	case resource.ResolverReadyMsg:
 		resource.Resolve = msg.R
