@@ -16,6 +16,7 @@ import (
 
 type formSavedMsg struct{}
 type formErrorMsg struct{ err error }
+type asyncDeriveMsg struct{ values map[string]string }
 
 // pickerItem represents one selectable entry in the FK picker.
 type pickerItem struct {
@@ -257,6 +258,16 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.saving = false
 		return f, nil
 
+	case asyncDeriveMsg:
+		for k, v := range msg.values {
+			for i, field := range f.def.Fields {
+				if field.Key == k && !f.manuallyEdited[i] {
+					f.inputs[i].SetValue(v)
+				}
+			}
+		}
+		return f, nil
+
 	case tea.KeyMsg:
 		// Picker mode — intercept all keys.
 		if f.picking {
@@ -330,12 +341,17 @@ func (f ResourceForm) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if len(f.pickerMatch) > 0 {
 			selected := f.pickerMatch[f.pickerCursor]
+			changedKey := f.def.Fields[f.focus].Key
 			f.inputs[f.focus].SetValue(selected.id)
 			f.picking = false
 			// Auto-advance to next field.
 			f.focus = (f.focus + 1) % len(f.inputs)
 			f.ensureVisible()
-			return f, f.updateFocus()
+			cmds := []tea.Cmd{f.updateFocus()}
+			if asyncCmd := f.fireAsyncDerive(changedKey); asyncCmd != nil {
+				cmds = append(cmds, asyncCmd)
+			}
+			return f, tea.Batch(cmds...)
 		}
 		return f, nil
 	case "up", "shift+tab":
@@ -499,6 +515,26 @@ func (f ResourceForm) viewPicker() string {
 
 	b.WriteString("\n" + HelpStyle.Render("↑↓ navigate • enter select • esc cancel"))
 	return b.String()
+}
+
+// fireAsyncDerive returns a tea.Cmd that calls AsyncDerive if defined.
+func (f ResourceForm) fireAsyncDerive(changedKey string) tea.Cmd {
+	if f.def.AsyncDerive == nil || f.id != "" {
+		return nil
+	}
+	values := make(map[string]string, len(f.def.Fields))
+	for i, fld := range f.def.Fields {
+		values[fld.Key] = f.inputs[i].Value()
+	}
+	def := f.def
+	client := f.client
+	return func() tea.Msg {
+		derived := def.AsyncDerive(client, changedKey, values)
+		if len(derived) == 0 {
+			return nil
+		}
+		return asyncDeriveMsg{values: derived}
+	}
 }
 
 func (f ResourceForm) updateFocus() tea.Cmd {

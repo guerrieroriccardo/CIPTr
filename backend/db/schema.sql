@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS manufacturers (
 CREATE TABLE IF NOT EXISTS categories (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,   -- e.g. "Server", "PC", "Switch", "Printer"
-    short_code  TEXT,                   -- e.g. "SRV", "NB", "SW" (variable length)
+    short_code  TEXT NOT NULL,           -- e.g. "SRV", "NB", "SW" (variable length, used for hostname generation)
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS devices (
 
     -- Type and status
     category_id         BIGINT NOT NULL REFERENCES categories(id),
-    status              TEXT NOT NULL DEFAULT 'active',  -- active, inactive, reserved, decommissioned
+    status              TEXT NOT NULL DEFAULT 'planned',  -- planned, active, inactive, decommissioned
     is_up               BOOLEAN DEFAULT TRUE,
 
     -- Software / management

@@ -48,6 +48,11 @@ type Def struct {
 	// Returns a filtered subset. If nil, all items are shown.
 	PickerFilter func(key string, values map[string]string, items map[int64]string) map[int64]string
 
+	// AsyncDerive is called when a field value changes. Given the changed
+	// field key and current form values, it may call the API and return
+	// derived values for other fields. Called in a tea.Cmd (background).
+	AsyncDerive func(client *apiclient.Client, key string, values map[string]string) map[string]string
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)

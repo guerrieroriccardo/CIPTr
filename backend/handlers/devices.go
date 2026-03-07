@@ -170,6 +170,80 @@ func (h *DeviceHandler) GetByID(c *gin.Context) {
 	ok(c, http.StatusOK, d)
 }
 
+// NextHostname handles GET /devices/next-hostname?site_id=X&category_id=Y
+// Returns the next available hostname for the given site and category.
+func (h *DeviceHandler) NextHostname(c *gin.Context) {
+	siteIDStr := c.Query("site_id")
+	catIDStr := c.Query("category_id")
+	if siteIDStr == "" || catIDStr == "" {
+		fail(c, http.StatusBadRequest, errors.New("site_id and category_id are required"))
+		return
+	}
+	siteID, err := strconv.ParseInt(siteIDStr, 10, 64)
+	if err != nil {
+		fail(c, http.StatusBadRequest, errors.New("invalid site_id"))
+		return
+	}
+	catID, err := strconv.ParseInt(catIDStr, 10, 64)
+	if err != nil {
+		fail(c, http.StatusBadRequest, errors.New("invalid category_id"))
+		return
+	}
+
+	// Get category short_code.
+	var prefix string
+	err = h.db.QueryRowContext(c.Request.Context(),
+		`SELECT short_code FROM categories WHERE id = $1`, catID,
+	).Scan(&prefix)
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("category not found"))
+		return
+	}
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Get all existing hostnames matching this prefix at this site.
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT hostname FROM devices WHERE site_id = $1 AND hostname LIKE $2`,
+		siteID, prefix+"%",
+	)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer rows.Close()
+
+	taken := make(map[int]bool)
+	for rows.Next() {
+		var hostname string
+		if err := rows.Scan(&hostname); err != nil {
+			continue
+		}
+		suffix := hostname[len(prefix):]
+		if num, err := strconv.Atoi(suffix); err == nil && num >= 1 && num <= 999 {
+			taken[num] = true
+		}
+	}
+
+	// Find first available number.
+	next := 0
+	for i := 1; i <= 999; i++ {
+		if !taken[i] {
+			next = i
+			break
+		}
+	}
+	if next == 0 {
+		fail(c, http.StatusConflict, errors.New("all 999 hostnames are taken"))
+		return
+	}
+
+	hostname := fmt.Sprintf("%s%03d", prefix, next)
+	ok(c, http.StatusOK, gin.H{"hostname": hostname})
+}
+
 // Create handles POST /devices
 // site_id, hostname, and category_id are required.
 func (h *DeviceHandler) Create(c *gin.Context) {
@@ -184,7 +258,7 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		return
 	}
 
-	status := "active"
+	status := "planned"
 	if input.Status != nil {
 		status = *input.Status
 	}

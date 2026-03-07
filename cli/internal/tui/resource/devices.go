@@ -41,8 +41,8 @@ func init() {
 
 		Fields: []Field{
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
-			{Key: "hostname", Label: "Hostname", Required: true},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
+			{Key: "hostname", Label: "Hostname", Required: true},
 			{Key: "location_id", Label: "Location", PickerKey: "locations"},
 			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
 			{Key: "dns_name", Label: "DNS Name"},
@@ -90,6 +90,24 @@ func init() {
 				return filtered
 			}
 			return items
+		},
+
+		AsyncDerive: func(client *apiclient.Client, key string, values map[string]string) map[string]string {
+			if key != "site_id" && key != "category_id" {
+				return nil
+			}
+			if values["site_id"] == "" || values["category_id"] == "" {
+				return nil
+			}
+			var result struct {
+				Hostname string `json:"hostname"`
+			}
+			err := client.Get(fmt.Sprintf("/devices/next-hostname?site_id=%s&category_id=%s",
+				values["site_id"], values["category_id"]), &result)
+			if err != nil || result.Hostname == "" {
+				return nil
+			}
+			return map[string]string{"hostname": result.Hostname}
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {

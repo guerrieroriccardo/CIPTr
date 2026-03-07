@@ -165,6 +165,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	devices := api.Group("/devices")
 	{
 		devices.GET("", deviceHandler.List)
+		devices.GET("/next-hostname", deviceHandler.NextHostname)
 		devices.POST("", deviceHandler.Create)
 		devices.GET("/:id", deviceHandler.GetByID)
 		devices.PUT("/:id", deviceHandler.Update)
