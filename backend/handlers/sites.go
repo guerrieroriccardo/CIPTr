@@ -27,7 +27,7 @@ func NewSiteHandler(db *sql.DB) *SiteHandler {
 
 // siteSelectSQL is the base SELECT used by every read operation.
 // Defined as a constant to avoid repeating the column list.
-const siteSelectSQL = `SELECT id, client_id, name, address, notes, created_at FROM sites`
+const siteSelectSQL = `SELECT id, client_id, name, address, domain, notes, created_at FROM sites`
 
 // scanSite reads one row (from Query or QueryRow) into a Site struct.
 //
@@ -36,7 +36,7 @@ const siteSelectSQL = `SELECT id, client_id, name, address, notes, created_at FR
 // This avoids duplicating the column list in every handler.
 func scanSite(row interface{ Scan(...any) error }) (models.Site, error) {
 	var s models.Site
-	err := row.Scan(&s.ID, &s.ClientID, &s.Name, &s.Address, &s.Notes, &s.CreatedAt)
+	err := row.Scan(&s.ID, &s.ClientID, &s.Name, &s.Address, &s.Domain, &s.Notes, &s.CreatedAt)
 	return s, err
 }
 
@@ -142,9 +142,9 @@ func (h *SiteHandler) Create(c *gin.Context) {
 	}
 
 	s, err := scanSite(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO sites (client_id, name, address, notes) VALUES ($1, $2, $3, $4)
-		 RETURNING id, client_id, name, address, notes, created_at`,
-		input.ClientID, input.Name, input.Address, input.Notes,
+		`INSERT INTO sites (client_id, name, address, domain, notes) VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, client_id, name, address, domain, notes, created_at`,
+		input.ClientID, input.Name, input.Address, input.Domain, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -171,9 +171,9 @@ func (h *SiteHandler) Update(c *gin.Context) {
 	}
 
 	s, err := scanSite(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE sites SET client_id = $1, name = $2, address = $3, notes = $4 WHERE id = $5
-		 RETURNING id, client_id, name, address, notes, created_at`,
-		input.ClientID, input.Name, input.Address, input.Notes, id,
+		`UPDATE sites SET client_id = $1, name = $2, address = $3, domain = $4, notes = $5 WHERE id = $6
+		 RETURNING id, client_id, name, address, domain, notes, created_at`,
+		input.ClientID, input.Name, input.Address, input.Domain, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("site not found"))

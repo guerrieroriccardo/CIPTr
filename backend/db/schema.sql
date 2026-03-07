@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS clients (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
     short_code  TEXT NOT NULL UNIQUE,   -- e.g. "ADP", "XYZ"
+    domain      TEXT,                   -- e.g. "berpa.local" (default domain for all sites)
     notes       TEXT,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sites (
     client_id   BIGINT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,          -- e.g. "HQ", "Rome Branch"
     address     TEXT,
+    domain      TEXT,                   -- overrides client.domain if set (e.g. "branch.berpa.local")
     notes       TEXT,
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(client_id, name)

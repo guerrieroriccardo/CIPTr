@@ -37,6 +37,7 @@ func init() {
 			{Key: "client_id", Label: "Client", Required: true, PickerKey: "clients"},
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "address", Label: "Address"},
+			{Key: "domain", Label: "Domain (overrides client)"},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -56,6 +57,7 @@ func init() {
 				ClientID: mustInt64(data["client_id"]),
 				Name:     data["name"],
 				Address:  strPtr(data["address"]),
+				Domain:   strPtr(data["domain"]),
 				Notes:    strPtr(data["notes"]),
 			}
 			var created models.Site
@@ -67,6 +69,7 @@ func init() {
 				ClientID: mustInt64(data["client_id"]),
 				Name:     data["name"],
 				Address:  strPtr(data["address"]),
+				Domain:   strPtr(data["domain"]),
 				Notes:    strPtr(data["notes"]),
 			}
 			var updated models.Site

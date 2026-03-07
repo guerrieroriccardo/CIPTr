@@ -6,22 +6,22 @@ API_URL="${API_URL:-http://localhost:8080/api/v1}"
 echo "==> Seeding via API at $API_URL"
 
 # Check API is reachable
-if ! curl -sf "$API_URL/health" > /dev/null 2>&1; then
-    echo "ERROR: API not reachable at $API_URL"
-    exit 1
+if ! curl -sf "$API_URL/health" >/dev/null 2>&1; then
+  echo "ERROR: API not reachable at $API_URL"
+  exit 1
 fi
 
 post() {
-    local path="$1"
-    local data="$2"
-    local result
-    result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' -d "$data" 2>&1) || {
-        echo "  FAILED: POST $path"
-        echo "  Data: $data"
-        echo "  Response: $result"
-        return 1
-    }
-    echo "$result"
+  local path="$1"
+  local data="$2"
+  local result
+  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI3ODcwNjcsInVzZXJfaWQiOjEsInVzZXJuYW1lIjoiZ3VlcnJvIn0.lnhkvPDZ3NuiAUNkgLqqTefGxIbzeJXlUj9URJNL1DU" -d "$data" 2>&1) || {
+    echo "  FAILED: POST $path"
+    echo "  Data: $data"
+    echo "  Response: $result"
+    return 1
+  }
+  echo "$result"
 }
 
 # ── Manufacturers ──
@@ -54,8 +54,8 @@ post /suppliers '{"name":"InfoStore SpA","address":"Via Giardini 300, Modena","p
 
 # ── Clients ──
 echo "==> Clients..."
-post /clients '{"name":"Berpa Costruzioni","short_code":"BRP","notes":"Construction company"}'
-post /clients '{"name":"Officine Meccaniche Pontina","short_code":"OMP","notes":"Mechanical workshop"}'
+post /clients '{"name":"Berpa Costruzioni","short_code":"BRP","domain":"berpa.local","notes":"Construction company"}'
+post /clients '{"name":"Officine Meccaniche Pontina","short_code":"OMP","domain":"omp.local","notes":"Mechanical workshop"}'
 post /clients '{"name":"Studio Legale Rossi","short_code":"SLR","notes":"Law firm"}'
 post /clients '{"name":"Farmacia Centrale","short_code":"FRC","notes":"Pharmacy chain"}'
 

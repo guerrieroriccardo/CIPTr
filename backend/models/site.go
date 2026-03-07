@@ -8,6 +8,7 @@ type Site struct {
 	ClientID  int64     `json:"client_id"`
 	Name      string    `json:"name"`
 	Address   *string   `json:"address"`
+	Domain    *string   `json:"domain"`
 	Notes     *string   `json:"notes"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -17,5 +18,6 @@ type SiteInput struct {
 	ClientID int64   `json:"client_id" binding:"required"`
 	Name     string  `json:"name"      binding:"required"`
 	Address  *string `json:"address"`
+	Domain   *string `json:"domain"`
 	Notes    *string `json:"notes"`
 }

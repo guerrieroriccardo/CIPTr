@@ -4,11 +4,11 @@
 -- ============================================================
 
 -- Clients
-INSERT INTO clients (name, short_code, notes) VALUES
-  ('Berpa Costruzioni', 'BRP', 'Construction company'),
-  ('Officine Meccaniche Pontina', 'OMP', 'Mechanical workshop'),
-  ('Studio Legale Rossi', 'SLR', 'Law firm'),
-  ('Farmacia Centrale', 'FRC', 'Pharmacy chain');
+INSERT INTO clients (name, short_code, domain, notes) VALUES
+  ('Berpa Costruzioni', 'BRP', 'berpa.local', 'Construction company'),
+  ('Officine Meccaniche Pontina', 'OMP', 'omp.local', 'Mechanical workshop'),
+  ('Studio Legale Rossi', 'SLR', NULL, 'Law firm'),
+  ('Farmacia Centrale', 'FRC', NULL, 'Pharmacy chain');
 
 -- Sites
 INSERT INTO sites (client_id, name, address, notes) VALUES

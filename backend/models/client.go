@@ -7,6 +7,7 @@ type Client struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
 	ShortCode string    `json:"short_code"`
+	Domain    *string   `json:"domain"`
 	Notes     *string   `json:"notes"` // nullable
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -15,5 +16,6 @@ type Client struct {
 type ClientInput struct {
 	Name      string  `json:"name"       binding:"required"`
 	ShortCode string  `json:"short_code" binding:"required"`
+	Domain    *string `json:"domain"`
 	Notes     *string `json:"notes"`
 }

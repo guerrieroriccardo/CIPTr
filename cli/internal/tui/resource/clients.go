@@ -118,6 +118,7 @@ func init() {
 		Fields: []Field{
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "short_code", Label: "Short Code", Required: true},
+			{Key: "domain", Label: "Domain (e.g. berpa.local)"},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -143,6 +144,7 @@ func init() {
 			input := models.ClientInput{
 				Name:      data["name"],
 				ShortCode: data["short_code"],
+				Domain:    strPtr(data["domain"]),
 			}
 			if v, ok := data["notes"]; ok && v != "" {
 				input.Notes = &v
@@ -155,6 +157,7 @@ func init() {
 			input := models.ClientInput{
 				Name:      data["name"],
 				ShortCode: data["short_code"],
+				Domain:    strPtr(data["domain"]),
 			}
 			if v, ok := data["notes"]; ok && v != "" {
 				input.Notes = &v

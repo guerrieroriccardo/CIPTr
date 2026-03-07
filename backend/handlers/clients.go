@@ -30,13 +30,13 @@ func NewClientHandler(db *sql.DB) *ClientHandler {
 }
 
 // clientSelectSQL is the base SELECT used by every read operation.
-const clientSelectSQL = `SELECT id, name, short_code, notes, created_at FROM clients`
+const clientSelectSQL = `SELECT id, name, short_code, domain, notes, created_at FROM clients`
 
 // scanClient reads one row into a Client struct.
 // Accepts both *sql.Rows and *sql.Row (both implement Scan).
 func scanClient(row interface{ Scan(...any) error }) (models.Client, error) {
 	var cl models.Client
-	err := row.Scan(&cl.ID, &cl.Name, &cl.ShortCode, &cl.Notes, &cl.CreatedAt)
+	err := row.Scan(&cl.ID, &cl.Name, &cl.ShortCode, &cl.Domain, &cl.Notes, &cl.CreatedAt)
 	return cl, err
 }
 
@@ -101,9 +101,9 @@ func (h *ClientHandler) Create(c *gin.Context) {
 	// INSERT ... RETURNING fetches all columns in one round-trip,
 	// avoiding a separate SELECT after insert.
 	cl, err := scanClient(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO clients (name, short_code, notes) VALUES ($1, $2, $3)
-		 RETURNING id, name, short_code, notes, created_at`,
-		input.Name, input.ShortCode, input.Notes,
+		`INSERT INTO clients (name, short_code, domain, notes) VALUES ($1, $2, $3, $4)
+		 RETURNING id, name, short_code, domain, notes, created_at`,
+		input.Name, input.ShortCode, input.Domain, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -132,9 +132,9 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	// UPDATE ... RETURNING returns sql.ErrNoRows if no row matched the WHERE,
 	// giving us 404 detection without a separate RowsAffected check.
 	cl, err := scanClient(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE clients SET name = $1, short_code = $2, notes = $3 WHERE id = $4
-		 RETURNING id, name, short_code, notes, created_at`,
-		input.Name, input.ShortCode, input.Notes, id,
+		`UPDATE clients SET name = $1, short_code = $2, domain = $3, notes = $4 WHERE id = $5
+		 RETURNING id, name, short_code, domain, notes, created_at`,
+		input.Name, input.ShortCode, input.Domain, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("client not found"))

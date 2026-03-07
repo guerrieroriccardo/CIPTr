@@ -37,7 +37,7 @@
 **Unique:** `name` (global), `short_code` (global)
 
 ```json
-{ "name": "Acme Corp", "short_code": "ACM", "notes": null }
+{ "name": "Acme Corp", "short_code": "ACM", "domain": "acme.local", "notes": null }
 ```
 
 **Frontend note:** Short code should auto-generate from name (3 uppercase chars):
@@ -68,8 +68,10 @@
 **Unique:** `(client_id, name)`
 
 ```json
-{ "client_id": 1, "name": "Main Office", "address": "Via Roma 1", "notes": null }
+{ "client_id": 1, "name": "Main Office", "address": "Via Roma 1", "domain": "branch.acme.local", "notes": null }
 ```
+
+**Note:** `domain` is optional. If set, it overrides the client's domain for DNS name generation.
 
 ---
 

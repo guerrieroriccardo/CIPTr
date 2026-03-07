@@ -101,13 +101,18 @@ func init() {
 			}
 			var result struct {
 				Hostname string `json:"hostname"`
+				DnsName  string `json:"dns_name"`
 			}
 			err := client.Get(fmt.Sprintf("/devices/next-hostname?site_id=%s&category_id=%s",
 				values["site_id"], values["category_id"]), &result)
 			if err != nil || result.Hostname == "" {
 				return nil
 			}
-			return map[string]string{"hostname": result.Hostname}
+			derived := map[string]string{"hostname": result.Hostname}
+			if result.DnsName != "" {
+				derived["dns_name"] = result.DnsName
+			}
+			return derived
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {

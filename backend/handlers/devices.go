@@ -241,7 +241,24 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 	}
 
 	hostname := fmt.Sprintf("%s%03d", prefix, next)
-	ok(c, http.StatusOK, gin.H{"hostname": hostname})
+
+	// Resolve domain: site.domain overrides client.domain.
+	var domain *string
+	err = h.db.QueryRowContext(c.Request.Context(),
+		`SELECT COALESCE(s.domain, c.domain)
+		 FROM sites s JOIN clients c ON c.id = s.client_id
+		 WHERE s.id = $1`, siteID,
+	).Scan(&domain)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	result := gin.H{"hostname": hostname}
+	if domain != nil && *domain != "" {
+		result["dns_name"] = hostname + "." + *domain
+	}
+	ok(c, http.StatusOK, result)
 }
 
 // Create handles POST /devices
