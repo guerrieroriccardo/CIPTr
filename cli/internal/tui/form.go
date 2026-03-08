@@ -358,6 +358,20 @@ func (f ResourceForm) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		f.picking = false
 		return f, nil
+	case "ctrl+n":
+		// Create new entry for this picker's resource inline.
+		field := f.def.Fields[f.focus]
+		if field.PickerKey == "" {
+			return f, nil
+		}
+		subDef, ok := resource.Registry[field.PickerKey]
+		if !ok || subDef.Create == nil {
+			return f, nil
+		}
+		f.picking = false
+		return f, func() tea.Msg {
+			return PushScreenMsg{Screen: NewResourceForm(subDef, f.client, "", nil)}
+		}
 	case "enter":
 		if len(f.pickerMatch) > 0 {
 			selected := f.pickerMatch[f.pickerCursor]
@@ -533,7 +547,14 @@ func (f ResourceForm) viewPicker() string {
 		}
 	}
 
-	b.WriteString("\n" + HelpStyle.Render("↑↓ navigate • enter select • esc cancel"))
+	helpParts := []string{"↑↓ navigate", "enter select"}
+	if field.PickerKey != "" {
+		if subDef, ok := resource.Registry[field.PickerKey]; ok && subDef.Create != nil {
+			helpParts = append(helpParts, "ctrl+n create new")
+		}
+	}
+	helpParts = append(helpParts, "esc cancel")
+	b.WriteString("\n" + HelpStyle.Render(strings.Join(helpParts, " • ")))
 	return b.String()
 }
 
