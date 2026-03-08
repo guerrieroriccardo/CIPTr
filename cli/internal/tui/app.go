@@ -153,6 +153,8 @@ func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
 		screen = NewResourceTableWithSelect(def, a.client, manufacturerDrillDown(a.client))
 	case "locations":
 		screen = NewResourceTableWithSelect(def, a.client, locationDrillDown(a.client))
+	case "operating_systems":
+		screen = NewResourceTableWithSelect(def, a.client, osDrillDown(a.client))
 	default:
 		screen = NewResourceTable(def, a.client)
 	}

@@ -21,10 +21,10 @@ type Device struct {
 	IsUp       *bool  `json:"is_up"`
 
 	// Software / management
-	Os           *string `json:"os"`
-	HasRmm       *bool   `json:"has_rmm"`
-	HasAntivirus *bool   `json:"has_antivirus"`
-	SupplierID   *int64  `json:"supplier_id"`
+	OsID         *int64 `json:"os_id"`
+	HasRmm       *bool  `json:"has_rmm"`
+	HasAntivirus *bool  `json:"has_antivirus"`
+	SupplierID   *int64 `json:"supplier_id"`
 
 	// Logistics
 	InstallationDate *string `json:"installation_date"` // DATE as string (YYYY-MM-DD)
@@ -50,10 +50,10 @@ type DeviceInput struct {
 	Status     *string `json:"status"`
 	IsUp       *bool   `json:"is_up"`
 
-	Os           *string `json:"os"`
-	HasRmm       *bool   `json:"has_rmm"`
-	HasAntivirus *bool   `json:"has_antivirus"`
-	SupplierID   *int64  `json:"supplier_id"`
+	OsID         *int64 `json:"os_id"`
+	HasRmm       *bool  `json:"has_rmm"`
+	HasAntivirus *bool  `json:"has_antivirus"`
+	SupplierID   *int64 `json:"supplier_id"`
 
 	InstallationDate *string `json:"installation_date"`
 	IsReserved       *bool   `json:"is_reserved"`

@@ -349,6 +349,23 @@ func scopedDevicesByLocation(locationID string) *resource.Def {
 	return &base
 }
 
+func scopedDevicesByOs(osID string) *resource.Def {
+	base := *resource.Registry["devices"]
+	base.Defaults = map[string]string{"os_id": osID, "status": "planned"}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.Device
+		if err := c.Get("/devices?os_id="+osID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
 func scopedModelsByManufacturer(mfgID string) *resource.Def {
 	base := *resource.Registry["device_models"]
 	base.Defaults = map[string]string{"manufacturer_id": mfgID}
@@ -537,6 +554,18 @@ func manufacturerDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 		screen := NewResourceTableWithSelect(def, apiClient, deviceModelDrillDown(apiClient))
 		return func() tea.Msg {
 			return PushScreenMsg{Screen: titledScreen{screen, mfg.Name + " Models"}}
+		}
+	}
+}
+
+func osDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		os := raw.(*models.OperatingSystem)
+		osID := fmt.Sprintf("%d", os.ID)
+		def := scopedDevicesByOs(osID)
+		screen := NewResourceTable(def, apiClient)
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, os.Name + " Devices"}}
 		}
 	}
 }

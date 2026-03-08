@@ -46,6 +46,7 @@ func NewMenu() Menu {
 		MenuItem{name: "All Manufacturers", desc: "Hardware manufacturers", key: "manufacturers"},
 		MenuItem{name: "All Categories", desc: "Device categories", key: "categories"},
 		MenuItem{name: "All Suppliers", desc: "Device suppliers", key: "suppliers"},
+		MenuItem{name: "All Operating Systems", desc: "Operating systems catalog", key: "operating_systems"},
 		MenuItem{name: "All Device Models", desc: "Hardware catalog", key: "device_models"},
 		MenuItem{name: "All Devices", desc: "List all devices", key: "devices"},
 		MenuItem{name: "All Device Interfaces", desc: "List all NICs", key: "device_interfaces"},

@@ -156,6 +156,10 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
 { "name": "TechSupply", "address": "Via Roma 1", "phone": "+39...", "email": "info@..." }
 ```
 
+### Operating Systems
+
+Standard CRUD at `/operating-systems`. **Required:** `name` (globally unique).
+
 ---
 
 ### Device Models
@@ -171,7 +175,7 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
 ```json
 {
   "manufacturer_id": 1, "model_name": "ProLiant DL380", "category_id": 1,
-  "os_default": "Windows Server 2022", "specs": "32GB RAM", "notes": null
+  "os_default_id": 1, "specs": "32GB RAM", "notes": null
 }
 ```
 
@@ -204,7 +208,7 @@ Standard CRUD at `/suppliers`. **Required:** `name`.
   "location_id": 1, "model_id": 1,
   "dns_name": "srv-dc01.domain.local", "serial_number": "ABC123",
   "asset_tag": "IT-001", "status": "active", "is_up": true,
-  "os": "Windows Server 2022", "has_rmm": true, "has_antivirus": true,
+  "os_id": 1, "has_rmm": true, "has_antivirus": true,
   "supplier_id": 1, "installation_date": "2024-01-15",
   "is_reserved": false, "notes": null
 }

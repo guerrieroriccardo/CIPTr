@@ -33,6 +33,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	manufacturerHandler := handlers.NewManufacturerHandler(database)
 	categoryHandler     := handlers.NewCategoryHandler(database)
 	supplierHandler     := handlers.NewSupplierHandler(database)
+	osHandler           := handlers.NewOperatingSystemHandler(database)
 	deviceModelHandler := handlers.NewDeviceModelHandler(database)
 	deviceHandler          := handlers.NewDeviceHandler(database)
 	deviceInterfaceHandler := handlers.NewDeviceInterfaceHandler(database)
@@ -95,6 +96,15 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		categoriesGroup.GET("/:id", categoryHandler.GetByID)
 		categoriesGroup.PUT("/:id", categoryHandler.Update)
 		categoriesGroup.DELETE("/:id", categoryHandler.Delete)
+	}
+
+	operatingSystems := api.Group("/operating-systems")
+	{
+		operatingSystems.GET("", osHandler.List)
+		operatingSystems.POST("", osHandler.Create)
+		operatingSystems.GET("/:id", osHandler.GetByID)
+		operatingSystems.PUT("/:id", osHandler.Update)
+		operatingSystems.DELETE("/:id", osHandler.Delete)
 	}
 
 	suppliersGroup := api.Group("/suppliers")

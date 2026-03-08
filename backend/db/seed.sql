@@ -56,19 +56,30 @@ INSERT INTO suppliers (name, address, phone, email) VALUES
   ('TechDistribution Srl', 'Via dell''Industria 5, Bologna', '+39 051 1234567', 'ordini@techdist.it'),
   ('InfoStore SpA', 'Via Giardini 300, Modena', '+39 059 9876543', 'vendite@infostore.it');
 
+-- Operating Systems
+INSERT INTO operating_systems (name) VALUES
+  ('Windows Server 2022'),
+  ('Windows Server 2012 R2'),
+  ('Windows 11 Pro'),
+  ('Windows 10 Pro'),
+  ('Proxmox VE 8'),
+  ('Proxmox VE 8.1'),
+  ('FortiOS 7.4'),
+  ('FortiOS 7.4.2');
+
 -- Device Models
-INSERT INTO device_models (manufacturer_id, model_name, category_id, os_default, specs, notes) VALUES
-  (1, 'ProLiant DL380 Gen10', 1, 'Windows Server 2022', '2x Xeon Gold, 64GB RAM, 4x 1.2TB SAS', NULL),
-  (1, 'ProLiant DL360 Gen10', 1, 'Windows Server 2022', 'Xeon Silver, 32GB RAM, 2x 480GB SSD', NULL),
-  (3, 'OptiPlex 7090', 2, 'Windows 11 Pro', 'i7-11700, 16GB RAM, 512GB NVMe', NULL),
-  (6, 'ThinkPad T14s Gen3', 3, 'Windows 11 Pro', 'i7-1260P, 16GB RAM, 512GB NVMe', NULL),
+INSERT INTO device_models (manufacturer_id, model_name, category_id, os_default_id, specs, notes) VALUES
+  (1, 'ProLiant DL380 Gen10', 1, 1, '2x Xeon Gold, 64GB RAM, 4x 1.2TB SAS', NULL),
+  (1, 'ProLiant DL360 Gen10', 1, 1, 'Xeon Silver, 32GB RAM, 2x 480GB SSD', NULL),
+  (3, 'OptiPlex 7090', 2, 3, 'i7-11700, 16GB RAM, 512GB NVMe', NULL),
+  (6, 'ThinkPad T14s Gen3', 3, 3, 'i7-1260P, 16GB RAM, 512GB NVMe', NULL),
   (2, 'Catalyst 2960-X 48', 4, NULL, '48x 1GbE, 4x SFP+', NULL),
   (2, 'Catalyst 2960-X 24', 4, NULL, '24x 1GbE, 4x SFP+', NULL),
   (4, 'UniFi U6 Pro', 5, NULL, 'Wi-Fi 6, PoE', NULL),
-  (7, 'FortiGate 60F', 6, 'FortiOS 7.4', '10 GbE ports, 700 Mbps throughput', NULL),
+  (7, 'FortiGate 60F', 6, 7, '10 GbE ports, 700 Mbps throughput', NULL),
   (5, 'Smart-UPS 1500', 7, NULL, '1500VA / 1000W, LCD, rack 2U', NULL),
   (1, 'LaserJet Pro M404dn', 8, NULL, 'B&W, duplex, network', NULL),
-  (3, 'PowerEdge R640', 1, 'Proxmox VE 8', '2x Xeon Gold, 128GB RAM, 8x 960GB SSD', 'Virtualization host');
+  (3, 'PowerEdge R640', 1, 5, '2x Xeon Gold, 128GB RAM, 8x 960GB SSD', 'Virtualization host');
 
 -- Address Blocks
 INSERT INTO address_blocks (site_id, network, description, notes) VALUES
@@ -138,44 +149,44 @@ INSERT INTO patch_panel_ports (patch_panel_id, port_number, port_label) VALUES
   (1, 5, 'A1-05'), (1, 6, 'A1-06'), (1, 7, 'A1-07'), (1, 8, 'A1-08'),
   (2, 1, 'A2-01'), (2, 2, 'A2-02'), (2, 3, 'A2-03'), (2, 4, 'A2-04');
 
--- Devices
-INSERT INTO devices (site_id, location_id, model_id, hostname, dns_name, serial_number, asset_tag, category_id, status, is_up, os, has_rmm, has_antivirus, supplier_id, installation_date, is_reserved, notes) VALUES
+-- Devices (os_id: 1=WinSrv2022, 2=WinSrv2012R2, 3=Win11Pro, 4=Win10Pro, 5=Proxmox8, 6=Proxmox8.1, 7=FortiOS7.4, 8=FortiOS7.4.2)
+INSERT INTO devices (site_id, location_id, model_id, hostname, dns_name, serial_number, asset_tag, category_id, status, is_up, os_id, has_rmm, has_antivirus, supplier_id, installation_date, is_reserved, notes) VALUES
   -- Berpa HQ servers
-  (1, 1, 1, 'SRV-DC01',    'srv-dc01.berpa.local',    'CZJ12345AB', 'IT-001', 1, 'active', true,  'Windows Server 2022', true, true, 1, '2023-06-15', false, 'Primary domain controller'),
-  (1, 1, 2, 'SRV-DC02',    'srv-dc02.berpa.local',    'CZJ12345AC', 'IT-002', 1, 'active', true,  'Windows Server 2022', true, true, 1, '2023-06-15', false, 'Secondary domain controller'),
-  (1, 1, 11, 'SRV-PROX01', 'srv-prox01.berpa.local',  'DXJG7890AB', 'IT-003', 1, 'active', true,  'Proxmox VE 8.1',      true, false, 2, '2024-01-10', false, 'Virtualization host'),
+  (1, 1, 1, 'SRV-DC01',    'srv-dc01.berpa.local',    'CZJ12345AB', 'IT-001', 1, 'active', true,  1, true, true, 1, '2023-06-15', false, 'Primary domain controller'),
+  (1, 1, 2, 'SRV-DC02',    'srv-dc02.berpa.local',    'CZJ12345AC', 'IT-002', 1, 'active', true,  1, true, true, 1, '2023-06-15', false, 'Secondary domain controller'),
+  (1, 1, 11, 'SRV-PROX01', 'srv-prox01.berpa.local',  'DXJG7890AB', 'IT-003', 1, 'active', true,  6, true, false, 2, '2024-01-10', false, 'Virtualization host'),
   -- Berpa HQ firewall
-  (1, 1, 8, 'FW-BERPA-01', 'fw-berpa-01.berpa.local', 'FG60F12345', 'IT-010', 6, 'active', true,  'FortiOS 7.4.2',       false, false, 1, '2023-06-15', false, 'Edge firewall'),
+  (1, 1, 8, 'FW-BERPA-01', 'fw-berpa-01.berpa.local', 'FG60F12345', 'IT-010', 6, 'active', true,  8, false, false, 1, '2023-06-15', false, 'Edge firewall'),
   -- Berpa HQ workstations
-  (1, 2, 3, 'PC-DIR-01',   'pc-dir-01.berpa.local',   'DELL90001', 'IT-020', 2, 'active', true,  'Windows 11 Pro',      true, true, 2, '2024-03-01', false, 'Director office'),
-  (1, 3, 3, 'PC-OPEN-01',  'pc-open-01.berpa.local',  'DELL90002', 'IT-021', 2, 'active', true,  'Windows 11 Pro',      true, true, 2, '2024-03-01', false, NULL),
-  (1, 3, 3, 'PC-OPEN-02',  'pc-open-02.berpa.local',  'DELL90003', 'IT-022', 2, 'active', true,  'Windows 11 Pro',      true, true, 2, '2024-03-01', false, NULL),
-  (1, 3, 3, 'PC-OPEN-03',  'pc-open-03.berpa.local',  'DELL90004', 'IT-023', 2, 'active', false, 'Windows 11 Pro',      true, true, 2, '2024-03-01', false, 'Monitor issue, ticket #1234'),
+  (1, 2, 3, 'PC-DIR-01',   'pc-dir-01.berpa.local',   'DELL90001', 'IT-020', 2, 'active', true,  3, true, true, 2, '2024-03-01', false, 'Director office'),
+  (1, 3, 3, 'PC-OPEN-01',  'pc-open-01.berpa.local',  'DELL90002', 'IT-021', 2, 'active', true,  3, true, true, 2, '2024-03-01', false, NULL),
+  (1, 3, 3, 'PC-OPEN-02',  'pc-open-02.berpa.local',  'DELL90003', 'IT-022', 2, 'active', true,  3, true, true, 2, '2024-03-01', false, NULL),
+  (1, 3, 3, 'PC-OPEN-03',  'pc-open-03.berpa.local',  'DELL90004', 'IT-023', 2, 'active', false, 3, true, true, 2, '2024-03-01', false, 'Monitor issue, ticket #1234'),
   -- Berpa HQ notebooks
-  (1, NULL, 4, 'NB-ADMIN-01', 'nb-admin-01.berpa.local', 'LEN80001', 'IT-030', 3, 'active', true, 'Windows 11 Pro', true, true, 2, '2024-06-01', false, 'IT admin laptop'),
+  (1, NULL, 4, 'NB-ADMIN-01', 'nb-admin-01.berpa.local', 'LEN80001', 'IT-030', 3, 'active', true, 3, true, true, 2, '2024-06-01', false, 'IT admin laptop'),
   -- Berpa HQ peripherals
   (1, 3, 10, 'PRT-OPEN-01', NULL, 'HPP40001', 'IT-040', 8, 'active', true, NULL, false, false, 1, '2024-03-01', false, 'Open space printer'),
   (1, 1, 9,  'UPS-RACK-01', NULL, 'APC50001', 'IT-050', 7, 'active', true, NULL, false, false, 1, '2023-06-15', false, 'Server rack UPS'),
   -- Berpa HQ AP
   (1, 3, 7, 'AP-FLOOR1-01', NULL, 'UBQ60001', 'IT-060', 5, 'active', true, NULL, false, false, 2, '2024-01-15', false, NULL),
   -- Berpa Cantiere
-  (2, NULL, 8, 'FW-CANT-01', NULL, 'FG60F22222', 'IT-070', 6, 'active', true, 'FortiOS 7.4.2', false, false, 1, '2024-06-01', false, 'Site-to-site VPN to HQ'),
+  (2, NULL, 8, 'FW-CANT-01', NULL, 'FG60F22222', 'IT-070', 6, 'active', true, 8, false, false, 1, '2024-06-01', false, 'Site-to-site VPN to HQ'),
   -- OMP
-  (3, 4, 1, 'SRV-OMP-01',  'srv-omp-01.omp.local',   'CZJ55555AB', 'OMP-001', 1, 'active', true,  'Windows Server 2022', true, true, 1, '2023-09-01', false, 'File server + DC'),
-  (3, NULL, 3, 'PC-OMP-01', 'pc-omp-01.omp.local',    'DELL70001',  'OMP-010', 2, 'active', true,  'Windows 11 Pro',      true, true, 2, '2024-02-01', false, NULL),
-  (3, NULL, 3, 'PC-OMP-02', 'pc-omp-02.omp.local',    'DELL70002',  'OMP-011', 2, 'active', true,  'Windows 11 Pro',      true, true, 2, '2024-02-01', false, NULL),
+  (3, 4, 1, 'SRV-OMP-01',  'srv-omp-01.omp.local',   'CZJ55555AB', 'OMP-001', 1, 'active', true,  1, true, true, 1, '2023-09-01', false, 'File server + DC'),
+  (3, NULL, 3, 'PC-OMP-01', 'pc-omp-01.omp.local',    'DELL70001',  'OMP-010', 2, 'active', true,  3, true, true, 2, '2024-02-01', false, NULL),
+  (3, NULL, 3, 'PC-OMP-02', 'pc-omp-02.omp.local',    'DELL70002',  'OMP-011', 2, 'active', true,  3, true, true, 2, '2024-02-01', false, NULL),
   -- Studio Rossi
-  (4, 5, 3, 'PC-ROSSI-01', NULL, 'DELL80001', 'SLR-001', 2, 'active', true, 'Windows 11 Pro', true, true, 2, '2024-01-15', false, 'Avvocato 1'),
-  (4, 5, 3, 'PC-ROSSI-02', NULL, 'DELL80002', 'SLR-002', 2, 'active', true, 'Windows 11 Pro', true, true, 2, '2024-01-15', false, 'Avvocato 2'),
-  (4, 5, 4, 'NB-ROSSI-01', NULL, 'LEN88001', 'SLR-003', 3, 'active', true, 'Windows 11 Pro', true, true, 2, '2024-06-01', false, 'Mobile'),
+  (4, 5, 3, 'PC-ROSSI-01', NULL, 'DELL80001', 'SLR-001', 2, 'active', true, 3, true, true, 2, '2024-01-15', false, 'Avvocato 1'),
+  (4, 5, 3, 'PC-ROSSI-02', NULL, 'DELL80002', 'SLR-002', 2, 'active', true, 3, true, true, 2, '2024-01-15', false, 'Avvocato 2'),
+  (4, 5, 4, 'NB-ROSSI-01', NULL, 'LEN88001', 'SLR-003', 3, 'active', true, 3, true, true, 2, '2024-06-01', false, 'Mobile'),
   -- Farmacia 1
-  (5, 6, 3, 'PC-FARM1-01', NULL, 'DELL99001', 'FRC-001', 2, 'active', true, 'Windows 10 Pro', true, true, 2, '2022-04-01', false, 'POS/cash register'),
-  (5, 6, 3, 'PC-FARM1-02', NULL, 'DELL99002', 'FRC-002', 2, 'active', true, 'Windows 10 Pro', true, true, 2, '2022-04-01', false, 'Back office'),
+  (5, 6, 3, 'PC-FARM1-01', NULL, 'DELL99001', 'FRC-001', 2, 'active', true, 4, true, true, 2, '2022-04-01', false, 'POS/cash register'),
+  (5, 6, 3, 'PC-FARM1-02', NULL, 'DELL99002', 'FRC-002', 2, 'active', true, 4, true, true, 2, '2022-04-01', false, 'Back office'),
   -- Farmacia 2
-  (6, NULL, 3, 'PC-FARM2-01', NULL, 'DELL99003', 'FRC-010', 2, 'active', true, 'Windows 10 Pro', true, true, 2, '2022-04-01', false, 'POS/cash register'),
+  (6, NULL, 3, 'PC-FARM2-01', NULL, 'DELL99003', 'FRC-010', 2, 'active', true, 4, true, true, 2, '2022-04-01', false, 'POS/cash register'),
   -- Decommissioned / storage
-  (1, NULL, NULL, 'SRV-OLD-01', NULL, 'OLD00001', 'IT-900', 1, 'decommissioned', false, 'Windows Server 2012 R2', false, false, NULL, '2018-01-01', false, 'Old DC, decommissioned 2023'),
-  (1, NULL, 3, 'PC-SPARE-01', NULL, 'DELL00099', 'IT-901', 2, 'storage', false, 'Windows 11 Pro', false, false, 2, '2024-03-01', true, 'Spare workstation');
+  (1, NULL, NULL, 'SRV-OLD-01', NULL, 'OLD00001', 'IT-900', 1, 'decommissioned', false, 2, false, false, NULL, '2018-01-01', false, 'Old DC, decommissioned 2023'),
+  (1, NULL, 3, 'PC-SPARE-01', NULL, 'DELL00099', 'IT-901', 2, 'storage', false, 3, false, false, 2, '2024-03-01', true, 'Spare workstation');
 
 -- Device Interfaces
 INSERT INTO device_interfaces (device_id, name, mac_address, notes) VALUES

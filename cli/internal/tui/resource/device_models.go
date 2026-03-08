@@ -28,7 +28,7 @@ func init() {
 				ManufacturerName(dm.ManufacturerID),
 				dm.ModelName,
 				CategoryName(dm.CategoryID),
-				derefStr(dm.OsDefault),
+				OsName(dm.OsDefaultID),
 			}
 		},
 		GetID: func(raw any) string {
@@ -39,7 +39,7 @@ func init() {
 			{Key: "manufacturer_id", Label: "Manufacturer", Required: true, PickerKey: "manufacturers"},
 			{Key: "model_name", Label: "Model Name", Required: true},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
-			{Key: "os_default", Label: "OS Default"},
+			{Key: "os_default_id", Label: "OS Default", PickerKey: "operating_systems"},
 			{Key: "specs", Label: "Specs"},
 			{Key: "notes", Label: "Notes"},
 		},
@@ -60,7 +60,7 @@ func init() {
 				ManufacturerID: mustInt64(data["manufacturer_id"]),
 				ModelName:      data["model_name"],
 				CategoryID:     mustInt64(data["category_id"]),
-				OsDefault:      strPtr(data["os_default"]),
+				OsDefaultID:    int64Ptr(data["os_default_id"]),
 				Specs:          strPtr(data["specs"]),
 				Notes:          strPtr(data["notes"]),
 			}
@@ -73,7 +73,7 @@ func init() {
 				ManufacturerID: mustInt64(data["manufacturer_id"]),
 				ModelName:      data["model_name"],
 				CategoryID:     mustInt64(data["category_id"]),
-				OsDefault:      strPtr(data["os_default"]),
+				OsDefaultID:    int64Ptr(data["os_default_id"]),
 				Specs:          strPtr(data["specs"]),
 				Notes:          strPtr(data["notes"]),
 			}

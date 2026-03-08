@@ -28,7 +28,7 @@ func NewDeviceHandler(db *sql.DB) *DeviceHandler {
 const deviceSelectSQL = `SELECT id, site_id, location_id, model_id,
 	hostname, dns_name, serial_number, asset_tag,
 	category_id, status, is_up,
-	os, has_rmm, has_antivirus, supplier_id,
+	os_id, has_rmm, has_antivirus, supplier_id,
 	installation_date, is_reserved,
 	notes, created_at, updated_at
 	FROM devices`
@@ -40,7 +40,7 @@ func scanDevice(row interface{ Scan(...any) error }) (models.Device, error) {
 		&d.ID, &d.SiteID, &d.LocationID, &d.ModelID,
 		&d.Hostname, &d.DnsName, &d.SerialNumber, &d.AssetTag,
 		&d.CategoryID, &d.Status, &d.IsUp,
-		&d.Os, &d.HasRmm, &d.HasAntivirus, &d.SupplierID,
+		&d.OsID, &d.HasRmm, &d.HasAntivirus, &d.SupplierID,
 		&d.InstallationDate, &d.IsReserved,
 		&d.Notes, &d.CreatedAt, &d.UpdatedAt,
 	)
@@ -98,6 +98,11 @@ func (h *DeviceHandler) List(c *gin.Context) {
 	if locationID := c.Query("location_id"); locationID != "" {
 		conds = append(conds, fmt.Sprintf("location_id = $%d", n))
 		args = append(args, locationID)
+		n++
+	}
+	if osID := c.Query("os_id"); osID != "" {
+		conds = append(conds, fmt.Sprintf("os_id = $%d", n))
+		args = append(args, osID)
 		n++
 	}
 	if search := c.Query("search"); search != "" {
@@ -300,19 +305,19 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 			site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
-			os, has_rmm, has_antivirus, supplier_id,
+			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved, notes
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
-			os, has_rmm, has_antivirus, supplier_id,
+			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
 			notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
 		input.CategoryID, status, input.IsUp,
-		input.Os, input.HasRmm, input.HasAntivirus, input.SupplierID,
+		input.OsID, input.HasRmm, input.HasAntivirus, input.SupplierID,
 		input.InstallationDate, input.IsReserved, input.Notes,
 	))
 	if err != nil {
@@ -354,19 +359,19 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 			site_id = $1, location_id = $2, model_id = $3,
 			hostname = $4, dns_name = $5, serial_number = $6, asset_tag = $7,
 			category_id = $8, status = $9, is_up = $10,
-			os = $11, has_rmm = $12, has_antivirus = $13, supplier_id = $14,
+			os_id = $11, has_rmm = $12, has_antivirus = $13, supplier_id = $14,
 			installation_date = $15, is_reserved = $16, notes = $17
 		WHERE id = $18
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
-			os, has_rmm, has_antivirus, supplier_id,
+			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
 			notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
 		input.CategoryID, status, input.IsUp,
-		input.Os, input.HasRmm, input.HasAntivirus, input.SupplierID,
+		input.OsID, input.HasRmm, input.HasAntivirus, input.SupplierID,
 		input.InstallationDate, input.IsReserved, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {

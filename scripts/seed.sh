@@ -15,7 +15,7 @@ post() {
   local path="$1"
   local data="$2"
   local result
-  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI5NzkyNjEsInVzZXJfaWQiOjIsInVzZXJuYW1lIjoiZ3VlcnJvIn0.ZrCGayGgM-a4Nu72p9fUocgZOl04h9T0EC-W9hwT1fQ" -d "$data" 2>&1) || {
+  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI5ODExOTIsInVzZXJfaWQiOjIsInVzZXJuYW1lIjoiZ3VlcnJvIn0.2l8FoZSqlvCQFH5ImtpxKwLlUJ5hCJo4f9IB580Rce8" -d "$data" 2>&1) || {
     echo "  FAILED: POST $path"
     echo "  Data: $data"
     echo "  Response: $result"
@@ -77,19 +77,30 @@ post /locations '{"site_id":3,"name":"Sala CED","floor":"0","notes":"Small rack 
 post /locations '{"site_id":4,"name":"Ufficio","floor":"0"}'
 post /locations '{"site_id":5,"name":"Retro Banco","floor":"0","notes":"Behind the counter"}'
 
+# ── Operating Systems ──
+echo "==> Operating Systems..."
+post /operating-systems '{"name":"Windows Server 2022"}'
+post /operating-systems '{"name":"Windows Server 2012 R2"}'
+post /operating-systems '{"name":"Windows 11 Pro"}'
+post /operating-systems '{"name":"Windows 10 Pro"}'
+post /operating-systems '{"name":"Proxmox VE 8"}'
+post /operating-systems '{"name":"Proxmox VE 8.1"}'
+post /operating-systems '{"name":"FortiOS 7.4"}'
+post /operating-systems '{"name":"FortiOS 7.4.2"}'
+
 # ── Device Models ──
 echo "==> Device Models..."
-post /device-models '{"manufacturer_id":1,"model_name":"ProLiant DL380 Gen10","category_id":1,"os_default":"Windows Server 2022","specs":"2x Xeon Gold, 64GB RAM, 4x 1.2TB SAS"}'
-post /device-models '{"manufacturer_id":1,"model_name":"ProLiant DL360 Gen10","category_id":1,"os_default":"Windows Server 2022","specs":"Xeon Silver, 32GB RAM, 2x 480GB SSD"}'
-post /device-models '{"manufacturer_id":3,"model_name":"OptiPlex 7090","category_id":2,"os_default":"Windows 11 Pro","specs":"i7-11700, 16GB RAM, 512GB NVMe"}'
-post /device-models '{"manufacturer_id":6,"model_name":"ThinkPad T14s Gen3","category_id":3,"os_default":"Windows 11 Pro","specs":"i7-1260P, 16GB RAM, 512GB NVMe"}'
+post /device-models '{"manufacturer_id":1,"model_name":"ProLiant DL380 Gen10","category_id":1,"os_default_id":1,"specs":"2x Xeon Gold, 64GB RAM, 4x 1.2TB SAS"}'
+post /device-models '{"manufacturer_id":1,"model_name":"ProLiant DL360 Gen10","category_id":1,"os_default_id":1,"specs":"Xeon Silver, 32GB RAM, 2x 480GB SSD"}'
+post /device-models '{"manufacturer_id":3,"model_name":"OptiPlex 7090","category_id":2,"os_default_id":3,"specs":"i7-11700, 16GB RAM, 512GB NVMe"}'
+post /device-models '{"manufacturer_id":6,"model_name":"ThinkPad T14s Gen3","category_id":3,"os_default_id":3,"specs":"i7-1260P, 16GB RAM, 512GB NVMe"}'
 post /device-models '{"manufacturer_id":2,"model_name":"Catalyst 2960-X 48","category_id":4,"specs":"48x 1GbE, 4x SFP+"}'
 post /device-models '{"manufacturer_id":2,"model_name":"Catalyst 2960-X 24","category_id":4,"specs":"24x 1GbE, 4x SFP+"}'
 post /device-models '{"manufacturer_id":4,"model_name":"UniFi U6 Pro","category_id":5,"specs":"Wi-Fi 6, PoE"}'
-post /device-models '{"manufacturer_id":7,"model_name":"FortiGate 60F","category_id":6,"os_default":"FortiOS 7.4","specs":"10 GbE ports, 700 Mbps throughput"}'
+post /device-models '{"manufacturer_id":7,"model_name":"FortiGate 60F","category_id":6,"os_default_id":7,"specs":"10 GbE ports, 700 Mbps throughput"}'
 post /device-models '{"manufacturer_id":5,"model_name":"Smart-UPS 1500","category_id":7,"specs":"1500VA / 1000W, LCD, rack 2U"}'
 post /device-models '{"manufacturer_id":1,"model_name":"LaserJet Pro M404dn","category_id":8,"specs":"B&W, duplex, network"}'
-post /device-models '{"manufacturer_id":3,"model_name":"PowerEdge R640","category_id":1,"os_default":"Proxmox VE 8","specs":"2x Xeon Gold, 128GB RAM, 8x 960GB SSD","notes":"Virtualization host"}'
+post /device-models '{"manufacturer_id":3,"model_name":"PowerEdge R640","category_id":1,"os_default_id":5,"specs":"2x Xeon Gold, 128GB RAM, 8x 960GB SSD","notes":"Virtualization host"}'
 
 # ── Address Blocks ──
 echo "==> Address Blocks..."
@@ -133,42 +144,42 @@ post /patch-panels '{"site_id":1,"name":"PP-RACK-A-2","total_ports":24,"location
 
 # ── Devices ──
 echo "==> Devices..."
-# Berpa HQ servers
-post /devices '{"site_id":1,"location_id":1,"model_id":1,"hostname":"SRV-DC01","dns_name":"srv-dc01.berpa.local","serial_number":"CZJ12345AB","asset_tag":"IT-001","category_id":1,"status":"active","is_up":true,"os":"Windows Server 2022","has_rmm":true,"has_antivirus":true,"supplier_id":1,"installation_date":"2023-06-15","notes":"Primary domain controller"}'
-post /devices '{"site_id":1,"location_id":1,"model_id":2,"hostname":"SRV-DC02","dns_name":"srv-dc02.berpa.local","serial_number":"CZJ12345AC","asset_tag":"IT-002","category_id":1,"status":"active","is_up":true,"os":"Windows Server 2022","has_rmm":true,"has_antivirus":true,"supplier_id":1,"installation_date":"2023-06-15","notes":"Secondary domain controller"}'
-post /devices '{"site_id":1,"location_id":1,"model_id":11,"hostname":"SRV-PROX01","dns_name":"srv-prox01.berpa.local","serial_number":"DXJG7890AB","asset_tag":"IT-003","category_id":1,"status":"active","is_up":true,"os":"Proxmox VE 8.1","has_rmm":true,"has_antivirus":false,"supplier_id":2,"installation_date":"2024-01-10","notes":"Virtualization host"}'
+# Berpa HQ servers (os_id: 1=WinSrv2022, 2=WinSrv2012R2, 3=Win11Pro, 4=Win10Pro, 5=Proxmox8, 6=Proxmox8.1, 7=FortiOS7.4, 8=FortiOS7.4.2)
+post /devices '{"site_id":1,"location_id":1,"model_id":1,"hostname":"SRV-DC01","dns_name":"srv-dc01.berpa.local","serial_number":"CZJ12345AB","asset_tag":"IT-001","category_id":1,"status":"active","is_up":true,"os_id":1,"has_rmm":true,"has_antivirus":true,"supplier_id":1,"installation_date":"2023-06-15","notes":"Primary domain controller"}'
+post /devices '{"site_id":1,"location_id":1,"model_id":2,"hostname":"SRV-DC02","dns_name":"srv-dc02.berpa.local","serial_number":"CZJ12345AC","asset_tag":"IT-002","category_id":1,"status":"active","is_up":true,"os_id":1,"has_rmm":true,"has_antivirus":true,"supplier_id":1,"installation_date":"2023-06-15","notes":"Secondary domain controller"}'
+post /devices '{"site_id":1,"location_id":1,"model_id":11,"hostname":"SRV-PROX01","dns_name":"srv-prox01.berpa.local","serial_number":"DXJG7890AB","asset_tag":"IT-003","category_id":1,"status":"active","is_up":true,"os_id":6,"has_rmm":true,"has_antivirus":false,"supplier_id":2,"installation_date":"2024-01-10","notes":"Virtualization host"}'
 # Berpa HQ firewall
-post /devices '{"site_id":1,"location_id":1,"model_id":8,"hostname":"FW-BERPA-01","dns_name":"fw-berpa-01.berpa.local","serial_number":"FG60F12345","asset_tag":"IT-010","category_id":6,"status":"active","is_up":true,"os":"FortiOS 7.4.2","has_rmm":false,"has_antivirus":false,"supplier_id":1,"installation_date":"2023-06-15","notes":"Edge firewall"}'
+post /devices '{"site_id":1,"location_id":1,"model_id":8,"hostname":"FW-BERPA-01","dns_name":"fw-berpa-01.berpa.local","serial_number":"FG60F12345","asset_tag":"IT-010","category_id":6,"status":"active","is_up":true,"os_id":8,"has_rmm":false,"has_antivirus":false,"supplier_id":1,"installation_date":"2023-06-15","notes":"Edge firewall"}'
 # Berpa HQ workstations
-post /devices '{"site_id":1,"location_id":2,"model_id":3,"hostname":"PC-DIR-01","dns_name":"pc-dir-01.berpa.local","serial_number":"DELL90001","asset_tag":"IT-020","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01","notes":"Director office"}'
-post /devices '{"site_id":1,"location_id":3,"model_id":3,"hostname":"PC-OPEN-01","dns_name":"pc-open-01.berpa.local","serial_number":"DELL90002","asset_tag":"IT-021","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01"}'
-post /devices '{"site_id":1,"location_id":3,"model_id":3,"hostname":"PC-OPEN-02","dns_name":"pc-open-02.berpa.local","serial_number":"DELL90003","asset_tag":"IT-022","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01"}'
-post /devices '{"site_id":1,"location_id":3,"model_id":3,"hostname":"PC-OPEN-03","dns_name":"pc-open-03.berpa.local","serial_number":"DELL90004","asset_tag":"IT-023","category_id":2,"status":"active","is_up":false,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01","notes":"Monitor issue, ticket #1234"}'
+post /devices '{"site_id":1,"location_id":2,"model_id":3,"hostname":"PC-DIR-01","dns_name":"pc-dir-01.berpa.local","serial_number":"DELL90001","asset_tag":"IT-020","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01","notes":"Director office"}'
+post /devices '{"site_id":1,"location_id":3,"model_id":3,"hostname":"PC-OPEN-01","dns_name":"pc-open-01.berpa.local","serial_number":"DELL90002","asset_tag":"IT-021","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01"}'
+post /devices '{"site_id":1,"location_id":3,"model_id":3,"hostname":"PC-OPEN-02","dns_name":"pc-open-02.berpa.local","serial_number":"DELL90003","asset_tag":"IT-022","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01"}'
+post /devices '{"site_id":1,"location_id":3,"model_id":3,"hostname":"PC-OPEN-03","dns_name":"pc-open-03.berpa.local","serial_number":"DELL90004","asset_tag":"IT-023","category_id":2,"status":"active","is_up":false,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-03-01","notes":"Monitor issue, ticket #1234"}'
 # Berpa HQ notebook
-post /devices '{"site_id":1,"model_id":4,"hostname":"NB-ADMIN-01","dns_name":"nb-admin-01.berpa.local","serial_number":"LEN80001","asset_tag":"IT-030","category_id":3,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-06-01","notes":"IT admin laptop"}'
+post /devices '{"site_id":1,"model_id":4,"hostname":"NB-ADMIN-01","dns_name":"nb-admin-01.berpa.local","serial_number":"LEN80001","asset_tag":"IT-030","category_id":3,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-06-01","notes":"IT admin laptop"}'
 # Berpa HQ peripherals
 post /devices '{"site_id":1,"location_id":3,"model_id":10,"hostname":"PRT-OPEN-01","serial_number":"HPP40001","asset_tag":"IT-040","category_id":8,"status":"active","is_up":true,"has_rmm":false,"has_antivirus":false,"supplier_id":1,"installation_date":"2024-03-01","notes":"Open space printer"}'
 post /devices '{"site_id":1,"location_id":1,"model_id":9,"hostname":"UPS-RACK-01","serial_number":"APC50001","asset_tag":"IT-050","category_id":7,"status":"active","is_up":true,"has_rmm":false,"has_antivirus":false,"supplier_id":1,"installation_date":"2023-06-15","notes":"Server rack UPS"}'
 # Berpa HQ AP
 post /devices '{"site_id":1,"location_id":3,"model_id":7,"hostname":"AP-FLOOR1-01","serial_number":"UBQ60001","asset_tag":"IT-060","category_id":5,"status":"active","is_up":true,"has_rmm":false,"has_antivirus":false,"supplier_id":2,"installation_date":"2024-01-15"}'
 # Berpa Cantiere
-post /devices '{"site_id":2,"model_id":8,"hostname":"FW-CANT-01","serial_number":"FG60F22222","asset_tag":"IT-070","category_id":6,"status":"active","is_up":true,"os":"FortiOS 7.4.2","has_rmm":false,"has_antivirus":false,"supplier_id":1,"installation_date":"2024-06-01","notes":"Site-to-site VPN to HQ"}'
+post /devices '{"site_id":2,"model_id":8,"hostname":"FW-CANT-01","serial_number":"FG60F22222","asset_tag":"IT-070","category_id":6,"status":"active","is_up":true,"os_id":8,"has_rmm":false,"has_antivirus":false,"supplier_id":1,"installation_date":"2024-06-01","notes":"Site-to-site VPN to HQ"}'
 # OMP
-post /devices '{"site_id":3,"location_id":4,"model_id":1,"hostname":"SRV-OMP-01","dns_name":"srv-omp-01.omp.local","serial_number":"CZJ55555AB","asset_tag":"OMP-001","category_id":1,"status":"active","is_up":true,"os":"Windows Server 2022","has_rmm":true,"has_antivirus":true,"supplier_id":1,"installation_date":"2023-09-01","notes":"File server + DC"}'
-post /devices '{"site_id":3,"model_id":3,"hostname":"PC-OMP-01","dns_name":"pc-omp-01.omp.local","serial_number":"DELL70001","asset_tag":"OMP-010","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-02-01"}'
-post /devices '{"site_id":3,"model_id":3,"hostname":"PC-OMP-02","dns_name":"pc-omp-02.omp.local","serial_number":"DELL70002","asset_tag":"OMP-011","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-02-01"}'
+post /devices '{"site_id":3,"location_id":4,"model_id":1,"hostname":"SRV-OMP-01","dns_name":"srv-omp-01.omp.local","serial_number":"CZJ55555AB","asset_tag":"OMP-001","category_id":1,"status":"active","is_up":true,"os_id":1,"has_rmm":true,"has_antivirus":true,"supplier_id":1,"installation_date":"2023-09-01","notes":"File server + DC"}'
+post /devices '{"site_id":3,"model_id":3,"hostname":"PC-OMP-01","dns_name":"pc-omp-01.omp.local","serial_number":"DELL70001","asset_tag":"OMP-010","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-02-01"}'
+post /devices '{"site_id":3,"model_id":3,"hostname":"PC-OMP-02","dns_name":"pc-omp-02.omp.local","serial_number":"DELL70002","asset_tag":"OMP-011","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-02-01"}'
 # Studio Rossi
-post /devices '{"site_id":4,"location_id":5,"model_id":3,"hostname":"PC-ROSSI-01","serial_number":"DELL80001","asset_tag":"SLR-001","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-01-15","notes":"Avvocato 1"}'
-post /devices '{"site_id":4,"location_id":5,"model_id":3,"hostname":"PC-ROSSI-02","serial_number":"DELL80002","asset_tag":"SLR-002","category_id":2,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-01-15","notes":"Avvocato 2"}'
-post /devices '{"site_id":4,"location_id":5,"model_id":4,"hostname":"NB-ROSSI-01","serial_number":"LEN88001","asset_tag":"SLR-003","category_id":3,"status":"active","is_up":true,"os":"Windows 11 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-06-01","notes":"Mobile"}'
+post /devices '{"site_id":4,"location_id":5,"model_id":3,"hostname":"PC-ROSSI-01","serial_number":"DELL80001","asset_tag":"SLR-001","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-01-15","notes":"Avvocato 1"}'
+post /devices '{"site_id":4,"location_id":5,"model_id":3,"hostname":"PC-ROSSI-02","serial_number":"DELL80002","asset_tag":"SLR-002","category_id":2,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-01-15","notes":"Avvocato 2"}'
+post /devices '{"site_id":4,"location_id":5,"model_id":4,"hostname":"NB-ROSSI-01","serial_number":"LEN88001","asset_tag":"SLR-003","category_id":3,"status":"active","is_up":true,"os_id":3,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2024-06-01","notes":"Mobile"}'
 # Farmacia 1
-post /devices '{"site_id":5,"location_id":6,"model_id":3,"hostname":"PC-FARM1-01","serial_number":"DELL99001","asset_tag":"FRC-001","category_id":2,"status":"active","is_up":true,"os":"Windows 10 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2022-04-01","notes":"POS/cash register"}'
-post /devices '{"site_id":5,"location_id":6,"model_id":3,"hostname":"PC-FARM1-02","serial_number":"DELL99002","asset_tag":"FRC-002","category_id":2,"status":"active","is_up":true,"os":"Windows 10 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2022-04-01","notes":"Back office"}'
+post /devices '{"site_id":5,"location_id":6,"model_id":3,"hostname":"PC-FARM1-01","serial_number":"DELL99001","asset_tag":"FRC-001","category_id":2,"status":"active","is_up":true,"os_id":4,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2022-04-01","notes":"POS/cash register"}'
+post /devices '{"site_id":5,"location_id":6,"model_id":3,"hostname":"PC-FARM1-02","serial_number":"DELL99002","asset_tag":"FRC-002","category_id":2,"status":"active","is_up":true,"os_id":4,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2022-04-01","notes":"Back office"}'
 # Farmacia 2
-post /devices '{"site_id":6,"model_id":3,"hostname":"PC-FARM2-01","serial_number":"DELL99003","asset_tag":"FRC-010","category_id":2,"status":"active","is_up":true,"os":"Windows 10 Pro","has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2022-04-01","notes":"POS/cash register"}'
+post /devices '{"site_id":6,"model_id":3,"hostname":"PC-FARM2-01","serial_number":"DELL99003","asset_tag":"FRC-010","category_id":2,"status":"active","is_up":true,"os_id":4,"has_rmm":true,"has_antivirus":true,"supplier_id":2,"installation_date":"2022-04-01","notes":"POS/cash register"}'
 # Decommissioned / storage
-post /devices '{"site_id":1,"hostname":"SRV-OLD-01","serial_number":"OLD00001","asset_tag":"IT-900","category_id":1,"status":"decommissioned","is_up":false,"os":"Windows Server 2012 R2","has_rmm":false,"has_antivirus":false,"installation_date":"2018-01-01","notes":"Old DC, decommissioned 2023"}'
-post /devices '{"site_id":1,"model_id":3,"hostname":"PC-SPARE-01","serial_number":"DELL00099","asset_tag":"IT-901","category_id":2,"status":"storage","is_up":false,"os":"Windows 11 Pro","has_rmm":false,"has_antivirus":false,"supplier_id":2,"installation_date":"2024-03-01","is_reserved":true,"notes":"Spare workstation"}'
+post /devices '{"site_id":1,"hostname":"SRV-OLD-01","serial_number":"OLD00001","asset_tag":"IT-900","category_id":1,"status":"decommissioned","is_up":false,"os_id":2,"has_rmm":false,"has_antivirus":false,"installation_date":"2018-01-01","notes":"Old DC, decommissioned 2023"}'
+post /devices '{"site_id":1,"model_id":3,"hostname":"PC-SPARE-01","serial_number":"DELL00099","asset_tag":"IT-901","category_id":2,"status":"storage","is_up":false,"os_id":3,"has_rmm":false,"has_antivirus":false,"supplier_id":2,"installation_date":"2024-03-01","is_reserved":true,"notes":"Spare workstation"}'
 
 # ── Device Interfaces ──
 echo "==> Device Interfaces..."

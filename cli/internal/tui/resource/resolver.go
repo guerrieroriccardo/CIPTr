@@ -26,7 +26,8 @@ type Resolver struct {
 	VLANs          map[int64]string
 	AddressBlocks  map[int64]string
 	DeviceModels   map[int64]string
-	Locations      map[int64]string
+	Locations          map[int64]string
+	OperatingSystems   map[int64]string
 	SwitchPorts     map[int64]string
 	PatchPanelPorts map[int64]string
 	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
@@ -71,7 +72,8 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			VLANs:          make(map[int64]string),
 			AddressBlocks:  make(map[int64]string),
 			DeviceModels:   make(map[int64]string),
-			Locations:      make(map[int64]string),
+			Locations:          make(map[int64]string),
+			OperatingSystems:   make(map[int64]string),
 			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
 			VLANSubnets:     make(map[int64]string),
@@ -215,6 +217,13 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			}
 		}
 
+		var operatingSystems []models.OperatingSystem
+		if err := c.Get("/operating-systems", &operatingSystems); err == nil {
+			for _, v := range operatingSystems {
+				r.OperatingSystems[v.ID] = v.Name
+			}
+		}
+
 		var deviceModels []models.DeviceModel
 		if err := c.Get("/device-models", &deviceModels); err == nil {
 			for _, v := range deviceModels {
@@ -320,6 +329,7 @@ func VLANName(id *int64) string           { return lookupOptional(func() map[int
 func AddressBlockName(id *int64) string   { return lookupOptional(func() map[int64]string { return safeLookup().AddressBlocks }, id) }
 func DeviceModelName(id *int64) string    { return lookupOptional(func() map[int64]string { return safeLookup().DeviceModels }, id) }
 func LocationName(id *int64) string       { return lookupOptional(func() map[int64]string { return safeLookup().Locations }, id) }
+func OsName(id *int64) string             { return lookupOptional(func() map[int64]string { return safeLookup().OperatingSystems }, id) }
 
 // Lookup returns the resolver map for a given key string (e.g. "clients", "sites").
 // Returns nil if the key is unknown or the resolver is not ready.
@@ -357,6 +367,8 @@ func (r *Resolver) Lookup(key string) map[int64]string {
 		return r.PatchPanelPorts
 	case "device_ips":
 		return r.DeviceIPs
+	case "operating_systems":
+		return r.OperatingSystems
 	}
 	return nil
 }
