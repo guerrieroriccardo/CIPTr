@@ -1,0 +1,23 @@
+-- Drop in reverse dependency order.
+DROP TABLE IF EXISTS device_connections;
+DROP TABLE IF EXISTS device_ips;
+DROP TABLE IF EXISTS device_interfaces;
+DROP TRIGGER IF EXISTS devices_updated_at ON devices;
+DROP TABLE IF EXISTS devices;
+DROP FUNCTION IF EXISTS trigger_set_updated_at();
+DROP TABLE IF EXISTS patch_panel_ports;
+DROP TABLE IF EXISTS patch_panels;
+DROP TABLE IF EXISTS switch_ports;
+DROP TABLE IF EXISTS switches;
+DROP TABLE IF EXISTS device_models;
+DROP TABLE IF EXISTS operating_systems;
+DROP TABLE IF EXISTS suppliers;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS manufacturers;
+DROP TABLE IF EXISTS vlans;
+DROP TABLE IF EXISTS address_blocks;
+DROP TABLE IF EXISTS locations;
+DROP TABLE IF EXISTS sites;
+DROP TABLE IF EXISTS clients;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS users;

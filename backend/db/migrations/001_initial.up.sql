@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS clients (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
-    short_code  TEXT NOT NULL UNIQUE,   -- e.g. "ADP", "XYZ"
-    domain      TEXT,                   -- e.g. "berpa.local" (default domain for all sites)
+    short_code  TEXT NOT NULL UNIQUE,
+    domain      TEXT,
     notes       TEXT,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
@@ -26,9 +26,9 @@ CREATE TABLE IF NOT EXISTS clients (
 CREATE TABLE IF NOT EXISTS sites (
     id          BIGSERIAL PRIMARY KEY,
     client_id   BIGINT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,          -- e.g. "HQ", "Rome Branch"
+    name        TEXT NOT NULL,
     address     TEXT,
-    domain      TEXT,                   -- overrides client.domain if set (e.g. "branch.berpa.local")
+    domain      TEXT,
     notes       TEXT,
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(client_id, name)
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS sites (
 CREATE TABLE IF NOT EXISTS locations (
     id          BIGSERIAL PRIMARY KEY,
     site_id     BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,          -- e.g. "Server Room", "Floor 2", "Reception"
+    name        TEXT NOT NULL,
     floor       TEXT,
     notes       TEXT,
     UNIQUE(site_id, name)
@@ -47,47 +47,43 @@ CREATE TABLE IF NOT EXISTS locations (
 -- IP ADDRESS SPACE
 -- ============================================================
 
--- One block (or more) is assigned to each site.
--- CIDR type enforces valid network notation (e.g. '10.10.0.0/20').
 CREATE TABLE IF NOT EXISTS address_blocks (
     id          BIGSERIAL PRIMARY KEY,
     site_id     BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    network     CIDR NOT NULL,          -- e.g. '10.10.0.0/20'
+    network     CIDR NOT NULL,
     description TEXT,
     notes       TEXT,
     UNIQUE(site_id, network)
 );
 
--- VLANs are subnets carved from an address_block (e.g. /24 per VLAN).
--- CIDR for subnet, INET for gateway (a host address, not a network address).
 CREATE TABLE IF NOT EXISTS vlans (
     id               BIGSERIAL PRIMARY KEY,
     site_id          BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     address_block_id BIGINT REFERENCES address_blocks(id) ON DELETE SET NULL,
-    vlan_id          INTEGER NOT NULL,  -- VLAN tag number, e.g. 10, 20, 100
-    name             TEXT NOT NULL,     -- e.g. "Users LAN", "VOIP"
-    subnet           CIDR,              -- e.g. '10.10.0.0/24'
-    gateway_device_ip_id BIGINT,          -- FK added after device_ips table exists
-    dhcp_start       INET,               -- e.g. '10.10.0.100'
-    dhcp_end         INET,               -- e.g. '10.10.0.200'
+    vlan_id          INTEGER NOT NULL,
+    name             TEXT NOT NULL,
+    subnet           CIDR,
+    gateway_device_ip_id BIGINT,
+    dhcp_start       INET,
+    dhcp_end         INET,
     description      TEXT,
     UNIQUE(site_id, vlan_id)
 );
 
 -- ============================================================
--- LOOKUP TABLES (manufacturers, categories, suppliers)
+-- LOOKUP TABLES
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS manufacturers (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,   -- e.g. "HP", "Cisco", "Dell"
+    name        TEXT NOT NULL UNIQUE,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS categories (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,   -- e.g. "Server", "PC", "Switch", "Printer"
-    short_code  TEXT NOT NULL,           -- e.g. "SRV", "NB", "SW" (variable length, used for hostname generation)
+    name        TEXT NOT NULL UNIQUE,
+    short_code  TEXT NOT NULL,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -102,21 +98,21 @@ CREATE TABLE IF NOT EXISTS suppliers (
 
 CREATE TABLE IF NOT EXISTS operating_systems (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,   -- e.g. "Windows Server 2022", "FortiOS 7.4"
+    name        TEXT NOT NULL UNIQUE,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
--- DEVICE CATALOG (defined before switches/devices that reference it)
+-- DEVICE CATALOG
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS device_models (
     id              BIGSERIAL PRIMARY KEY,
     manufacturer_id BIGINT NOT NULL REFERENCES manufacturers(id),
-    model_name      TEXT NOT NULL,      -- e.g. "ProLiant DL360 Gen10"
+    model_name      TEXT NOT NULL,
     category_id     BIGINT NOT NULL REFERENCES categories(id),
-    os_default_id   BIGINT REFERENCES operating_systems(id) ON DELETE SET NULL,  -- typical OS for this model
-    specs           TEXT,               -- free text: CPU, RAM, etc.
+    os_default_id   BIGINT REFERENCES operating_systems(id) ON DELETE SET NULL,
+    specs           TEXT,
     notes           TEXT,
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(manufacturer_id, model_name)
@@ -129,9 +125,9 @@ CREATE TABLE IF NOT EXISTS device_models (
 CREATE TABLE IF NOT EXISTS switches (
     id              BIGSERIAL PRIMARY KEY,
     site_id         BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    hostname        TEXT NOT NULL,      -- e.g. "SW001", "SW002"
+    hostname        TEXT NOT NULL,
     model_id        BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
-    ip_address      INET,               -- management IP
+    ip_address      INET,
     location_id     BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     total_ports     INTEGER NOT NULL DEFAULT 24,
     notes           TEXT,
@@ -142,10 +138,10 @@ CREATE TABLE IF NOT EXISTS switch_ports (
     id              BIGSERIAL PRIMARY KEY,
     switch_id       BIGINT NOT NULL REFERENCES switches(id) ON DELETE CASCADE,
     port_number     INTEGER NOT NULL,
-    port_label      TEXT,               -- optional label
-    speed           TEXT,               -- e.g. "1G", "10G"
+    port_label      TEXT,
+    speed           TEXT,
     is_uplink       BOOLEAN DEFAULT FALSE,
-    mac_restriction MACADDR,            -- restrict port to this MAC address
+    mac_restriction MACADDR,
     notes           TEXT,
     UNIQUE(switch_id, port_number)
 );
@@ -153,7 +149,7 @@ CREATE TABLE IF NOT EXISTS switch_ports (
 CREATE TABLE IF NOT EXISTS patch_panels (
     id              BIGSERIAL PRIMARY KEY,
     site_id         BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    name            TEXT NOT NULL,      -- e.g. "PP-RACK1-A"
+    name            TEXT NOT NULL,
     total_ports     INTEGER NOT NULL DEFAULT 24,
     location_id     BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     notes           TEXT,
@@ -179,35 +175,25 @@ CREATE TABLE IF NOT EXISTS devices (
     site_id             BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     location_id         BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     model_id            BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
-
-    -- Identification
     hostname            TEXT NOT NULL,
     dns_name            TEXT,
     serial_number       TEXT,
     asset_tag           TEXT,
-
-    -- Type and status
     category_id         BIGINT NOT NULL REFERENCES categories(id),
-    status              TEXT NOT NULL DEFAULT 'planned',  -- planned, active, inactive, decommissioned
+    status              TEXT NOT NULL DEFAULT 'planned',
     is_up               BOOLEAN DEFAULT TRUE,
-
-    -- Software / management
     os_id               BIGINT REFERENCES operating_systems(id) ON DELETE SET NULL,
-    has_rmm             BOOLEAN DEFAULT FALSE,  -- RMM agent installed
-    has_antivirus       BOOLEAN DEFAULT FALSE,  -- antivirus installed
+    has_rmm             BOOLEAN DEFAULT FALSE,
+    has_antivirus       BOOLEAN DEFAULT FALSE,
     supplier_id         BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
-
-    -- Logistics
     installation_date   DATE,
     is_reserved         BOOLEAN DEFAULT FALSE,
-
     notes               TEXT,
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(site_id, hostname)
 );
 
--- Trigger function to auto-update updated_at on any UPDATE.
 CREATE OR REPLACE FUNCTION trigger_set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -222,36 +208,32 @@ BEFORE UPDATE ON devices
 FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
 -- ============================================================
--- NETWORK INTERFACES (NICs on a device)
+-- NETWORK INTERFACES
 -- ============================================================
 
--- Each row is one physical or virtual NIC on a device.
--- A PC typically has one; a server may have eth0, eth1, iDRAC;
--- a router may have WAN, LAN1, LAN2, mgmt.
 CREATE TABLE IF NOT EXISTS device_interfaces (
     id          BIGSERIAL PRIMARY KEY,
     device_id   BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,      -- e.g. "eth0", "iDRAC", "WAN", "LAN1"
-    mac_address MACADDR,            -- MAC address of this NIC
+    name        TEXT NOT NULL,
+    mac_address MACADDR,
     notes       TEXT,
     UNIQUE(device_id, name)
 );
 
 -- ============================================================
--- IP ADDRESSES (one or more IPs per NIC)
+-- IP ADDRESSES
 -- ============================================================
 
--- INET type stores a host address with optional prefix (e.g. '10.0.0.1/24').
 CREATE TABLE IF NOT EXISTS device_ips (
     id              BIGSERIAL PRIMARY KEY,
     interface_id    BIGINT NOT NULL REFERENCES device_interfaces(id) ON DELETE CASCADE,
     ip_address      INET NOT NULL,
     vlan_id         BIGINT REFERENCES vlans(id),
-    is_primary      BOOLEAN DEFAULT FALSE,  -- primary IP of the whole device
+    is_primary      BOOLEAN DEFAULT FALSE,
     notes           TEXT
 );
 
--- Deferred FK: vlans.gateway_device_ip_id → device_ips (circular dep with device_ips.vlan_id → vlans).
+-- Deferred FK: vlans.gateway_device_ip_id -> device_ips (circular dep).
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -266,12 +248,9 @@ END
 $$;
 
 -- ============================================================
--- PHYSICAL CONNECTIONS (NIC → switch port / patch panel port)
+-- PHYSICAL CONNECTIONS
 -- ============================================================
 
--- Tracks which NIC is physically plugged into which switch port
--- and/or patch panel port. Both columns are optional because a
--- cable may bypass the patch panel and go directly to the switch.
 CREATE TABLE IF NOT EXISTS device_connections (
     id                  BIGSERIAL PRIMARY KEY,
     interface_id        BIGINT NOT NULL REFERENCES device_interfaces(id) ON DELETE CASCADE,
