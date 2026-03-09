@@ -1,0 +1,41 @@
+project_name: ciptr-cli
+
+before:
+  hooks:
+    - go mod tidy -C cli
+
+builds:
+  - id: ciptr-cli
+    dir: cli
+    binary: ciptr-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+      - -X github.com/guerrieroriccardo/CIPTr/cli/internal/version.Version={{.Version}}
+      - -X github.com/guerrieroriccardo/CIPTr/cli/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/guerrieroriccardo/CIPTr/cli/internal/version.Date={{.Date}}
+
+archives:
+  - id: ciptr-cli
+    builds: [ciptr-cli]
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+
+release:
+  github:
+    owner: guerrieroriccardo
+    name: CIPTr
