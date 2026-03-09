@@ -22,6 +22,14 @@ type dataErrorMsg struct {
 	err error
 }
 
+type exportSuccessMsg struct {
+	path string
+}
+
+type exportErrorMsg struct {
+	err error
+}
+
 // ResourceTable is a generic list screen for any resource.
 type ResourceTable struct {
 	def      *resource.Def
@@ -33,6 +41,8 @@ type ResourceTable struct {
 	width    int
 	height   int
 	onSelect func(item any) tea.Cmd // if set, enter drills down instead of editing
+
+	status string // flash message (e.g. export result)
 
 	// Filtering
 	filtering   bool
@@ -111,7 +121,17 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rt.err = msg.err
 		rt.loaded = true
 
+	case exportSuccessMsg:
+		rt.status = "Saved: " + msg.path
+		return rt, nil
+
+	case exportErrorMsg:
+		rt.status = "Error: " + msg.err.Error()
+		return rt, nil
+
 	case tea.KeyMsg:
+		rt.status = "" // clear flash on any key press
+
 		// When filtering, handle filter input keys.
 		if rt.filtering {
 			switch msg.String() {
@@ -190,6 +210,23 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "r":
 			return rt, rt.loadData()
+		case "l":
+			if rt.def.ExportLabel == nil {
+				break
+			}
+			if item := rt.selectedItem(); item != nil {
+				id := rt.def.GetID(item)
+				def := rt.def
+				client := rt.client
+				rt.status = "Downloading label..."
+				return rt, func() tea.Msg {
+					path, err := def.ExportLabel(client, id)
+					if err != nil {
+						return exportErrorMsg{err: err}
+					}
+					return exportSuccessMsg{path: path}
+				}
+			}
 		}
 	}
 
@@ -220,9 +257,17 @@ func (rt ResourceTable) View() string {
 	if rt.onSelect != nil {
 		helpText = "/ filter • n new • enter open • e edit • d delete • r refresh • esc back"
 	}
+	if rt.def.ExportLabel != nil {
+		helpText = "l label • " + helpText
+	}
 	help := HelpStyle.Render(helpText)
 
-	return fmt.Sprintf("%s\n%s%s\n%s", title, filterLine, rt.table.View(), help)
+	var statusLine string
+	if rt.status != "" {
+		statusLine = HelpStyle.Render(rt.status) + "\n"
+	}
+
+	return fmt.Sprintf("%s\n%s%s\n%s%s", title, filterLine, rt.table.View(), statusLine, help)
 }
 
 func (rt ResourceTable) loadData() tea.Cmd {

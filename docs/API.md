@@ -192,6 +192,7 @@ Standard CRUD at `/operating-systems`. **Required:** `name` (globally unique).
 | GET | `/devices/:id/interfaces` | |
 | GET | `/devices/:id/ips` | IPs across all interfaces |
 | GET | `/devices/:id/connections` | connections across all interfaces |
+| GET | `/devices/:id/label` | Returns PDF label (binary, not JSON envelope) |
 
 **Required:** `site_id`, `hostname`, `category_id`
 **Unique:** `(site_id, hostname)`
@@ -201,6 +202,8 @@ Standard CRUD at `/operating-systems`. **Required:** `name` (globally unique).
 - Hostname must be unique within the site
 
 **Status values:** `active`, `planned`, `inactive`, `decommissioned`, `storage`
+
+**Label endpoint:** `GET /devices/:id/label` returns `application/pdf` directly (not wrapped in the standard JSON envelope). The QR code encodes `{LABEL_BASE_URL}/devices/{id}` where `LABEL_BASE_URL` is an environment variable (default: `https://ciptr.example.com`). The label is sized for DYMO 99012 (89x36mm).
 
 ```json
 {

@@ -2,6 +2,7 @@ package resource
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/guerrieroriccardo/CIPTr/backend/models"
@@ -59,6 +60,15 @@ func init() {
 			{Key: "installation_date", Label: "Installation Date (YYYY-MM-DD)"},
 			{Key: "is_reserved", Label: "Is Reserved", PickerOptions: []string{"true", "false"}},
 			{Key: "notes", Label: "Notes"},
+		},
+
+		ExportLabel: func(client *apiclient.Client, id string) (string, error) {
+			data, err := client.GetRaw("/devices/" + id + "/label")
+			if err != nil {
+				return "", err
+			}
+			path := fmt.Sprintf("label-device-%s.pdf", id)
+			return path, os.WriteFile(path, data, 0644)
 		},
 
 		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {

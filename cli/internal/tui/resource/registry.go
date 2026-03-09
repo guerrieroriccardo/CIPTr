@@ -60,6 +60,9 @@ type Def struct {
 	// derived values for other fields. Called in a tea.Cmd (background).
 	AsyncDerive func(client *apiclient.Client, key string, values map[string]string) map[string]string
 
+	// ExportLabel downloads a label PDF for the selected item. Returns saved file path.
+	ExportLabel func(client *apiclient.Client, id string) (string, error)
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)

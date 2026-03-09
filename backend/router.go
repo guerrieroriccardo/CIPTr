@@ -191,6 +191,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		devices.GET("/:id/interfaces", deviceInterfaceHandler.ListByDevice)
 		devices.GET("/:id/ips", deviceIPHandler.ListByDevice)
 		devices.GET("/:id/connections", deviceConnectionHandler.ListByDevice)
+		devices.GET("/:id/label", deviceHandler.Label)
 	}
 
 	deviceInterfaces := api.Group("/device-interfaces")
