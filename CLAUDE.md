@@ -410,6 +410,13 @@ TUI interattiva per gestire i dati via REST API (senza frontend web).
 - Il CI (`.github/workflows/release.yml`) builda automaticamente i binari per linux/amd64 e windows/amd64
 - Gli utenti ricevono l'aggiornamento tramite `ciptr-cli update`
 
+### Versione Minima CLI
+- Il backend ha una costante `MinCLIVersion` in `backend/handlers/version_middleware.go`
+- La CLI invia `X-CLI-Version` header su ogni richiesta; il middleware confronta con `MinCLIVersion`
+- Se la versione è troppo vecchia → HTTP `426 Upgrade Required` con messaggio chiaro
+- Richieste senza header (browser, curl, webapp) passano senza controllo
+- **Quando si fanno breaking changes all'API, aggiornare `MinCLIVersion` e bumpare la versione della CLI** (nuovo tag `v<MAJOR>.<MINOR>.<PATCH>`)
+
 ### Database
 - PostgreSQL 18 — FK enforcement è attivo di default
 - Nessun soft delete: eliminazione reale con conferma nel frontend/CLI
