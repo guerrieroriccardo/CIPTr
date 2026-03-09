@@ -1,3 +1,5 @@
+version: 2
+
 project_name: ciptr-cli
 
 before:
@@ -23,10 +25,10 @@ builds:
 
 archives:
   - id: ciptr-cli
-    builds: [ciptr-cli]
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
