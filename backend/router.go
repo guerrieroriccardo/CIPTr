@@ -19,7 +19,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-CLI-Version"},
 		AllowCredentials: false,
 	}))
 
@@ -46,6 +46,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	auditHandler            := handlers.NewAuditHandler(database)
 
 	api := r.Group("/api/v1")
+	api.Use(handlers.CLIVersionRequired())
 	api.GET("/health", handlers.Health)
 	api.POST("/login", authHandler.Login)
 	api.POST("/guest-login", authHandler.GuestLogin)

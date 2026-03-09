@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/version"
 )
 
 // ErrUnauthorized is returned when the API responds with 401.
@@ -80,6 +82,7 @@ func (c *Client) do(method, path string, body any, result any) error {
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
+	req.Header.Set("X-CLI-Version", version.Version)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -129,6 +132,7 @@ func (c *Client) GetRaw(path string) ([]byte, error) {
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
+	req.Header.Set("X-CLI-Version", version.Version)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
