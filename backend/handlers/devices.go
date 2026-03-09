@@ -392,13 +392,19 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 }
 
 // deviceLabelSQL fetches the label data for a single device.
-const deviceLabelSQL = `SELECT d.id, d.hostname, d.dns_name, d.asset_tag,
+const deviceLabelSQL = `SELECT d.id, d.hostname, d.dns_name, d.asset_tag, d.notes,
 	s.name AS site_name, c.name AS client_name,
-	l.name AS location_name
+	l.name AS location_name,
+	sup.name AS supplier_name,
+	dm.model_name AS device_model_name,
+	mfr.name AS manufacturer_name
 FROM devices d
 JOIN sites s ON s.id = d.site_id
 JOIN clients c ON c.id = s.client_id
 LEFT JOIN locations l ON l.id = d.location_id
+LEFT JOIN suppliers sup ON sup.id = d.supplier_id
+LEFT JOIN device_models dm ON dm.id = d.model_id
+LEFT JOIN manufacturers mfr ON mfr.id = dm.manufacturer_id
 WHERE d.id = $1`
 
 // Label handles GET /devices/:id/label
@@ -414,12 +420,17 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 		deviceID             int64
 		hostname             string
 		dnsName, assetTag    *string
+		notes                *string
 		siteName, clientName string
 		locationName         *string
+		supplierName         *string
+		deviceModelName      *string
+		manufacturerName     *string
 	)
 	err = h.db.QueryRowContext(c.Request.Context(), deviceLabelSQL, id).Scan(
-		&deviceID, &hostname, &dnsName, &assetTag,
+		&deviceID, &hostname, &dnsName, &assetTag, &notes,
 		&siteName, &clientName, &locationName,
+		&supplierName, &deviceModelName, &manufacturerName,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("device not found"))
@@ -459,7 +470,8 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 	// Text block on the right.
 	textX := 35.0 // 2mm margin + 30mm QR + 3mm gap
 	textW := 52.0
-	lineH := 3.5
+	lineH := 3.2
+	fontSize := 6.0
 
 	// Helper to truncate text that would exceed the available width.
 	truncate := func(s string, font string, style string, size float64) string {
@@ -470,41 +482,85 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 		return s
 	}
 
-	// Line 1: Client name (bold, 8pt)
-	pdf.SetFont("Helvetica", "B", 8)
-	pdf.SetXY(textX, 3)
-	pdf.CellFormat(textW, lineH, truncate(clientName, "Helvetica", "B", 8), "", 1, "L", false, 0, "")
+	// Helper to dereference *string with fallback.
+	deref := func(s *string) string {
+		if s != nil {
+			return *s
+		}
+		return ""
+	}
 
-	// Line 2: Site - Location (bold, 7pt)
+	// Line 1: Client name (bold, 7pt)
+	pdf.SetFont("Helvetica", "B", 7)
+	pdf.SetXY(textX, 2)
+	pdf.CellFormat(textW, lineH, truncate(clientName, "Helvetica", "B", 7), "", 1, "L", false, 0, "")
+
+	// Line 2: Site - Location (bold, 6pt)
 	siteLine := siteName
 	if locationName != nil && *locationName != "" {
 		siteLine += " - " + *locationName
 	}
-	pdf.SetFont("Helvetica", "B", 7)
+	pdf.SetFont("Helvetica", "B", fontSize)
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, lineH, truncate(siteLine, "Helvetica", "B", 7), "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate(siteLine, "Helvetica", "B", fontSize), "", 1, "L", false, 0, "")
 
-	pdf.SetFont("Helvetica", "", 7)
+	pdf.SetFont("Helvetica", "", fontSize)
 
 	// Line 3: Host
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, lineH, truncate("Host: "+hostname, "Helvetica", "", 7), "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate("Host: "+hostname, "Helvetica", "", fontSize), "", 1, "L", false, 0, "")
 
 	// Line 4: DNS
-	dns := ""
-	if dnsName != nil {
-		dns = *dnsName
-	}
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, lineH, truncate("DNS: "+dns, "Helvetica", "", 7), "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate("DNS: "+deref(dnsName), "Helvetica", "", fontSize), "", 1, "L", false, 0, "")
 
-	// Line 5: Tag
-	tag := ""
-	if assetTag != nil {
-		tag = *assetTag
+	// Line 5: Model (Manufacturer + Model)
+	modelStr := ""
+	if m := deref(manufacturerName); m != "" {
+		modelStr = m
+	}
+	if m := deref(deviceModelName); m != "" {
+		if modelStr != "" {
+			modelStr += " "
+		}
+		modelStr += m
 	}
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, lineH, truncate("Tag: "+tag, "Helvetica", "", 7), "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate("Model: "+modelStr, "Helvetica", "", fontSize), "", 1, "L", false, 0, "")
+
+	// Line 6: Supplier
+	pdf.SetX(textX)
+	pdf.CellFormat(textW, lineH, truncate("Supplier: "+deref(supplierName), "Helvetica", "", fontSize), "", 1, "L", false, 0, "")
+
+	// Line 7: Tag
+	pdf.SetX(textX)
+	pdf.CellFormat(textW, lineH, truncate("Tag: "+deref(assetTag), "Helvetica", "", fontSize), "", 1, "L", false, 0, "")
+
+	// Lines 8-10: Notes (exactly 3 single-line cells)
+	notesStr := "Notes: " + deref(notes)
+	pdf.SetFont("Helvetica", "", fontSize)
+	for line := 0; line < 3; line++ {
+		// Find how many characters fit on this line.
+		fit := 0
+		for i := range notesStr {
+			if i == 0 {
+				continue
+			}
+			if pdf.GetStringWidth(notesStr[:i]) > textW {
+				break
+			}
+			fit = i
+		}
+		if fit == 0 || pdf.GetStringWidth(notesStr) <= textW {
+			// Entire remaining text fits on this line.
+			pdf.SetX(textX)
+			pdf.CellFormat(textW, lineH, truncate(notesStr, "Helvetica", "", fontSize), "", 1, "L", false, 0, "")
+			break
+		}
+		pdf.SetX(textX)
+		pdf.CellFormat(textW, lineH, notesStr[:fit], "", 1, "L", false, 0, "")
+		notesStr = notesStr[fit:]
+	}
 
 	// Logo bottom-right of text area (optional, loaded from LABEL_LOGO_PATH).
 	if logoPath := os.Getenv("LABEL_LOGO_PATH"); logoPath != "" {
