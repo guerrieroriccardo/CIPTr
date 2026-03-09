@@ -12,6 +12,9 @@ import (
 // ErrUnauthorized is returned when the API responds with 401.
 var ErrUnauthorized = errors.New("unauthorized")
 
+// ErrForbidden is returned when the API responds with 403.
+var ErrForbidden = errors.New("forbidden")
+
 // Client wraps net/http to call the CIPTr REST API.
 type Client struct {
 	BaseURL    string
@@ -92,6 +95,9 @@ func (c *Client) do(method, path string, body any, result any) error {
 	if resp.StatusCode == http.StatusUnauthorized {
 		return ErrUnauthorized
 	}
+	if resp.StatusCode == http.StatusForbidden {
+		return ErrForbidden
+	}
 
 	var env envelope
 	if err := json.Unmarshal(raw, &env); err != nil {
@@ -119,6 +125,20 @@ func (c *Client) Login(username, password string) (string, error) {
 	err := c.do(http.MethodPost, "/login", map[string]string{
 		"username": username,
 		"password": password,
+	}, &result)
+	if err != nil {
+		return "", err
+	}
+	return result.Token, nil
+}
+
+// GuestLogin authenticates a guest user (no password) and returns the JWT token.
+func (c *Client) GuestLogin(username string) (string, error) {
+	var result struct {
+		Token string `json:"token"`
+	}
+	err := c.do(http.MethodPost, "/guest-login", map[string]string{
+		"username": username,
 	}, &result)
 	if err != nil {
 		return "", err

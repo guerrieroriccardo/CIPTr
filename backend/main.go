@@ -71,7 +71,7 @@ func ensureDefaultAdmin(database *sql.DB) {
 	}
 
 	_, err = database.Exec(
-		`INSERT INTO users (username, password_hash, is_admin) VALUES ($1, $2, true)`,
+		`INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'admin')`,
 		"admin", string(hash),
 	)
 	if err != nil {

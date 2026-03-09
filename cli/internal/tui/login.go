@@ -31,7 +31,7 @@ func NewLoginScreen(client *apiclient.Client) *LoginScreen {
 	u.Width = 30
 
 	p := textinput.New()
-	p.Placeholder = "password"
+	p.Placeholder = "password (empty for guest)"
 	p.EchoMode = textinput.EchoPassword
 	p.EchoCharacter = '*'
 	p.CharLimit = 128
@@ -72,13 +72,25 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			u := strings.TrimSpace(l.username.Value())
 			p := l.password.Value()
-			if u == "" || p == "" {
-				l.err = fmt.Errorf("username and password are required")
+			if u == "" {
+				l.err = fmt.Errorf("username is required")
 				return l, nil
 			}
 			l.loading = true
 			l.err = nil
 			client := l.client
+			if p == "" {
+				// Guest login (no password).
+				return l, func() tea.Msg {
+					token, err := client.GuestLogin(u)
+					if err != nil {
+						return loginErrorMsg{err: err}
+					}
+					client.Token = token
+					_ = auth.SaveToken(token)
+					return loginSuccessMsg{}
+				}
+			}
 			return l, func() tea.Msg {
 				token, err := client.Login(u, p)
 				if err != nil {
@@ -127,6 +139,6 @@ func (l *LoginScreen) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(HelpStyle.Render("tab: next field • enter: login • ctrl+c: quit"))
+	b.WriteString(HelpStyle.Render("tab: next field • enter: login (empty password = guest) • ctrl+c: quit"))
 	return b.String()
 }
