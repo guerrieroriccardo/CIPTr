@@ -23,5 +23,11 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Assets (keep out of public repo)
+logo.png
+
 # Claude
 .claude
+
+# Generated Labels
+label-*

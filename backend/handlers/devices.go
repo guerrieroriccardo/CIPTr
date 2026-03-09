@@ -484,6 +484,16 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 	pdf.SetX(textX)
 	pdf.CellFormat(textW, 4, "Tag: "+tag, "", 1, "L", false, 0, "")
 
+	// Logo bottom-right of text area (optional, loaded from LABEL_LOGO_PATH).
+	if logoPath := os.Getenv("LABEL_LOGO_PATH"); logoPath != "" {
+		if logoData, err := os.ReadFile(logoPath); err == nil {
+			logoReader := bytes.NewReader(logoData)
+			logoOpts := fpdf.ImageOptions{ImageType: "PNG"}
+			pdf.RegisterImageOptionsReader("logo", logoOpts, logoReader)
+			pdf.ImageOptions("logo", 62, 27, 25, 0, false, logoOpts, 0, "")
+		}
+	}
+
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
 		fail(c, http.StatusInternalServerError, fmt.Errorf("generate PDF: %w", err))
