@@ -67,12 +67,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, tea.Batch(msg.Screen.Init(), sizeCmd)
 
 	case dataErrorMsg:
+		if errors.Is(msg.err, apiclient.ErrForbidden) {
+			return a.updateCurrent(msg)
+		}
 		if errors.Is(msg.err, apiclient.ErrUnauthorized) {
 			return a.forceLogin()
 		}
 		return a.updateCurrent(msg)
 
 	case formErrorMsg:
+		if errors.Is(msg.err, apiclient.ErrForbidden) {
+			return a.updateCurrent(msg)
+		}
 		if errors.Is(msg.err, apiclient.ErrUnauthorized) {
 			return a.forceLogin()
 		}
@@ -129,6 +135,14 @@ func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
 	// Hierarchical browse entry point.
 	if key == "browse_clients" {
 		screen := NewBrowseByClientScreen(a.client)
+		return a, func() tea.Msg {
+			return PushScreenMsg{Screen: screen}
+		}
+	}
+
+	// Administration submenu.
+	if key == "admin" {
+		screen := NewAdminMenu(a.client)
 		return a, func() tea.Msg {
 			return PushScreenMsg{Screen: screen}
 		}

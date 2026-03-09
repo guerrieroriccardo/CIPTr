@@ -22,4 +22,9 @@ var (
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")). // red
 			Bold(true)
+
+	// SuccessStyle is used for success messages.
+	SuccessStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("40")). // green
+			Bold(true)
 )

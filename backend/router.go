@@ -25,53 +25,59 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 
 	authHandler := handlers.NewAuthHandler(database, jwtSecret)
 
-	clientHandler      := handlers.NewClientHandler(database)
-	siteHandler        := handlers.NewSiteHandler(database)
+	clientHandler       := handlers.NewClientHandler(database)
+	siteHandler         := handlers.NewSiteHandler(database)
 	addressBlockHandler := handlers.NewAddressBlockHandler(database)
-	vlanHandler        := handlers.NewVLANHandler(database)
-	locationHandler    := handlers.NewLocationHandler(database)
+	vlanHandler         := handlers.NewVLANHandler(database)
+	locationHandler     := handlers.NewLocationHandler(database)
 	manufacturerHandler := handlers.NewManufacturerHandler(database)
 	categoryHandler     := handlers.NewCategoryHandler(database)
 	supplierHandler     := handlers.NewSupplierHandler(database)
 	osHandler           := handlers.NewOperatingSystemHandler(database)
-	deviceModelHandler := handlers.NewDeviceModelHandler(database)
-	deviceHandler          := handlers.NewDeviceHandler(database)
-	deviceInterfaceHandler := handlers.NewDeviceInterfaceHandler(database)
+	deviceModelHandler  := handlers.NewDeviceModelHandler(database)
+	deviceHandler           := handlers.NewDeviceHandler(database)
+	deviceInterfaceHandler  := handlers.NewDeviceInterfaceHandler(database)
 	deviceIPHandler         := handlers.NewDeviceIPHandler(database)
 	deviceConnectionHandler := handlers.NewDeviceConnectionHandler(database)
 	switchHandler           := handlers.NewSwitchHandler(database)
 	switchPortHandler       := handlers.NewSwitchPortHandler(database)
-	patchPanelHandler      := handlers.NewPatchPanelHandler(database)
-	patchPanelPortHandler  := handlers.NewPatchPanelPortHandler(database)
-	auditHandler           := handlers.NewAuditHandler(database)
+	patchPanelHandler       := handlers.NewPatchPanelHandler(database)
+	patchPanelPortHandler   := handlers.NewPatchPanelPortHandler(database)
+	auditHandler            := handlers.NewAuditHandler(database)
 
 	api := r.Group("/api/v1")
 	api.GET("/health", handlers.Health)
 	api.POST("/login", authHandler.Login)
-	api.POST("/register", authHandler.Register)
+	api.POST("/guest-login", authHandler.GuestLogin)
 
 	// All routes below require authentication.
 	api.Use(handlers.AuthRequired(jwtSecret))
 	api.GET("/me", authHandler.Me)
-	api.PUT("/change-password", authHandler.ChangePassword)
+	api.PUT("/change-password", handlers.RoleRequired("viewer"), authHandler.ChangePassword)
+	api.POST("/register", handlers.RoleRequired("admin"), authHandler.Register)
+	api.GET("/users", handlers.RoleRequired("admin"), authHandler.ListUsers)
+	api.PUT("/users/:id", handlers.RoleRequired("admin"), authHandler.UpdateUser)
+
+	// Shorthand for technician-level write protection.
+	write := handlers.RoleRequired("technician")
 
 	clients := api.Group("/clients")
 	{
 		clients.GET("", clientHandler.List)
-		clients.POST("", clientHandler.Create)
+		clients.POST("", write, clientHandler.Create)
 		clients.GET("/:id", clientHandler.GetByID)
-		clients.PUT("/:id", clientHandler.Update)
-		clients.DELETE("/:id", clientHandler.Delete)
+		clients.PUT("/:id", write, clientHandler.Update)
+		clients.DELETE("/:id", write, clientHandler.Delete)
 		clients.GET("/:id/sites", siteHandler.ListByClient)
 	}
 
 	sites := api.Group("/sites")
 	{
 		sites.GET("", siteHandler.List)
-		sites.POST("", siteHandler.Create)
+		sites.POST("", write, siteHandler.Create)
 		sites.GET("/:id", siteHandler.GetByID)
-		sites.PUT("/:id", siteHandler.Update)
-		sites.DELETE("/:id", siteHandler.Delete)
+		sites.PUT("/:id", write, siteHandler.Update)
+		sites.DELETE("/:id", write, siteHandler.Delete)
 		sites.GET("/:id/address-blocks", addressBlockHandler.ListBySite)
 		sites.GET("/:id/vlans", vlanHandler.ListBySite)
 		sites.GET("/:id/locations", locationHandler.ListBySite)
@@ -83,105 +89,105 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	manufacturers := api.Group("/manufacturers")
 	{
 		manufacturers.GET("", manufacturerHandler.List)
-		manufacturers.POST("", manufacturerHandler.Create)
+		manufacturers.POST("", write, manufacturerHandler.Create)
 		manufacturers.GET("/:id", manufacturerHandler.GetByID)
-		manufacturers.PUT("/:id", manufacturerHandler.Update)
-		manufacturers.DELETE("/:id", manufacturerHandler.Delete)
+		manufacturers.PUT("/:id", write, manufacturerHandler.Update)
+		manufacturers.DELETE("/:id", write, manufacturerHandler.Delete)
 	}
 
 	categoriesGroup := api.Group("/categories")
 	{
 		categoriesGroup.GET("", categoryHandler.List)
-		categoriesGroup.POST("", categoryHandler.Create)
+		categoriesGroup.POST("", write, categoryHandler.Create)
 		categoriesGroup.GET("/:id", categoryHandler.GetByID)
-		categoriesGroup.PUT("/:id", categoryHandler.Update)
-		categoriesGroup.DELETE("/:id", categoryHandler.Delete)
+		categoriesGroup.PUT("/:id", write, categoryHandler.Update)
+		categoriesGroup.DELETE("/:id", write, categoryHandler.Delete)
 	}
 
 	operatingSystems := api.Group("/operating-systems")
 	{
 		operatingSystems.GET("", osHandler.List)
-		operatingSystems.POST("", osHandler.Create)
+		operatingSystems.POST("", write, osHandler.Create)
 		operatingSystems.GET("/:id", osHandler.GetByID)
-		operatingSystems.PUT("/:id", osHandler.Update)
-		operatingSystems.DELETE("/:id", osHandler.Delete)
+		operatingSystems.PUT("/:id", write, osHandler.Update)
+		operatingSystems.DELETE("/:id", write, osHandler.Delete)
 	}
 
 	suppliersGroup := api.Group("/suppliers")
 	{
 		suppliersGroup.GET("", supplierHandler.List)
-		suppliersGroup.POST("", supplierHandler.Create)
+		suppliersGroup.POST("", write, supplierHandler.Create)
 		suppliersGroup.GET("/:id", supplierHandler.GetByID)
-		suppliersGroup.PUT("/:id", supplierHandler.Update)
-		suppliersGroup.DELETE("/:id", supplierHandler.Delete)
+		suppliersGroup.PUT("/:id", write, supplierHandler.Update)
+		suppliersGroup.DELETE("/:id", write, supplierHandler.Delete)
 	}
 
 	patchPanels := api.Group("/patch-panels")
 	{
 		patchPanels.GET("", patchPanelHandler.List)
-		patchPanels.POST("", patchPanelHandler.Create)
+		patchPanels.POST("", write, patchPanelHandler.Create)
 		patchPanels.GET("/:id", patchPanelHandler.GetByID)
-		patchPanels.PUT("/:id", patchPanelHandler.Update)
-		patchPanels.DELETE("/:id", patchPanelHandler.Delete)
+		patchPanels.PUT("/:id", write, patchPanelHandler.Update)
+		patchPanels.DELETE("/:id", write, patchPanelHandler.Delete)
 		patchPanels.GET("/:id/ports", patchPanelPortHandler.ListByPatchPanel)
 	}
 
 	patchPanelPorts := api.Group("/patch-panel-ports")
 	{
 		patchPanelPorts.GET("", patchPanelPortHandler.List)
-		patchPanelPorts.POST("", patchPanelPortHandler.Create)
+		patchPanelPorts.POST("", write, patchPanelPortHandler.Create)
 		patchPanelPorts.GET("/:id", patchPanelPortHandler.GetByID)
-		patchPanelPorts.PUT("/:id", patchPanelPortHandler.Update)
-		patchPanelPorts.DELETE("/:id", patchPanelPortHandler.Delete)
+		patchPanelPorts.PUT("/:id", write, patchPanelPortHandler.Update)
+		patchPanelPorts.DELETE("/:id", write, patchPanelPortHandler.Delete)
 	}
 
 	switches := api.Group("/switches")
 	{
 		switches.GET("", switchHandler.List)
 		switches.GET("/next-name", switchHandler.NextName)
-		switches.POST("", switchHandler.Create)
+		switches.POST("", write, switchHandler.Create)
 		switches.GET("/:id", switchHandler.GetByID)
-		switches.PUT("/:id", switchHandler.Update)
-		switches.DELETE("/:id", switchHandler.Delete)
+		switches.PUT("/:id", write, switchHandler.Update)
+		switches.DELETE("/:id", write, switchHandler.Delete)
 		switches.GET("/:id/ports", switchPortHandler.ListBySwitch)
 	}
 
 	switchPorts := api.Group("/switch-ports")
 	{
 		switchPorts.GET("", switchPortHandler.List)
-		switchPorts.POST("", switchPortHandler.Create)
+		switchPorts.POST("", write, switchPortHandler.Create)
 		switchPorts.GET("/:id", switchPortHandler.GetByID)
-		switchPorts.PUT("/:id", switchPortHandler.Update)
-		switchPorts.DELETE("/:id", switchPortHandler.Delete)
+		switchPorts.PUT("/:id", write, switchPortHandler.Update)
+		switchPorts.DELETE("/:id", write, switchPortHandler.Delete)
 	}
 
 	addressBlocks := api.Group("/address-blocks")
 	{
 		addressBlocks.GET("", addressBlockHandler.List)
-		addressBlocks.POST("", addressBlockHandler.Create)
+		addressBlocks.POST("", write, addressBlockHandler.Create)
 		addressBlocks.GET("/:id", addressBlockHandler.GetByID)
-		addressBlocks.PUT("/:id", addressBlockHandler.Update)
-		addressBlocks.DELETE("/:id", addressBlockHandler.Delete)
+		addressBlocks.PUT("/:id", write, addressBlockHandler.Update)
+		addressBlocks.DELETE("/:id", write, addressBlockHandler.Delete)
 		addressBlocks.GET("/:id/vlans", vlanHandler.ListByAddressBlock)
 	}
 
 	locations := api.Group("/locations")
 	{
 		locations.GET("", locationHandler.List)
-		locations.POST("", locationHandler.Create)
+		locations.POST("", write, locationHandler.Create)
 		locations.GET("/:id", locationHandler.GetByID)
-		locations.PUT("/:id", locationHandler.Update)
-		locations.DELETE("/:id", locationHandler.Delete)
+		locations.PUT("/:id", write, locationHandler.Update)
+		locations.DELETE("/:id", write, locationHandler.Delete)
 	}
 
 	devices := api.Group("/devices")
 	{
 		devices.GET("", deviceHandler.List)
 		devices.GET("/next-hostname", deviceHandler.NextHostname)
-		devices.POST("", deviceHandler.Create)
+		devices.POST("", write, deviceHandler.Create)
 		devices.GET("/:id", deviceHandler.GetByID)
-		devices.PUT("/:id", deviceHandler.Update)
-		devices.DELETE("/:id", deviceHandler.Delete)
+		devices.PUT("/:id", write, deviceHandler.Update)
+		devices.DELETE("/:id", write, deviceHandler.Delete)
 		devices.GET("/:id/interfaces", deviceInterfaceHandler.ListByDevice)
 		devices.GET("/:id/ips", deviceIPHandler.ListByDevice)
 		devices.GET("/:id/connections", deviceConnectionHandler.ListByDevice)
@@ -190,49 +196,49 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	deviceInterfaces := api.Group("/device-interfaces")
 	{
 		deviceInterfaces.GET("", deviceInterfaceHandler.List)
-		deviceInterfaces.POST("", deviceInterfaceHandler.Create)
+		deviceInterfaces.POST("", write, deviceInterfaceHandler.Create)
 		deviceInterfaces.GET("/:id", deviceInterfaceHandler.GetByID)
-		deviceInterfaces.PUT("/:id", deviceInterfaceHandler.Update)
-		deviceInterfaces.DELETE("/:id", deviceInterfaceHandler.Delete)
+		deviceInterfaces.PUT("/:id", write, deviceInterfaceHandler.Update)
+		deviceInterfaces.DELETE("/:id", write, deviceInterfaceHandler.Delete)
 	}
 
 	deviceIPs := api.Group("/device-ips")
 	{
 		deviceIPs.GET("", deviceIPHandler.List)
-		deviceIPs.POST("", deviceIPHandler.Create)
+		deviceIPs.POST("", write, deviceIPHandler.Create)
 		deviceIPs.GET("/:id", deviceIPHandler.GetByID)
-		deviceIPs.PUT("/:id", deviceIPHandler.Update)
-		deviceIPs.DELETE("/:id", deviceIPHandler.Delete)
+		deviceIPs.PUT("/:id", write, deviceIPHandler.Update)
+		deviceIPs.DELETE("/:id", write, deviceIPHandler.Delete)
 	}
 
 	deviceConnections := api.Group("/device-connections")
 	{
 		deviceConnections.GET("", deviceConnectionHandler.List)
-		deviceConnections.POST("", deviceConnectionHandler.Create)
+		deviceConnections.POST("", write, deviceConnectionHandler.Create)
 		deviceConnections.GET("/:id", deviceConnectionHandler.GetByID)
-		deviceConnections.PUT("/:id", deviceConnectionHandler.Update)
-		deviceConnections.DELETE("/:id", deviceConnectionHandler.Delete)
+		deviceConnections.PUT("/:id", write, deviceConnectionHandler.Update)
+		deviceConnections.DELETE("/:id", write, deviceConnectionHandler.Delete)
 	}
 
 	deviceModels := api.Group("/device-models")
 	{
 		deviceModels.GET("", deviceModelHandler.List)
-		deviceModels.POST("", deviceModelHandler.Create)
+		deviceModels.POST("", write, deviceModelHandler.Create)
 		deviceModels.GET("/:id", deviceModelHandler.GetByID)
-		deviceModels.PUT("/:id", deviceModelHandler.Update)
-		deviceModels.DELETE("/:id", deviceModelHandler.Delete)
+		deviceModels.PUT("/:id", write, deviceModelHandler.Update)
+		deviceModels.DELETE("/:id", write, deviceModelHandler.Delete)
 	}
 
 	vlans := api.Group("/vlans")
 	{
 		vlans.GET("", vlanHandler.List)
-		vlans.POST("", vlanHandler.Create)
+		vlans.POST("", write, vlanHandler.Create)
 		vlans.GET("/:id", vlanHandler.GetByID)
-		vlans.PUT("/:id", vlanHandler.Update)
-		vlans.DELETE("/:id", vlanHandler.Delete)
+		vlans.PUT("/:id", write, vlanHandler.Update)
+		vlans.DELETE("/:id", write, vlanHandler.Delete)
 	}
 
-	api.GET("/audit-logs", auditHandler.List)
+	api.GET("/audit-logs", handlers.RoleRequired("admin"), auditHandler.List)
 
 	return r
 }
