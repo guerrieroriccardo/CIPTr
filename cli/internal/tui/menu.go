@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/version"
 )
 
 // MenuItem represents a selectable entry in the main menu.
@@ -109,5 +111,5 @@ func (m Menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Menu) View() string {
-	return fmt.Sprintf("%s\n%s", m.list.View(), HelpStyle.Render("q quit • / filter • enter select"))
+	return fmt.Sprintf("%s\n%s", m.list.View(), HelpStyle.Render(fmt.Sprintf("ciptr-cli %s • q quit • / filter • enter select", version.Version)))
 }

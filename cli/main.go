@@ -8,13 +8,26 @@ import (
 
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/auth"
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/selfupdate"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui"
+	"github.com/guerrieroriccardo/CIPTr/cli/internal/version"
 
 	// Register resource definitions.
 	_ "github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version":
+			fmt.Printf("ciptr-cli %s (%s) built %s\n", version.Version, version.Commit, version.Date)
+			return
+		case "update":
+			selfupdate.Run()
+			return
+		}
+	}
+
 	apiURL := os.Getenv("CIPTR_API_URL")
 	if apiURL == "" {
 		apiURL = "http://localhost:8080/api/v1"

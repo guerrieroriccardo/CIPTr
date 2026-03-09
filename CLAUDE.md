@@ -74,9 +74,13 @@ CIPTr/
 │   ├── models/                 # Struct Go che rispecchiano le tabelle (condivise con CLI)
 │   └── Dockerfile              # Multi-stage build
 ├── cli/
-│   ├── main.go                 # Entry point bubbletea
+│   ├── main.go                 # Entry point: subcommands (version, update) + bubbletea TUI
 │   ├── go.mod                  # module github.com/guerrieroriccardo/CIPTr/cli
 │   └── internal/
+│       ├── version/            # Version/Commit/Date vars (injected via ldflags)
+│       │   └── version.go
+│       ├── selfupdate/         # Self-update from GitHub Releases
+│       │   └── selfupdate.go
 │       ├── apiclient/          # Client HTTP per la REST API
 │       │   ├── client.go       # HTTP helpers + envelope parsing
 │       │   └── clients.go      # Metodi per ogni risorsa (uno per file)
@@ -84,7 +88,7 @@ CIPTr/
 │           ├── app.go          # Root model + dispatching
 │           ├── nav.go          # Stack di navigazione + breadcrumb
 │           ├── styles.go       # Stili lipgloss
-│           ├── menu.go         # Menu principale
+│           ├── menu.go         # Menu principale (mostra versione nel footer)
 │           ├── table.go        # Tabella generica per ogni risorsa
 │           ├── form.go         # Form generico create/edit
 │           ├── confirm.go      # Dialog conferma eliminazione
@@ -102,8 +106,11 @@ CIPTr/
 │   ├── vite.config.ts
 │   └── Dockerfile              # Build + nginx:alpine
 ├── docker-compose.yml          # Orchestrazione backend + frontend
+├── .goreleaser.yml             # GoReleaser: cross-platform CLI builds
+├── .github/workflows/
+│   └── release.yml             # CI: build + publish on version tags
 ├── .gitignore
-└── agents.md                   # Questo file
+└── CLAUDE.md                   # Questo file
 ```
 
 ---
@@ -295,6 +302,16 @@ manufacturers, categories, suppliers,
 device_models, devices, device_interfaces, device_ips, device_connections,
 switches, switch_ports, patch_panels, patch_panel_ports
 
+### Fase 2b — CLI Releases & Self-Update ✅
+1. ✅ Version embedding via `-ldflags` (`cli/internal/version/`)
+2. ✅ Subcommands: `ciptr-cli version`, `ciptr-cli update` (before TUI starts)
+3. ✅ Self-update from GitHub Releases (`go-selfupdate` → `guerrieroriccardo/CIPTr`)
+4. ✅ GoReleaser config (`.goreleaser.yml`): builds `linux/amd64` + `windows/amd64`
+5. ✅ GitHub Actions CI (`.github/workflows/release.yml`): triggered on `v*` tags
+6. ✅ Version shown in TUI menu footer
+
+**Release workflow:** `git tag v1.0.0 && git push --tags` → GitHub Actions → GoReleaser → GitHub Release with binaries → `ciptr-cli update` picks it up.
+
 ### Fase 3 — CLI (bubbletea TUI) 🔄
 TUI interattiva per gestire i dati via REST API (senza frontend web).
 - Stack: bubbletea + bubbles + lipgloss
@@ -342,7 +359,7 @@ TUI interattiva per gestire i dati via REST API (senza frontend web).
 
 ### Lingua
 - **Tutto il codice sorgente è in inglese**: variabili, funzioni, commenti, messaggi di errore, nomi di file, commit message.
-- Questo documento (`agents.md`) rimane in italiano perché è una specifica per il team.
+- Questo documento (`CLAUDE.md`) rimane in italiano perché è una specifica per il team.
 - In futuro si potrà aggiungere l'i18n per l'interfaccia utente (testi delle pagine), ma non ora.
 
 ### Backend (Go)
@@ -359,6 +376,10 @@ TUI interattiva per gestire i dati via REST API (senza frontend web).
 ### CLI (bubbletea)
 - Binario separato in `cli/`, chiama la REST API (non accede al DB direttamente)
 - URL API configurabile via env `CIPTR_API_URL` (default `http://localhost:8080/api/v1`)
+- Subcommands (`version`, `update`) vengono gestiti prima di avviare la TUI
+- Versione iniettata a build time via `-ldflags` (vedi `.goreleaser.yml`)
+- Self-update scarica da GitHub Releases (`guerrieroriccardo/CIPTr`)
+- Target: `linux/amd64`, `windows/amd64`
 - Componenti generici (table, form) guidati da un registro di definizioni (`resource/registry.go`)
 - Navigazione stack-based: `PushScreenMsg` / `PopScreenMsg` / Esc per tornare indietro
 - **Tutte le tabelle devono essere filtrabili**: pressione `/` attiva un campo di ricerca che filtra le righe per qualsiasi colonna (case-insensitive). Enter conferma il filtro, Esc lo cancella. Questo vale sia per il menu principale (built-in di `bubbles/list`) che per le tabelle risorse (`ResourceTable` con `textinput`)
@@ -381,6 +402,13 @@ TUI interattiva per gestire i dati via REST API (senza frontend web).
 - Committare spesso: dopo ogni risorsa CRUD completata, ogni refactor, ogni modifica significativa
 - Non aggiungere `Co-Authored-By` nei commit message
 - Commit message in inglese, stile conventional commits (`feat`, `fix`, `refactor`, ecc.)
+
+### Rilasci CLI
+- Quando si aggiunge una feature significativa o un bug fix alla CLI, **creare un nuovo tag di versione** per triggerare una release:
+  `git tag v<MAJOR>.<MINOR>.<PATCH> && git push --tags`
+- Seguire semver: MAJOR per breaking changes, MINOR per nuove feature, PATCH per bug fix
+- Il CI (`.github/workflows/release.yml`) builda automaticamente i binari per linux/amd64 e windows/amd64
+- Gli utenti ricevono l'aggiornamento tramite `ciptr-cli update`
 
 ### Database
 - PostgreSQL 18 — FK enforcement è attivo di default
