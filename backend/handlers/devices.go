@@ -393,10 +393,12 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 
 // deviceLabelSQL fetches the label data for a single device.
 const deviceLabelSQL = `SELECT d.id, d.hostname, d.dns_name, d.asset_tag,
-	s.name AS site_name, c.name AS client_name
+	s.name AS site_name, c.name AS client_name,
+	l.name AS location_name
 FROM devices d
 JOIN sites s ON s.id = d.site_id
 JOIN clients c ON c.id = s.client_id
+LEFT JOIN locations l ON l.id = d.location_id
 WHERE d.id = $1`
 
 // Label handles GET /devices/:id/label
@@ -409,14 +411,15 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 	}
 
 	var (
-		deviceID                         int64
-		hostname                         string
-		dnsName, assetTag                *string
-		siteName, clientName             string
+		deviceID             int64
+		hostname             string
+		dnsName, assetTag    *string
+		siteName, clientName string
+		locationName         *string
 	)
 	err = h.db.QueryRowContext(c.Request.Context(), deviceLabelSQL, id).Scan(
 		&deviceID, &hostname, &dnsName, &assetTag,
-		&siteName, &clientName,
+		&siteName, &clientName, &locationName,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("device not found"))
@@ -456,33 +459,52 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 	// Text block on the right.
 	textX := 35.0 // 2mm margin + 30mm QR + 3mm gap
 	textW := 52.0
+	lineH := 3.5
 
-	// Line 1: Client - Site (bold, 8pt)
+	// Helper to truncate text that would exceed the available width.
+	truncate := func(s string, font string, style string, size float64) string {
+		pdf.SetFont(font, style, size)
+		for len(s) > 0 && pdf.GetStringWidth(s) > textW {
+			s = s[:len(s)-1]
+		}
+		return s
+	}
+
+	// Line 1: Client name (bold, 8pt)
 	pdf.SetFont("Helvetica", "B", 8)
-	pdf.SetXY(textX, 4)
-	pdf.CellFormat(textW, 4, clientName+" - "+siteName, "", 1, "L", false, 0, "")
+	pdf.SetXY(textX, 3)
+	pdf.CellFormat(textW, lineH, truncate(clientName, "Helvetica", "B", 8), "", 1, "L", false, 0, "")
+
+	// Line 2: Site - Location (bold, 7pt)
+	siteLine := siteName
+	if locationName != nil && *locationName != "" {
+		siteLine += " - " + *locationName
+	}
+	pdf.SetFont("Helvetica", "B", 7)
+	pdf.SetX(textX)
+	pdf.CellFormat(textW, lineH, truncate(siteLine, "Helvetica", "B", 7), "", 1, "L", false, 0, "")
 
 	pdf.SetFont("Helvetica", "", 7)
 
-	// Line 2: Host
+	// Line 3: Host
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, 4, "Host: "+hostname, "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate("Host: "+hostname, "Helvetica", "", 7), "", 1, "L", false, 0, "")
 
-	// Line 3: DNS
+	// Line 4: DNS
 	dns := ""
 	if dnsName != nil {
 		dns = *dnsName
 	}
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, 4, "DNS: "+dns, "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate("DNS: "+dns, "Helvetica", "", 7), "", 1, "L", false, 0, "")
 
-	// Line 4: Tag
+	// Line 5: Tag
 	tag := ""
 	if assetTag != nil {
 		tag = *assetTag
 	}
 	pdf.SetX(textX)
-	pdf.CellFormat(textW, 4, "Tag: "+tag, "", 1, "L", false, 0, "")
+	pdf.CellFormat(textW, lineH, truncate("Tag: "+tag, "Helvetica", "", 7), "", 1, "L", false, 0, "")
 
 	// Logo bottom-right of text area (optional, loaded from LABEL_LOGO_PATH).
 	if logoPath := os.Getenv("LABEL_LOGO_PATH"); logoPath != "" {
