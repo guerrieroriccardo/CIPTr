@@ -1,15 +1,19 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pdf/fpdf"
+	qrcode "github.com/skip2/go-qrcode"
 
 	"github.com/guerrieroriccardo/CIPTr/backend/models"
 )
@@ -385,6 +389,109 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 
 	logAudit(c.Request.Context(), h.db, c, "update", "devices", id, fmt.Sprintf("Updated device '%s'", d.Hostname))
 	ok(c, http.StatusOK, d)
+}
+
+// deviceLabelSQL fetches the label data for a single device.
+const deviceLabelSQL = `SELECT d.id, d.hostname, d.dns_name, d.asset_tag,
+	s.name AS site_name, c.name AS client_name
+FROM devices d
+JOIN sites s ON s.id = d.site_id
+JOIN clients c ON c.id = s.client_id
+WHERE d.id = $1`
+
+// Label handles GET /devices/:id/label
+// Returns a printable PDF label (DYMO 99012: 89x36mm) with a QR code and device info.
+func (h *DeviceHandler) Label(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		fail(c, http.StatusBadRequest, errors.New("invalid id"))
+		return
+	}
+
+	var (
+		deviceID                         int64
+		hostname                         string
+		dnsName, assetTag                *string
+		siteName, clientName             string
+	)
+	err = h.db.QueryRowContext(c.Request.Context(), deviceLabelSQL, id).Scan(
+		&deviceID, &hostname, &dnsName, &assetTag,
+		&siteName, &clientName,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(c, http.StatusNotFound, errors.New("device not found"))
+		return
+	}
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	baseURL := os.Getenv("LABEL_BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://ciptr.example.com"
+	}
+	qrURL := fmt.Sprintf("%s/devices/%d", baseURL, deviceID)
+
+	qrPNG, err := qrcode.Encode(qrURL, qrcode.Medium, 256)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, fmt.Errorf("generate QR: %w", err))
+		return
+	}
+
+	pdf := fpdf.NewCustom(&fpdf.InitType{
+		UnitStr: "mm",
+		Size:    fpdf.SizeType{Wd: 89, Ht: 36},
+	})
+	pdf.SetMargins(2, 3, 2)
+	pdf.SetAutoPageBreak(false, 0)
+	pdf.AddPage()
+
+	// QR code on the left: 30x30mm starting at (2, 3).
+	qrReader := bytes.NewReader(qrPNG)
+	opts := fpdf.ImageOptions{ImageType: "PNG"}
+	pdf.RegisterImageOptionsReader("qr", opts, qrReader)
+	pdf.ImageOptions("qr", 2, 3, 30, 30, false, opts, 0, "")
+
+	// Text block on the right.
+	textX := 35.0 // 2mm margin + 30mm QR + 3mm gap
+	textW := 52.0
+
+	// Line 1: Client - Site (bold, 8pt)
+	pdf.SetFont("Helvetica", "B", 8)
+	pdf.SetXY(textX, 4)
+	pdf.CellFormat(textW, 4, clientName+" - "+siteName, "", 1, "L", false, 0, "")
+
+	pdf.SetFont("Helvetica", "", 7)
+
+	// Line 2: Host
+	pdf.SetX(textX)
+	pdf.CellFormat(textW, 4, "Host: "+hostname, "", 1, "L", false, 0, "")
+
+	// Line 3: DNS
+	dns := ""
+	if dnsName != nil {
+		dns = *dnsName
+	}
+	pdf.SetX(textX)
+	pdf.CellFormat(textW, 4, "DNS: "+dns, "", 1, "L", false, 0, "")
+
+	// Line 4: Tag
+	tag := ""
+	if assetTag != nil {
+		tag = *assetTag
+	}
+	pdf.SetX(textX)
+	pdf.CellFormat(textW, 4, "Tag: "+tag, "", 1, "L", false, 0, "")
+
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		fail(c, http.StatusInternalServerError, fmt.Errorf("generate PDF: %w", err))
+		return
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="label-%s.pdf"`, hostname))
+	c.Data(http.StatusOK, "application/pdf", buf.Bytes())
 }
 
 // Delete handles DELETE /devices/:id

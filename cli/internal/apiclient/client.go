@@ -117,6 +117,48 @@ func (c *Client) do(method, path string, body any, result any) error {
 	return nil
 }
 
+// GetRaw performs a GET request and returns the raw response bytes.
+// Useful for binary responses (e.g. PDF) that are not wrapped in the JSON envelope.
+func (c *Client) GetRaw(path string) ([]byte, error) {
+	url := c.BaseURL + path
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP GET %s: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrUnauthorized
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, ErrForbidden
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var env envelope
+		if json.Unmarshal(raw, &env) == nil && env.Error != nil {
+			return nil, fmt.Errorf("API error: %s", *env.Error)
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, path)
+	}
+
+	return raw, nil
+}
+
 // Login authenticates and returns the JWT token.
 func (c *Client) Login(username, password string) (string, error) {
 	var result struct {
