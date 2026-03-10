@@ -226,6 +226,23 @@ func scopedDeviceGroupMembers(groupID string) *resource.Def {
 	return &base
 }
 
+func scopedFirewallRules(siteID string) *resource.Def {
+	base := *resource.Registry["firewall_rules"]
+	base.Defaults = map[string]string{"site_id": siteID}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.FirewallRule
+		if err := c.Get("/firewall-rules?site_id="+siteID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
 func scopedInterfaces(deviceID string) *resource.Def {
 	base := *resource.Registry["device_interfaces"]
 	base.Defaults = map[string]string{"device_id": deviceID}
@@ -537,6 +554,9 @@ func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu 
 			}},
 			{label: "Device Groups", build: func() Screen {
 				return NewResourceTableWithSelect(scopedDeviceGroups(siteID), apiClient, deviceGroupDrillDown(apiClient))
+			}},
+			{label: "Firewall Rules", build: func() Screen {
+				return NewResourceTable(scopedFirewallRules(siteID), apiClient)
 			}},
 		},
 	}

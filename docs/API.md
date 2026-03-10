@@ -343,6 +343,43 @@ Standard CRUD at `/operating-systems`. **Required:** `name` (globally unique).
 
 ---
 
+### Firewall Rules
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/firewall-rules` | `?site_id=` filter, ordered by position |
+| POST | `/firewall-rules` | |
+| GET | `/firewall-rules/:id` | |
+| PUT | `/firewall-rules/:id` | |
+| DELETE | `/firewall-rules/:id` | |
+| GET | `/sites/:id/firewall-rules` | |
+
+**Required:** `site_id`
+**Defaults:** `position` auto-assigned if not provided; `src_port`/`dst_port` = `*`; `protocol` = `any`; `action` = `allow`; `enabled` = `true`
+
+**Constraints:**
+- At most one source endpoint (`src_device_id` OR `src_group_id` OR `src_vlan_id` OR `src_cidr`; all NULL = "any")
+- Same for destination endpoint
+- All FK-referenced entities must belong to the rule's `site_id`
+- `src_cidr`/`dst_cidr` validated as CIDR by PostgreSQL
+
+**Protocol values:** `tcp`, `udp`, `both`, `icmp`, `any`
+**Action values:** `allow`, `deny`
+
+```json
+{
+  "site_id": 1,
+  "src_vlan_id": 3,
+  "dst_cidr": "0.0.0.0/0",
+  "dst_port": "443",
+  "protocol": "tcp",
+  "action": "allow",
+  "description": "Allow VLAN 10 to internet HTTPS"
+}
+```
+
+---
+
 ## Cascade Summary
 
 | Deleted | Children Effect |
@@ -356,6 +393,9 @@ Standard CRUD at `/operating-systems`. **Required:** `name` (globally unique).
 | Switch | Ports → CASCADE |
 | Patch panel | Ports → CASCADE |
 | Supplier | Devices: `supplier_id` → NULL |
+| Device | Firewall rules: `src_device_id`/`dst_device_id` → CASCADE |
+| Device group | Firewall rules: `src_group_id`/`dst_group_id` → CASCADE |
+| VLAN | Firewall rules: `src_vlan_id`/`dst_vlan_id` → CASCADE |
 
 ---
 

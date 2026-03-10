@@ -45,6 +45,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	patchPanelPortHandler   := handlers.NewPatchPanelPortHandler(database)
 	deviceGroupHandler      := handlers.NewDeviceGroupHandler(database)
 	deviceGroupMemberHandler := handlers.NewDeviceGroupMemberHandler(database)
+	firewallRuleHandler     := handlers.NewFirewallRuleHandler(database)
 	auditHandler            := handlers.NewAuditHandler(database)
 
 	api := r.Group("/api/v1")
@@ -88,6 +89,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		sites.GET("/:id/switches", switchHandler.ListBySite)
 		sites.GET("/:id/patch-panels", patchPanelHandler.ListBySite)
 		sites.GET("/:id/device-groups", deviceGroupHandler.ListBySite)
+		sites.GET("/:id/firewall-rules", firewallRuleHandler.ListBySite)
 	}
 
 	manufacturers := api.Group("/manufacturers")
@@ -251,6 +253,15 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		deviceGroups.PUT("/:id", write, deviceGroupHandler.Update)
 		deviceGroups.DELETE("/:id", write, deviceGroupHandler.Delete)
 		deviceGroups.GET("/:id/members", deviceGroupMemberHandler.ListByGroup)
+	}
+
+	firewallRules := api.Group("/firewall-rules")
+	{
+		firewallRules.GET("", firewallRuleHandler.List)
+		firewallRules.POST("", write, firewallRuleHandler.Create)
+		firewallRules.GET("/:id", firewallRuleHandler.GetByID)
+		firewallRules.PUT("/:id", write, firewallRuleHandler.Update)
+		firewallRules.DELETE("/:id", write, firewallRuleHandler.Delete)
 	}
 
 	deviceGroupMembers := api.Group("/device-group-members")
