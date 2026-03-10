@@ -28,6 +28,7 @@ type Resolver struct {
 	DeviceModels   map[int64]string
 	Locations          map[int64]string
 	OperatingSystems   map[int64]string
+	DeviceGroups    map[int64]string
 	SwitchPorts     map[int64]string
 	PatchPanelPorts map[int64]string
 	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
@@ -49,6 +50,7 @@ type Resolver struct {
 	DeviceIPVLAN        map[int64]int64  // device IP ID → VLAN ID
 	DeviceIPInterface   map[int64]int64  // device IP ID → interface ID
 	DeviceModelCategory map[int64]int64  // device model ID → category ID
+	DeviceGroupSite     map[int64]int64  // device group ID → site ID
 	InterfaceMAC        map[int64]string // interface ID → MAC address
 	UsedMACs            map[string]bool  // MAC addresses already restricted on a switch port
 }
@@ -74,6 +76,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceModels:   make(map[int64]string),
 			Locations:          make(map[int64]string),
 			OperatingSystems:   make(map[int64]string),
+			DeviceGroups:    make(map[int64]string),
 			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
 			VLANSubnets:     make(map[int64]string),
@@ -93,6 +96,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceIPVLAN:        make(map[int64]int64),
 			DeviceIPInterface:   make(map[int64]int64),
 			DeviceModelCategory: make(map[int64]int64),
+			DeviceGroupSite:     make(map[int64]int64),
 			InterfaceMAC:        make(map[int64]string),
 			UsedMACs:            make(map[string]bool),
 		}
@@ -244,6 +248,14 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			}
 		}
 
+		var deviceGroups []models.DeviceGroup
+		if err := c.Get("/device-groups", &deviceGroups); err == nil {
+			for _, v := range deviceGroups {
+				r.DeviceGroups[v.ID] = v.Name
+				r.DeviceGroupSite[v.ID] = v.SiteID
+			}
+		}
+
 		var switchPorts []models.SwitchPort
 		if err := c.Get("/switch-ports", &switchPorts); err == nil {
 			for _, v := range switchPorts {
@@ -330,6 +342,7 @@ func AddressBlockName(id *int64) string   { return lookupOptional(func() map[int
 func DeviceModelName(id *int64) string    { return lookupOptional(func() map[int64]string { return safeLookup().DeviceModels }, id) }
 func LocationName(id *int64) string       { return lookupOptional(func() map[int64]string { return safeLookup().Locations }, id) }
 func OsName(id *int64) string             { return lookupOptional(func() map[int64]string { return safeLookup().OperatingSystems }, id) }
+func DeviceGroupName(id int64) string     { return lookupName(func() map[int64]string { return safeLookup().DeviceGroups }, id) }
 
 // Lookup returns the resolver map for a given key string (e.g. "clients", "sites").
 // Returns nil if the key is unknown or the resolver is not ready.
@@ -369,6 +382,8 @@ func (r *Resolver) Lookup(key string) map[int64]string {
 		return r.DeviceIPs
 	case "operating_systems":
 		return r.OperatingSystems
+	case "device_groups":
+		return r.DeviceGroups
 	}
 	return nil
 }

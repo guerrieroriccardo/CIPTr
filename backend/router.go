@@ -43,6 +43,8 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	switchPortHandler       := handlers.NewSwitchPortHandler(database)
 	patchPanelHandler       := handlers.NewPatchPanelHandler(database)
 	patchPanelPortHandler   := handlers.NewPatchPanelPortHandler(database)
+	deviceGroupHandler      := handlers.NewDeviceGroupHandler(database)
+	deviceGroupMemberHandler := handlers.NewDeviceGroupMemberHandler(database)
 	auditHandler            := handlers.NewAuditHandler(database)
 
 	api := r.Group("/api/v1")
@@ -85,6 +87,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		sites.GET("/:id/devices", deviceHandler.ListBySite)
 		sites.GET("/:id/switches", switchHandler.ListBySite)
 		sites.GET("/:id/patch-panels", patchPanelHandler.ListBySite)
+		sites.GET("/:id/device-groups", deviceGroupHandler.ListBySite)
 	}
 
 	manufacturers := api.Group("/manufacturers")
@@ -238,6 +241,23 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		vlans.GET("/:id", vlanHandler.GetByID)
 		vlans.PUT("/:id", write, vlanHandler.Update)
 		vlans.DELETE("/:id", write, vlanHandler.Delete)
+	}
+
+	deviceGroups := api.Group("/device-groups")
+	{
+		deviceGroups.GET("", deviceGroupHandler.List)
+		deviceGroups.POST("", write, deviceGroupHandler.Create)
+		deviceGroups.GET("/:id", deviceGroupHandler.GetByID)
+		deviceGroups.PUT("/:id", write, deviceGroupHandler.Update)
+		deviceGroups.DELETE("/:id", write, deviceGroupHandler.Delete)
+		deviceGroups.GET("/:id/members", deviceGroupMemberHandler.ListByGroup)
+	}
+
+	deviceGroupMembers := api.Group("/device-group-members")
+	{
+		deviceGroupMembers.GET("", deviceGroupMemberHandler.List)
+		deviceGroupMembers.POST("", write, deviceGroupMemberHandler.Create)
+		deviceGroupMembers.DELETE("/:id", write, deviceGroupMemberHandler.Delete)
 	}
 
 	api.GET("/audit-logs", handlers.RoleRequired("admin"), auditHandler.List)

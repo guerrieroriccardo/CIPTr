@@ -58,6 +58,8 @@ func NewMenu() Menu {
 		MenuItem{name: "All Switch Ports", desc: "List all switch ports", key: "switch_ports"},
 		MenuItem{name: "All Patch Panels", desc: "List all patch panels", key: "patch_panels"},
 		MenuItem{name: "All Patch Panel Ports", desc: "List all patch panel ports", key: "patch_panel_ports"},
+		MenuItem{name: "All Device Groups", desc: "Named groups of devices", key: "device_groups"},
+		MenuItem{name: "All Device Group Members", desc: "Devices in groups", key: "device_group_members"},
 		// Administration
 		MenuItem{name: "Administration", desc: "Users, audit logs, password change", key: "admin"},
 	}
