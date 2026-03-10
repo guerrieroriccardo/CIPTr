@@ -192,6 +192,40 @@ func scopedPatchPanels(siteID string) *resource.Def {
 	return &base
 }
 
+func scopedDeviceGroups(siteID string) *resource.Def {
+	base := *resource.Registry["device_groups"]
+	base.Defaults = map[string]string{"site_id": siteID}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.DeviceGroup
+		if err := c.Get("/device-groups?site_id="+siteID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
+func scopedDeviceGroupMembers(groupID string) *resource.Def {
+	base := *resource.Registry["device_group_members"]
+	base.Defaults = map[string]string{"group_id": groupID}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.DeviceGroupMember
+		if err := c.Get("/device-group-members?group_id="+groupID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
 func scopedInterfaces(deviceID string) *resource.Def {
 	base := *resource.Registry["device_interfaces"]
 	base.Defaults = map[string]string{"device_id": deviceID}
@@ -452,6 +486,17 @@ func switchDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 	}
 }
 
+func deviceGroupDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
+	return func(raw any) tea.Cmd {
+		g := raw.(*models.DeviceGroup)
+		groupID := fmt.Sprintf("%d", g.ID)
+		screen := NewResourceTable(scopedDeviceGroupMembers(groupID), apiClient)
+		return func() tea.Msg {
+			return PushScreenMsg{Screen: titledScreen{screen, g.Name + " Members"}}
+		}
+	}
+}
+
 func patchPanelDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 	return func(raw any) tea.Cmd {
 		pp := raw.(*models.PatchPanel)
@@ -489,6 +534,9 @@ func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu 
 			}},
 			{label: "Patch Panels", build: func() Screen {
 				return NewResourceTableWithSelect(scopedPatchPanels(siteID), apiClient, patchPanelDrillDown(apiClient))
+			}},
+			{label: "Device Groups", build: func() Screen {
+				return NewResourceTableWithSelect(scopedDeviceGroups(siteID), apiClient, deviceGroupDrillDown(apiClient))
 			}},
 		},
 	}
