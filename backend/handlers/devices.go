@@ -447,7 +447,7 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 	}
 	qrURL := fmt.Sprintf("%s/devices/%d", baseURL, deviceID)
 
-	qrPNG, err := qrcode.Encode(qrURL, qrcode.Medium, 256)
+	qrPNG, err := qrcode.Encode(qrURL, qrcode.Highest, 256)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, fmt.Errorf("generate QR: %w", err))
 		return
@@ -562,13 +562,27 @@ func (h *DeviceHandler) Label(c *gin.Context) {
 		notesStr = notesStr[fit:]
 	}
 
-	// Logo bottom-right of text area (optional, loaded from LABEL_LOGO_PATH).
+	// Logo centered on QR code (optional, loaded from LABEL_LOGO_PATH).
+	// QR uses Highest error correction (~30% recovery), so the logo can cover
+	// up to ~30% of the QR area and it will still scan.
 	if logoPath := os.Getenv("LABEL_LOGO_PATH"); logoPath != "" {
 		if logoData, err := os.ReadFile(logoPath); err == nil {
 			logoReader := bytes.NewReader(logoData)
 			logoOpts := fpdf.ImageOptions{ImageType: "PNG"}
-			pdf.RegisterImageOptionsReader("logo", logoOpts, logoReader)
-			pdf.ImageOptions("logo", 62, 27, 25, 0, false, logoOpts, 0, "")
+			info := pdf.RegisterImageOptionsReader("logo", logoOpts, logoReader)
+			// Scale logo to QR width (30mm), auto-compute height from aspect ratio.
+			qrSize := 30.0
+			qrX := 2.0
+			qrY := 3.0
+			logoW := qrSize
+			logoH := logoW * info.Height() / info.Width()
+			if logoH > qrSize {
+				logoH = qrSize
+				logoW = logoH * info.Width() / info.Height()
+			}
+			logoX := qrX + (qrSize-logoW)/2
+			logoY := qrY + (qrSize-logoH)/2
+			pdf.ImageOptions("logo", logoX, logoY, logoW, logoH, false, logoOpts, 0, "")
 		}
 	}
 
