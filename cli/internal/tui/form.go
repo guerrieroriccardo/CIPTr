@@ -213,6 +213,11 @@ func (f *ResourceForm) openPicker() {
 		return
 	}
 
+	// Add a "None" option at the top for optional fields to allow clearing the value.
+	if !field.Required {
+		items = append([]pickerItem{{id: "", label: "(None)"}}, items...)
+	}
+
 	f.picking = true
 	f.pickerItems = items
 	f.pickerFilter = ""

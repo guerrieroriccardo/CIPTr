@@ -60,6 +60,7 @@ func NewMenu() Menu {
 		MenuItem{name: "All Patch Panel Ports", desc: "List all patch panel ports", key: "patch_panel_ports"},
 		MenuItem{name: "All Device Groups", desc: "Named groups of devices", key: "device_groups"},
 		MenuItem{name: "All Device Group Members", desc: "Devices in groups", key: "device_group_members"},
+		MenuItem{name: "All Firewall Rules", desc: "Firewall rules per site", key: "firewall_rules"},
 		// Administration
 		MenuItem{name: "Administration", desc: "Users, audit logs, password change", key: "admin"},
 	}
