@@ -27,6 +27,9 @@ services:
       GIN_MODE: ${GIN_MODE:-release}
       JWT_SECRET: ${JWT_SECRET}
       LABEL_BASE_URL: ${LABEL_BASE_URL:-}
+      LABEL_LOGO_PATH: ${LABEL_LOGO_PATH:-/app/logo.png}
+    volumes:
+      - ${LABEL_LOGO_SRC:-./logo.png}:/app/logo.png:ro
     depends_on:
       postgres:
         condition: service_healthy
