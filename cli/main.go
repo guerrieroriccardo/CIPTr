@@ -16,6 +16,10 @@ import (
 	_ "github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
 )
 
+// defaultAPIURL is the fallback API endpoint. It can be overridden at build
+// time via -ldflags "-X main.defaultAPIURL=https://...".
+var defaultAPIURL = "http://localhost:8080/api/v1"
+
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -30,7 +34,7 @@ func main() {
 
 	apiURL := os.Getenv("CIPTR_API_URL")
 	if apiURL == "" {
-		apiURL = "http://localhost:8080/api/v1"
+		apiURL = defaultAPIURL
 	}
 
 	client := apiclient.New(apiURL)

@@ -22,6 +22,7 @@ builds:
       - -X github.com/guerrieroriccardo/CIPTr/cli/internal/version.Version={{.Version}}
       - -X github.com/guerrieroriccardo/CIPTr/cli/internal/version.Commit={{.ShortCommit}}
       - -X github.com/guerrieroriccardo/CIPTr/cli/internal/version.Date={{.Date}}
+      - -X main.defaultAPIURL={{ .Env.DEFAULT_API_URL }}
 
 archives:
   - id: ciptr-cli
