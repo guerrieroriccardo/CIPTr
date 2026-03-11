@@ -140,6 +140,11 @@ func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Logout: clear token and go back to login screen.
+	if key == "logout" {
+		return a.forceLogin()
+	}
+
 	// Administration submenu.
 	if key == "admin" {
 		screen := NewAdminMenu(a.client)

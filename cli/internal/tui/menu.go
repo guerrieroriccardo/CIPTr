@@ -63,6 +63,8 @@ func NewMenu() Menu {
 		MenuItem{name: "All Firewall Rules", desc: "Firewall rules per site", key: "firewall_rules"},
 		// Administration
 		MenuItem{name: "Administration", desc: "Users, audit logs, password change", key: "admin"},
+		// Session
+		MenuItem{name: "Logout", desc: "Clear token and return to login", key: "logout"},
 	}
 
 	delegate := list.NewDefaultDelegate()
