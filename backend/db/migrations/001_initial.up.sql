@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS device_ips (
     id              BIGSERIAL PRIMARY KEY,
     interface_id    BIGINT NOT NULL REFERENCES device_interfaces(id) ON DELETE CASCADE,
     ip_address      INET NOT NULL,
-    vlan_id         BIGINT REFERENCES vlans(id),
+    vlan_id         BIGINT REFERENCES vlans(id) ON DELETE SET NULL,
     is_primary      BOOLEAN DEFAULT FALSE,
     notes           TEXT
 );
@@ -254,8 +254,8 @@ $$;
 CREATE TABLE IF NOT EXISTS device_connections (
     id                  BIGSERIAL PRIMARY KEY,
     interface_id        BIGINT NOT NULL REFERENCES device_interfaces(id) ON DELETE CASCADE,
-    switch_port_id      BIGINT REFERENCES switch_ports(id),
-    patch_panel_port_id BIGINT REFERENCES patch_panel_ports(id),
+    switch_port_id      BIGINT REFERENCES switch_ports(id) ON DELETE SET NULL,
+    patch_panel_port_id BIGINT REFERENCES patch_panel_ports(id) ON DELETE SET NULL,
     connected_at        DATE,
     notes               TEXT
 );
