@@ -131,11 +131,18 @@ func (h *SwitchHandler) NextName(c *gin.Context) {
 		return
 	}
 
-	const prefix = "SW"
+	// Load hostname format from settings.
+	format, err := GetHostnameFormat(c.Request.Context(), h.db)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	const label = "SW"
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
 		`SELECT hostname FROM switches WHERE site_id = $1 AND hostname LIKE $2`,
-		siteID, prefix+"%",
+		siteID, HostnameLikePattern(label, format),
 	)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -143,31 +150,31 @@ func (h *SwitchHandler) NextName(c *gin.Context) {
 	}
 	defer rows.Close()
 
+	maxNum := MaxHostnameNumber(format.NumDigits)
 	taken := make(map[int]bool)
 	for rows.Next() {
 		var hostname string
 		if err := rows.Scan(&hostname); err != nil {
 			continue
 		}
-		suffix := hostname[len(prefix):]
-		if num, err := strconv.Atoi(suffix); err == nil && num >= 1 && num <= 999 {
+		if num, ok := ParseHostnameNumber(hostname, label, format); ok && num >= 1 && num <= maxNum {
 			taken[num] = true
 		}
 	}
 
 	next := 0
-	for i := 1; i <= 999; i++ {
+	for i := 1; i <= maxNum; i++ {
 		if !taken[i] {
 			next = i
 			break
 		}
 	}
 	if next == 0 {
-		fail(c, http.StatusConflict, errors.New("all 999 switch names are taken"))
+		fail(c, http.StatusConflict, fmt.Errorf("all %d switch names are taken", maxNum))
 		return
 	}
 
-	hostname := fmt.Sprintf("%s%03d", prefix, next)
+	hostname := BuildHostname(label, next, format)
 	ok(c, http.StatusOK, gin.H{"hostname": hostname})
 }
 
