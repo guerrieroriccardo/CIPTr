@@ -29,6 +29,13 @@ func main() {
 		case "update":
 			selfupdate.Run()
 			return
+		case "logout":
+			if err := auth.ClearToken(); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Println("Logged out successfully.")
+			return
 		}
 	}
 
