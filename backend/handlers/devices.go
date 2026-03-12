@@ -214,11 +214,20 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 		return
 	}
 
-	// Get category short_code.
-	var prefix string
-	err = h.db.QueryRowContext(c.Request.Context(),
-		`SELECT short_code FROM categories WHERE id = $1`, catID,
-	).Scan(&prefix)
+	// Load hostname format from settings.
+	format, err := GetHostnameFormat(c.Request.Context(), h.db)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Get category label based on format configuration.
+	var label string
+	query := `SELECT short_code FROM categories WHERE id = $1`
+	if format.PrefixSource == "name" {
+		query = `SELECT name FROM categories WHERE id = $1`
+	}
+	err = h.db.QueryRowContext(c.Request.Context(), query, catID).Scan(&label)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("category not found"))
 		return
@@ -227,44 +236,52 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
+	label = SanitizeLabel(label)
 
-	// Get all existing hostnames matching this prefix at this site.
-	rows, err := h.db.QueryContext(c.Request.Context(),
-		`SELECT hostname FROM devices WHERE site_id = $1 AND hostname LIKE $2`,
-		siteID, prefix+"%",
-	)
+	// Get existing hostnames to find taken numbers.
+	var rows *sql.Rows
+	if format.PrefixPosition == "none" {
+		// Without a prefix, filter by category_id directly.
+		rows, err = h.db.QueryContext(c.Request.Context(),
+			`SELECT hostname FROM devices WHERE site_id = $1 AND category_id = $2`,
+			siteID, catID)
+	} else {
+		rows, err = h.db.QueryContext(c.Request.Context(),
+			`SELECT hostname FROM devices WHERE site_id = $1 AND hostname LIKE $2`,
+			siteID, HostnameLikePattern(label, format))
+	}
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
 	defer rows.Close()
 
+	maxNum := MaxHostnameNumber(format.NumDigits)
 	taken := make(map[int]bool)
 	for rows.Next() {
 		var hostname string
 		if err := rows.Scan(&hostname); err != nil {
 			continue
 		}
-		suffix := hostname[len(prefix):]
-		if num, err := strconv.Atoi(suffix); err == nil && num >= 1 && num <= 999 {
+		if num, ok := ParseHostnameNumber(hostname, label, format); ok && num >= 1 && num <= maxNum {
 			taken[num] = true
 		}
 	}
 
 	// Find first available number.
 	next := 0
-	for i := 1; i <= 999; i++ {
+	for i := 1; i <= maxNum; i++ {
 		if !taken[i] {
 			next = i
 			break
 		}
 	}
 	if next == 0 {
-		fail(c, http.StatusConflict, errors.New("all 999 hostnames are taken"))
+		fail(c, http.StatusConflict, fmt.Errorf("all %d hostnames are taken", maxNum))
 		return
 	}
 
-	hostname := fmt.Sprintf("%s%03d", prefix, next)
+	hostname := BuildHostname(label, next, format)
 
 	// Resolve domain: site.domain overrides client.domain.
 	var domain *string
