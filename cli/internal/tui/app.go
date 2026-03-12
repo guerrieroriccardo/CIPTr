@@ -2,12 +2,19 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/apiclient"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/auth"
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
+)
+
+const (
+	MinWidth  = 60
+	MinHeight = 15
 )
 
 // PushScreenMsg tells the app to push a new screen onto the nav stack.
@@ -114,6 +121,15 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a App) View() string {
+	if a.width < MinWidth || a.height < MinHeight {
+		msg := fmt.Sprintf("Terminal too small (%dx%d minimum)\nCurrent: %dx%d", MinWidth, MinHeight, a.width, a.height)
+		style := lipgloss.NewStyle().
+			Width(a.width).
+			Height(a.height).
+			Align(lipgloss.Center, lipgloss.Center)
+		return style.Render(msg)
+	}
+
 	current := a.nav.Current()
 	if current == nil {
 		return ""

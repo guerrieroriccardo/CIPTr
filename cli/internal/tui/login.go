@@ -21,6 +21,7 @@ type LoginScreen struct {
 	focus    int // 0=username, 1=password
 	err      error
 	loading  bool
+	width    int
 }
 
 func NewLoginScreen(client *apiclient.Client) *LoginScreen {
@@ -50,6 +51,16 @@ func (l *LoginScreen) Init() tea.Cmd { return textinput.Blink }
 
 func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		l.width = msg.Width
+		inputWidth := min(50, msg.Width-20)
+		if inputWidth < 20 {
+			inputWidth = 20
+		}
+		l.username.Width = inputWidth
+		l.password.Width = inputWidth
+		return l, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "tab", "down":

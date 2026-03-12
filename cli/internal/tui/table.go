@@ -106,6 +106,7 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rt.height = msg.Height
 		rt.table.SetHeight(msg.Height - 8)
 		rt.table.SetWidth(msg.Width)
+		rt.scaleColumns()
 
 	case dataLoadedMsg:
 		rt.items = msg.items
@@ -318,4 +319,46 @@ func (rt ResourceTable) selectedItem() any {
 		return nil
 	}
 	return rt.items[rt.filtered[cursor]]
+}
+
+// scaleColumns proportionally resizes column widths to fill the terminal width.
+func (rt *ResourceTable) scaleColumns() {
+	origCols := rt.def.Columns
+	if len(origCols) == 0 || rt.width <= 0 {
+		return
+	}
+
+	// Total original width (used as basis for proportional scaling).
+	var origTotal int
+	for _, c := range origCols {
+		origTotal += c.Width
+	}
+	if origTotal == 0 {
+		return
+	}
+
+	// Available width: terminal width minus column separators/padding.
+	// bubbles/table uses ~3 chars per column for padding/borders.
+	available := rt.width - len(origCols)*3 - 2
+	if available < len(origCols)*4 {
+		available = len(origCols) * 4
+	}
+
+	scaled := make([]table.Column, len(origCols))
+	var assigned int
+	for i, c := range origCols {
+		scaled[i].Title = c.Title
+		w := c.Width * available / origTotal
+		if w < 4 {
+			w = 4
+		}
+		scaled[i].Width = w
+		assigned += w
+	}
+	// Distribute remaining space to the last column.
+	if diff := available - assigned; diff > 0 {
+		scaled[len(scaled)-1].Width += diff
+	}
+
+	rt.table.SetColumns(scaled)
 }

@@ -22,6 +22,7 @@ type ChangePasswordScreen struct {
 	err         error
 	saving      bool
 	done        bool
+	width       int
 }
 
 func NewChangePasswordScreen(client *apiclient.Client) *ChangePasswordScreen {
@@ -61,6 +62,17 @@ func (s *ChangePasswordScreen) Init() tea.Cmd { return textinput.Blink }
 
 func (s *ChangePasswordScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		s.width = msg.Width
+		inputWidth := min(50, msg.Width-20)
+		if inputWidth < 20 {
+			inputWidth = 20
+		}
+		s.oldPassword.Width = inputWidth
+		s.newPassword.Width = inputWidth
+		s.confirm.Width = inputWidth
+		return s, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":

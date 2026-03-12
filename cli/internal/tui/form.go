@@ -33,6 +33,7 @@ type ResourceForm struct {
 	focus  int
 	err    error
 	saving bool
+	width  int // terminal width for input sizing
 	height int // terminal height for scrolling
 	scroll int // first visible field index
 
@@ -271,7 +272,15 @@ func (f *ResourceForm) ensurePickerVisible() {
 func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		f.width = msg.Width
 		f.height = msg.Height
+		inputWidth := min(60, msg.Width-10)
+		if inputWidth < 20 {
+			inputWidth = 20
+		}
+		for i := range f.inputs {
+			f.inputs[i].Width = inputWidth
+		}
 		f.ensureVisible()
 		return f, nil
 
