@@ -46,6 +46,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	deviceGroupHandler      := handlers.NewDeviceGroupHandler(database)
 	deviceGroupMemberHandler := handlers.NewDeviceGroupMemberHandler(database)
 	firewallRuleHandler     := handlers.NewFirewallRuleHandler(database)
+	settingsHandler         := handlers.NewSettingsHandler(database)
 	auditHandler            := handlers.NewAuditHandler(database)
 
 	api := r.Group("/api/v1")
@@ -269,6 +270,13 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		deviceGroupMembers.GET("", deviceGroupMemberHandler.List)
 		deviceGroupMembers.POST("", write, deviceGroupMemberHandler.Create)
 		deviceGroupMembers.DELETE("/:id", write, deviceGroupMemberHandler.Delete)
+	}
+
+	settingsGroup := api.Group("/settings")
+	{
+		settingsGroup.GET("", settingsHandler.List)
+		settingsGroup.GET("/:key", settingsHandler.GetByKey)
+		settingsGroup.PUT("/:key", handlers.RoleRequired("admin"), settingsHandler.Update)
 	}
 
 	api.GET("/audit-logs", handlers.RoleRequired("admin"), auditHandler.List)
