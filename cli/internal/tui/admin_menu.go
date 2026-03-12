@@ -23,6 +23,7 @@ func NewAdminMenu(client *apiclient.Client) AdminMenu {
 	items := []list.Item{
 		MenuItem{name: "Users", desc: "Manage user accounts (admin only)", key: "users"},
 		MenuItem{name: "Audit Logs", desc: "View recent activity log (admin only)", key: "audit_logs"},
+		MenuItem{name: "Settings", desc: "Hostname nomenclature and system config (admin only)", key: "settings"},
 		MenuItem{name: "Change Password", desc: "Change your own password", key: "change_password"},
 	}
 
@@ -91,6 +92,9 @@ func (m AdminMenu) handleSelection(key string) tea.Cmd {
 			return nil
 		}
 		screen := NewResourceTable(def, m.client)
+		return func() tea.Msg { return PushScreenMsg{Screen: screen} }
+	case "settings":
+		screen := NewSettingsScreen(m.client)
 		return func() tea.Msg { return PushScreenMsg{Screen: screen} }
 	}
 	return nil
