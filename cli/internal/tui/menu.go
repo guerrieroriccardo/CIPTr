@@ -107,6 +107,20 @@ func (m Menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return MenuItemSelected{Key: item.Key()}
 				}
 			}
+		case "right", "pgdown", "l":
+			// Wrap to first page when on last page.
+			if m.list.Paginator.OnLastPage() {
+				m.list.Paginator.Page = 0
+				m.list.Select(0)
+				return m, nil
+			}
+		case "left", "pgup", "h":
+			// Wrap to last page when on first page.
+			if m.list.Paginator.OnFirstPage() {
+				m.list.Paginator.Page = m.list.Paginator.TotalPages - 1
+				m.list.Select(len(m.list.Items()) - 1)
+				return m, nil
+			}
 		}
 	}
 
