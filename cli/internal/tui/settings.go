@@ -183,7 +183,11 @@ func (s *SettingsScreen) View() string {
 		b.WriteString(SuccessStyle.Render(s.saved) + "\n")
 	}
 
-	b.WriteString("\n" + HelpStyle.Render("←/→ change value • ↑/↓ navigate • esc back"))
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	b.WriteString(warnStyle.Render("  Note: changing these settings won't rename existing devices.") + "\n")
+	b.WriteString(warnStyle.Render("  New hostnames will use the updated format; old ones stay as-is.") + "\n\n")
+
+	b.WriteString(HelpStyle.Render("←/→ change value • ↑/↓ navigate • esc back"))
 	return b.String()
 }
 
