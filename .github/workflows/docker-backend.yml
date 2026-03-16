@@ -2,8 +2,8 @@ name: Build & Push Backend Docker Image
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
     paths:
       - 'backend/**'
       - 'docker-compose.yml'
