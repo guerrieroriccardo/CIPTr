@@ -100,6 +100,8 @@ func (m Menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q":
 			return m, tea.Quit
+		case "esc":
+			return m, nil
 		case "enter":
 			item, ok := m.list.SelectedItem().(MenuItem)
 			if ok {

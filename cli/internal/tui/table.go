@@ -117,6 +117,7 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			rt.allRows[i] = rt.def.ToRow(item)
 		}
 		rt.applyFilter()
+		rt.table.GotoTop()
 
 	case dataErrorMsg:
 		rt.err = msg.err
