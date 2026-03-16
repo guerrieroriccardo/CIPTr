@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -13,13 +14,19 @@ import (
 	"github.com/guerrieroriccardo/CIPTr/cli/internal/tui/resource"
 )
 
+// globalTableSeq assigns a unique ID to each ResourceTable instance so that
+// stale dataLoadedMsg from a popped table cannot contaminate a different table.
+var globalTableSeq uint64
+
 // Messages for async data loading.
 type dataLoadedMsg struct {
 	items []any
+	seq   uint64
 }
 
 type dataErrorMsg struct {
 	err error
+	seq uint64
 }
 
 type exportSuccessMsg struct {
@@ -40,6 +47,7 @@ type ResourceTable struct {
 	loaded   bool
 	width    int
 	height   int
+	seq      uint64             // unique ID for this instance; filters out stale dataLoadedMsg
 	onSelect func(item any) tea.Cmd // if set, enter drills down instead of editing
 
 	status string // flash message (e.g. export result)
@@ -81,6 +89,7 @@ func NewResourceTable(def *resource.Def, client *apiclient.Client) ResourceTable
 		client:      client,
 		table:       t,
 		filterInput: fi,
+		seq:         atomic.AddUint64(&globalTableSeq, 1),
 	}
 }
 
@@ -109,6 +118,9 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rt.scaleColumns()
 
 	case dataLoadedMsg:
+		if msg.seq != rt.seq {
+			return rt, nil // stale message from a different table instance
+		}
 		rt.items = msg.items
 		rt.loaded = true
 		rt.err = nil
@@ -120,6 +132,9 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rt.table.GotoTop()
 
 	case dataErrorMsg:
+		if msg.seq != rt.seq {
+			return rt, nil // stale message from a different table instance
+		}
 		rt.err = msg.err
 		rt.loaded = true
 
@@ -275,12 +290,13 @@ func (rt ResourceTable) View() string {
 func (rt ResourceTable) loadData() tea.Cmd {
 	def := rt.def
 	client := rt.client
+	seq := rt.seq
 	return func() tea.Msg {
 		items, err := def.List(client)
 		if err != nil {
-			return dataErrorMsg{err: err}
+			return dataErrorMsg{err: err, seq: seq}
 		}
-		return dataLoadedMsg{items: items}
+		return dataLoadedMsg{items: items, seq: seq}
 	}
 }
 
