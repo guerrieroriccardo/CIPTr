@@ -382,9 +382,19 @@ func (f ResourceForm) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok || subDef.Create == nil {
 			return f, nil
 		}
+		// Inherit site_id from the parent form so the sub-form is pre-scoped.
+		scopedDef := *subDef
+		for i, fld := range f.def.Fields {
+			if fld.Key == "site_id" {
+				if v := f.inputs[i].Value(); v != "" {
+					scopedDef.Defaults = map[string]string{"site_id": v}
+				}
+				break
+			}
+		}
 		f.picking = false
 		return f, func() tea.Msg {
-			return PushScreenMsg{Screen: NewResourceForm(subDef, f.client, "", nil)}
+			return PushScreenMsg{Screen: NewResourceForm(&scopedDef, f.client, "", nil)}
 		}
 	case "enter":
 		if len(f.pickerMatch) > 0 {
