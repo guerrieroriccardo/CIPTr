@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'backend/**'
-      - 'docker-compose.yml'
+      - 'compose.yml'
   workflow_dispatch:
 
 jobs:
