@@ -23,9 +23,14 @@ func init() {
 			{Title: "Site", Width: 14},
 			{Title: "Location", Width: 14},
 			{Title: "OS", Width: 12},
+			{Title: "VM ID", Width: 6},
 		},
 		ToRow: func(raw any) table.Row {
 			d := raw.(*models.Device)
+			vmID := ""
+			if d.VmID != nil {
+				vmID = fmt.Sprintf("%d", *d.VmID)
+			}
 			return table.Row{
 				fmt.Sprintf("%d", d.ID),
 				d.Hostname,
@@ -34,6 +39,7 @@ func init() {
 				SiteName(d.SiteID),
 				LocationName(d.LocationID),
 				OsName(d.OsID),
+				vmID,
 			}
 		},
 		GetID: func(raw any) string {
