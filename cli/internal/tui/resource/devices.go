@@ -59,7 +59,13 @@ func init() {
 			{Key: "supplier_id", Label: "Supplier", PickerKey: "suppliers"},
 			{Key: "installation_date", Label: "Installation Date (YYYY-MM-DD)"},
 			{Key: "is_reserved", Label: "Is Reserved", PickerOptions: []string{"true", "false"}},
-			{Key: "vm_id", Label: "VM ID (Proxmox)"},
+			{Key: "vm_id", Label: "VM ID (Proxmox)", Hidden: func(values map[string]string) bool {
+				if Resolve == nil {
+					return true
+				}
+				catID := mustInt64(values["category_id"])
+				return catID == 0 || !Resolve.CategoryTrackVmID[catID]
+			}},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -109,21 +115,46 @@ func init() {
 			if key != "site_id" && key != "category_id" {
 				return nil
 			}
-			if values["site_id"] == "" || values["category_id"] == "" {
+
+			derived := map[string]string{}
+
+			// Auto-hostname: requires both site and category.
+			if values["site_id"] != "" && values["category_id"] != "" {
+				var result struct {
+					Hostname string `json:"hostname"`
+					DnsName  string `json:"dns_name"`
+				}
+				if err := client.Get(fmt.Sprintf("/devices/next-hostname?site_id=%s&category_id=%s",
+					values["site_id"], values["category_id"]), &result); err == nil && result.Hostname != "" {
+					derived["hostname"] = result.Hostname
+					if result.DnsName != "" {
+						derived["dns_name"] = result.DnsName
+					}
+				}
+			}
+
+			// Auto-vm_id: only when category has track_vm_id=true.
+			// VM IDs are unique per client, so we resolve client_id from site via resolver.
+			if key == "category_id" && values["site_id"] != "" && Resolve != nil {
+				catID := mustInt64(values["category_id"])
+				if Resolve.CategoryTrackVmID[catID] {
+					siteID := mustInt64(values["site_id"])
+					clientID := Resolve.SiteClient[siteID]
+					if clientID != 0 {
+						var result struct {
+							VmID int64 `json:"vm_id"`
+						}
+						if err := client.Get(fmt.Sprintf("/devices/next-vm-id?client_id=%d", clientID), &result); err == nil && result.VmID > 0 {
+							derived["vm_id"] = fmt.Sprintf("%d", result.VmID)
+						}
+					}
+				} else {
+					derived["vm_id"] = "" // clear when category doesn't track VM IDs
+				}
+			}
+
+			if len(derived) == 0 {
 				return nil
-			}
-			var result struct {
-				Hostname string `json:"hostname"`
-				DnsName  string `json:"dns_name"`
-			}
-			err := client.Get(fmt.Sprintf("/devices/next-hostname?site_id=%s&category_id=%s",
-				values["site_id"], values["category_id"]), &result)
-			if err != nil || result.Hostname == "" {
-				return nil
-			}
-			derived := map[string]string{"hostname": result.Hostname}
-			if result.DnsName != "" {
-				derived["dns_name"] = result.DnsName
 			}
 			return derived
 		},
