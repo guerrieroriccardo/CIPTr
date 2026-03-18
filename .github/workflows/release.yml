@@ -1,10 +1,7 @@
 name: Release CLI
+
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'cli/**'
     tags:
       - 'v*'
   workflow_dispatch:
@@ -15,8 +12,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # On tag pushes, only run for major/minor bumps (vX.Y.0), not patch fixes.
-    if: ${{ !startsWith(github.ref, 'refs/tags/') || endsWith(github.ref_name, '.0') }}
     steps:
       - uses: actions/checkout@v4
         with:

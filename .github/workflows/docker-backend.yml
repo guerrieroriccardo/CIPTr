@@ -2,22 +2,13 @@ name: Build & Push Backend Docker Image
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - 'compose.yml'
     tags:
       - 'v*'
   workflow_dispatch:
 
-
-
 jobs:
   docker:
     runs-on: ubuntu-latest
-    # On tag pushes, skip patch releases (vX.Y.Z where Z != 0).
-    if: ${{ !startsWith(github.ref, 'refs/tags/') || endsWith(github.ref_name, '.0') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +21,6 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
             type=sha
 
       - uses: docker/setup-buildx-action@v3
