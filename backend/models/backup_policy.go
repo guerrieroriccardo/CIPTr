@@ -16,6 +16,7 @@ type BackupPolicy struct {
 	RetainMonthly int       `json:"retain_monthly"`
 	RetainYearly  int       `json:"retain_yearly"`
 	Enabled       bool      `json:"enabled"`
+	Source        *string   `json:"source"`
 	Notes         *string   `json:"notes"`
 	ScheduleTimes []string  `json:"schedule_times"` // "HH:MM" 24h format
 	CreatedAt     time.Time `json:"created_at"`
@@ -34,6 +35,7 @@ type BackupPolicyInput struct {
 	RetainMonthly *int     `json:"retain_monthly"`
 	RetainYearly  *int     `json:"retain_yearly"`
 	Enabled       *bool    `json:"enabled"`
+	Source        *string  `json:"source"`
 	Notes         *string  `json:"notes"`
 	ScheduleTimes []string `json:"schedule_times"` // "HH:MM" 24h format
 }

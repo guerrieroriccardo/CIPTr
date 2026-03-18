@@ -31,7 +31,7 @@ const backupPolicyCoreColumns = `bp.id, bp.client_id, c.name,
 	bp.name, bp.destination,
 	bp.retain_last, bp.retain_hourly, bp.retain_daily,
 	bp.retain_weekly, bp.retain_monthly, bp.retain_yearly,
-	bp.enabled, bp.notes, bp.created_at, bp.updated_at,
+	bp.enabled, bp.source, bp.notes, bp.created_at, bp.updated_at,
 	string_agg(to_char(bst.run_at, 'HH24:MI'), ',' ORDER BY bst.run_at) FILTER (WHERE bst.id IS NOT NULL)`
 
 const backupPolicySelectSQL = `SELECT ` + backupPolicyCoreColumns + `
@@ -48,7 +48,7 @@ func scanBackupPolicy(row interface{ Scan(...any) error }) (models.BackupPolicy,
 		&p.Name, &p.Destination,
 		&p.RetainLast, &p.RetainHourly, &p.RetainDaily,
 		&p.RetainWeekly, &p.RetainMonthly, &p.RetainYearly,
-		&p.Enabled, &p.Notes, &p.CreatedAt, &p.UpdatedAt,
+		&p.Enabled, &p.Source, &p.Notes, &p.CreatedAt, &p.UpdatedAt,
 		&times,
 	)
 	if err != nil {
@@ -234,13 +234,13 @@ func (h *BackupPolicyHandler) Create(c *gin.Context) {
 			(client_id, name, destination,
 			 retain_last, retain_hourly, retain_daily,
 			 retain_weekly, retain_monthly, retain_yearly,
-			 enabled, notes)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			 enabled, source, notes)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		 RETURNING id`,
 		input.ClientID, input.Name, input.Destination,
 		retainLast, retainHourly, retainDaily,
 		retainWeekly, retainMonthly, retainYearly,
-		enabled, input.Notes,
+		enabled, input.Source, input.Notes,
 	).Scan(&policyID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -330,14 +330,14 @@ func (h *BackupPolicyHandler) Update(c *gin.Context) {
 			client_id = $1, name = $2, destination = $3,
 			retain_last = $4, retain_hourly = $5, retain_daily = $6,
 			retain_weekly = $7, retain_monthly = $8, retain_yearly = $9,
-			enabled = $10, notes = $11,
+			enabled = $10, source = $11, notes = $12,
 			updated_at = NOW()
-		 WHERE id = $12
+		 WHERE id = $13
 		 RETURNING id`,
 		input.ClientID, input.Name, input.Destination,
 		retainLast, retainHourly, retainDaily,
 		retainWeekly, retainMonthly, retainYearly,
-		enabled, input.Notes, id,
+		enabled, input.Source, input.Notes, id,
 	).Scan(&updatedID)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("backup policy not found"))
