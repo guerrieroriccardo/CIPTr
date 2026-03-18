@@ -45,6 +45,13 @@ func init() {
 		Fields: []Field{
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
+			{Key: "vm_id", Label: "VM ID (Proxmox)", Hidden: func(values map[string]string) bool {
+				if Resolve == nil {
+					return true
+				}
+				catID := mustInt64(values["category_id"])
+				return catID == 0 || !Resolve.CategoryTrackVmID[catID]
+			}},
 			{Key: "hostname", Label: "Hostname", Required: true},
 			{Key: "location_id", Label: "Location", PickerKey: "locations"},
 			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
@@ -59,13 +66,6 @@ func init() {
 			{Key: "supplier_id", Label: "Supplier", PickerKey: "suppliers"},
 			{Key: "installation_date", Label: "Installation Date (YYYY-MM-DD)"},
 			{Key: "is_reserved", Label: "Is Reserved", PickerOptions: []string{"true", "false"}},
-			{Key: "vm_id", Label: "VM ID (Proxmox)", Hidden: func(values map[string]string) bool {
-				if Resolve == nil {
-					return true
-				}
-				catID := mustInt64(values["category_id"])
-				return catID == 0 || !Resolve.CategoryTrackVmID[catID]
-			}},
 			{Key: "notes", Label: "Notes"},
 		},
 
