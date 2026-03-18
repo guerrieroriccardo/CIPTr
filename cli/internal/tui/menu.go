@@ -61,6 +61,7 @@ func NewMenu() Menu {
 		MenuItem{name: "All Device Groups", desc: "Named groups of devices", key: "device_groups"},
 		MenuItem{name: "All Device Group Members", desc: "Devices in groups", key: "device_group_members"},
 		MenuItem{name: "All Firewall Rules", desc: "Firewall rules per site", key: "firewall_rules"},
+		MenuItem{name: "All Backup Policies", desc: "Backup policies per client", key: "backup_policies"},
 		// Administration
 		MenuItem{name: "Administration", desc: "Users, audit logs, password change", key: "admin"},
 		// Session

@@ -226,6 +226,23 @@ func scopedDeviceGroupMembers(groupID string) *resource.Def {
 	return &base
 }
 
+func scopedBackupPolicies(clientID string) *resource.Def {
+	base := *resource.Registry["backup_policies"]
+	base.Defaults = map[string]string{"client_id": clientID}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.BackupPolicy
+		if err := c.Get("/backup-policies?client_id="+clientID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
 func scopedFirewallRules(siteID string) *resource.Def {
 	base := *resource.Registry["firewall_rules"]
 	base.Defaults = map[string]string{"site_id": siteID}
@@ -441,12 +458,9 @@ func scopedModelsByManufacturer(mfgID string) *resource.Def {
 func clientDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 	return func(raw any) tea.Cmd {
 		c := raw.(*models.Client)
-		clientID := fmt.Sprintf("%d", c.ID)
-		def := scopedSites(clientID)
-		screen := NewResourceTableWithSelect(def, apiClient, siteDrillDown(apiClient))
-		// Override title to show client name instead of generic "Sites"
+		menu := newClientScopeMenu(c, apiClient)
 		return func() tea.Msg {
-			return PushScreenMsg{Screen: titledScreen{screen, c.Name}}
+			return PushScreenMsg{Screen: menu}
 		}
 	}
 }
@@ -528,6 +542,23 @@ func patchPanelDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 // ---------------------------------------------------------------------------
 // Scope menu factories
 // ---------------------------------------------------------------------------
+
+func newClientScopeMenu(client *models.Client, apiClient *apiclient.Client) ScopeMenu {
+	clientID := fmt.Sprintf("%d", client.ID)
+	return ScopeMenu{
+		title: client.Name,
+		items: []ScopeMenuItem{
+			{label: "Sites", build: func() Screen {
+				def := scopedSites(clientID)
+				screen := NewResourceTableWithSelect(def, apiClient, siteDrillDown(apiClient))
+				return titledScreen{screen, client.Name + " — Sites"}
+			}},
+			{label: "Backup Policies", build: func() Screen {
+				return NewResourceTable(scopedBackupPolicies(clientID), apiClient)
+			}},
+		},
+	}
+}
 
 func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu {
 	siteID := fmt.Sprintf("%d", site.ID)
