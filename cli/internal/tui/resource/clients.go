@@ -118,7 +118,7 @@ func init() {
 		Fields: []Field{
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "short_code", Label: "Short Code", Required: true},
-			{Key: "domain", Label: "Domain (e.g. berpa.local)"},
+			{Key: "domain", Label: "Domain (e.g. client.tld)"},
 			{Key: "notes", Label: "Notes"},
 		},
 
