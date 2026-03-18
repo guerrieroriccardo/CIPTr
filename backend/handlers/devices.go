@@ -302,17 +302,20 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 	ok(c, http.StatusOK, result)
 }
 
-// NextVmID handles GET /devices/next-vm-id?site_id=X
-// Returns the lowest available Proxmox VM ID (>= 100) for the given site.
+// NextVmID handles GET /devices/next-vm-id?client_id=X
+// Returns the lowest available Proxmox VM ID (>= 100) across all sites of the given client.
+// VM IDs are unique per client since a Proxmox cluster belongs to one client.
 func (h *DeviceHandler) NextVmID(c *gin.Context) {
-	siteIDStr := c.Query("site_id")
-	if siteIDStr == "" {
-		fail(c, http.StatusBadRequest, errors.New("site_id is required"))
+	clientIDStr := c.Query("client_id")
+	if clientIDStr == "" {
+		fail(c, http.StatusBadRequest, errors.New("client_id is required"))
 		return
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		`SELECT vm_id FROM devices WHERE site_id = $1 AND vm_id IS NOT NULL`, siteIDStr)
+		`SELECT d.vm_id FROM devices d
+		 JOIN sites s ON s.id = d.site_id
+		 WHERE s.client_id = $1 AND d.vm_id IS NOT NULL`, clientIDStr)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
