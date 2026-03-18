@@ -59,6 +59,7 @@ func init() {
 			{Key: "supplier_id", Label: "Supplier", PickerKey: "suppliers"},
 			{Key: "installation_date", Label: "Installation Date (YYYY-MM-DD)"},
 			{Key: "is_reserved", Label: "Is Reserved", PickerOptions: []string{"true", "false"}},
+			{Key: "vm_id", Label: "VM ID (Proxmox)"},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -156,6 +157,7 @@ func init() {
 				SupplierID:       int64Ptr(data["supplier_id"]),
 				InstallationDate: strPtr(data["installation_date"]),
 				IsReserved:       boolPtr(data["is_reserved"]),
+				VmID:             int64Ptr(data["vm_id"]),
 				Notes:            strPtr(data["notes"]),
 			}
 			var created models.Device
@@ -180,6 +182,7 @@ func init() {
 				SupplierID:       int64Ptr(data["supplier_id"]),
 				InstallationDate: strPtr(data["installation_date"]),
 				IsReserved:       boolPtr(data["is_reserved"]),
+				VmID:             int64Ptr(data["vm_id"]),
 				Notes:            strPtr(data["notes"]),
 			}
 			var updated models.Device

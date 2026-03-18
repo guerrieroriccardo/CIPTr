@@ -34,7 +34,7 @@ const deviceSelectSQL = `SELECT id, site_id, location_id, model_id,
 	category_id, status, is_up,
 	os_id, has_rmm, has_antivirus, supplier_id,
 	installation_date, is_reserved,
-	notes, created_at, updated_at
+	vm_id, notes, created_at, updated_at
 	FROM devices`
 
 // scanDevice reads one row into a Device struct.
@@ -46,7 +46,7 @@ func scanDevice(row interface{ Scan(...any) error }) (models.Device, error) {
 		&d.CategoryID, &d.Status, &d.IsUp,
 		&d.OsID, &d.HasRmm, &d.HasAntivirus, &d.SupplierID,
 		&d.InstallationDate, &d.IsReserved,
-		&d.Notes, &d.CreatedAt, &d.UpdatedAt,
+		&d.VmID, &d.Notes, &d.CreatedAt, &d.UpdatedAt,
 	)
 	return d, err
 }
@@ -327,19 +327,19 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
 			os_id, has_rmm, has_antivirus, supplier_id,
-			installation_date, is_reserved, notes
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+			installation_date, is_reserved, vm_id, notes
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
 			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
-			notes, created_at, updated_at`,
+			vm_id, notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
 		input.CategoryID, status, input.IsUp,
 		input.OsID, input.HasRmm, input.HasAntivirus, input.SupplierID,
-		input.InstallationDate, input.IsReserved, input.Notes,
+		input.InstallationDate, input.IsReserved, input.VmID, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -381,19 +381,19 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 			hostname = $4, dns_name = $5, serial_number = $6, asset_tag = $7,
 			category_id = $8, status = $9, is_up = $10,
 			os_id = $11, has_rmm = $12, has_antivirus = $13, supplier_id = $14,
-			installation_date = $15, is_reserved = $16, notes = $17
-		WHERE id = $18
+			installation_date = $15, is_reserved = $16, vm_id = $17, notes = $18
+		WHERE id = $19
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
 			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
-			notes, created_at, updated_at`,
+			vm_id, notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
 		input.CategoryID, status, input.IsUp,
 		input.OsID, input.HasRmm, input.HasAntivirus, input.SupplierID,
-		input.InstallationDate, input.IsReserved, input.Notes, id,
+		input.InstallationDate, input.IsReserved, input.VmID, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("device not found"))
