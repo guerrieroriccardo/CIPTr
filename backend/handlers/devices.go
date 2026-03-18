@@ -302,6 +302,39 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 	ok(c, http.StatusOK, result)
 }
 
+// NextVmID handles GET /devices/next-vm-id?site_id=X
+// Returns the lowest available Proxmox VM ID (>= 100) for the given site.
+func (h *DeviceHandler) NextVmID(c *gin.Context) {
+	siteIDStr := c.Query("site_id")
+	if siteIDStr == "" {
+		fail(c, http.StatusBadRequest, errors.New("site_id is required"))
+		return
+	}
+
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT vm_id FROM devices WHERE site_id = $1 AND vm_id IS NOT NULL`, siteIDStr)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer rows.Close()
+
+	taken := map[int]bool{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err == nil {
+			taken[id] = true
+		}
+	}
+
+	next := 100
+	for taken[next] {
+		next++
+	}
+
+	ok(c, http.StatusOK, gin.H{"vm_id": next})
+}
+
 // Create handles POST /devices
 // site_id, hostname, and category_id are required.
 func (h *DeviceHandler) Create(c *gin.Context) {
