@@ -23,9 +23,14 @@ func init() {
 			{Title: "Site", Width: 14},
 			{Title: "Location", Width: 14},
 			{Title: "OS", Width: 12},
+			{Title: "VM ID", Width: 6},
 		},
 		ToRow: func(raw any) table.Row {
 			d := raw.(*models.Device)
+			vmID := ""
+			if d.VmID != nil {
+				vmID = fmt.Sprintf("%d", *d.VmID)
+			}
 			return table.Row{
 				fmt.Sprintf("%d", d.ID),
 				d.Hostname,
@@ -34,6 +39,7 @@ func init() {
 				SiteName(d.SiteID),
 				LocationName(d.LocationID),
 				OsName(d.OsID),
+				vmID,
 			}
 		},
 		GetID: func(raw any) string {
@@ -45,6 +51,13 @@ func init() {
 		Fields: []Field{
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
+			{Key: "vm_id", Label: "VM ID (Proxmox)", Hidden: func(values map[string]string) bool {
+				if Resolve == nil {
+					return true
+				}
+				catID := mustInt64(values["category_id"])
+				return catID == 0 || !Resolve.CategoryTrackVmID[catID]
+			}},
 			{Key: "hostname", Label: "Hostname", Required: true},
 			{Key: "location_id", Label: "Location", PickerKey: "locations"},
 			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
@@ -108,21 +121,46 @@ func init() {
 			if key != "site_id" && key != "category_id" {
 				return nil
 			}
-			if values["site_id"] == "" || values["category_id"] == "" {
+
+			derived := map[string]string{}
+
+			// Auto-hostname: requires both site and category.
+			if values["site_id"] != "" && values["category_id"] != "" {
+				var result struct {
+					Hostname string `json:"hostname"`
+					DnsName  string `json:"dns_name"`
+				}
+				if err := client.Get(fmt.Sprintf("/devices/next-hostname?site_id=%s&category_id=%s",
+					values["site_id"], values["category_id"]), &result); err == nil && result.Hostname != "" {
+					derived["hostname"] = result.Hostname
+					if result.DnsName != "" {
+						derived["dns_name"] = result.DnsName
+					}
+				}
+			}
+
+			// Auto-vm_id: only when category has track_vm_id=true.
+			// VM IDs are unique per client, so we resolve client_id from site via resolver.
+			if key == "category_id" && values["site_id"] != "" && Resolve != nil {
+				catID := mustInt64(values["category_id"])
+				if Resolve.CategoryTrackVmID[catID] {
+					siteID := mustInt64(values["site_id"])
+					clientID := Resolve.SiteClient[siteID]
+					if clientID != 0 {
+						var result struct {
+							VmID int64 `json:"vm_id"`
+						}
+						if err := client.Get(fmt.Sprintf("/devices/next-vm-id?client_id=%d", clientID), &result); err == nil && result.VmID > 0 {
+							derived["vm_id"] = fmt.Sprintf("%d", result.VmID)
+						}
+					}
+				} else {
+					derived["vm_id"] = "" // clear when category doesn't track VM IDs
+				}
+			}
+
+			if len(derived) == 0 {
 				return nil
-			}
-			var result struct {
-				Hostname string `json:"hostname"`
-				DnsName  string `json:"dns_name"`
-			}
-			err := client.Get(fmt.Sprintf("/devices/next-hostname?site_id=%s&category_id=%s",
-				values["site_id"], values["category_id"]), &result)
-			if err != nil || result.Hostname == "" {
-				return nil
-			}
-			derived := map[string]string{"hostname": result.Hostname}
-			if result.DnsName != "" {
-				derived["dns_name"] = result.DnsName
 			}
 			return derived
 		},
@@ -156,6 +194,7 @@ func init() {
 				SupplierID:       int64Ptr(data["supplier_id"]),
 				InstallationDate: strPtr(data["installation_date"]),
 				IsReserved:       boolPtr(data["is_reserved"]),
+				VmID:             int64Ptr(data["vm_id"]),
 				Notes:            strPtr(data["notes"]),
 			}
 			var created models.Device
@@ -180,6 +219,7 @@ func init() {
 				SupplierID:       int64Ptr(data["supplier_id"]),
 				InstallationDate: strPtr(data["installation_date"]),
 				IsReserved:       boolPtr(data["is_reserved"]),
+				VmID:             int64Ptr(data["vm_id"]),
 				Notes:            strPtr(data["notes"]),
 			}
 			var updated models.Device

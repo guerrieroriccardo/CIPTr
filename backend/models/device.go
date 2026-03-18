@@ -30,6 +30,7 @@ type Device struct {
 	InstallationDate *string `json:"installation_date"` // DATE as string (YYYY-MM-DD)
 	IsReserved       *bool   `json:"is_reserved"`
 
+	VmID      *int64    `json:"vm_id"`
 	Notes     *string   `json:"notes"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -58,5 +59,6 @@ type DeviceInput struct {
 	InstallationDate *string `json:"installation_date"`
 	IsReserved       *bool   `json:"is_reserved"`
 
+	VmID  *int64  `json:"vm_id"`
 	Notes *string `json:"notes"`
 }

@@ -139,31 +139,62 @@ func (f ResourceForm) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// activeFieldIndices returns the indices of fields currently visible (not hidden).
+func (f ResourceForm) activeFieldIndices() []int {
+	values := make(map[string]string, len(f.def.Fields))
+	for i, fld := range f.def.Fields {
+		values[fld.Key] = f.inputs[i].Value()
+	}
+	var indices []int
+	for i, field := range f.def.Fields {
+		if field.Hidden == nil || !field.Hidden(values) {
+			indices = append(indices, i)
+		}
+	}
+	return indices
+}
+
+// focusPosition returns the position of f.focus within the active field list.
+func (f ResourceForm) focusPosition(active []int) int {
+	for i, idx := range active {
+		if idx == f.focus {
+			return i
+		}
+	}
+	return 0
+}
+
 // visibleFields returns how many fields fit on screen.
 // Each field takes 3 lines (label + input + blank), plus title (2) + help (2).
 func (f ResourceForm) visibleFields() int {
-	if f.height <= 0 {
-		return len(f.def.Fields)
-	}
-	available := f.height - 4 // title + help + error margin
-	perField := 3
-	n := available / perField
-	if n < 1 {
-		n = 1
-	}
-	if n > len(f.def.Fields) {
-		n = len(f.def.Fields)
+	active := f.activeFieldIndices()
+	n := len(active)
+	if f.height > 0 {
+		available := f.height - 4 // title + help + error margin
+		perField := 3
+		max := available / perField
+		if max < 1 {
+			max = 1
+		}
+		if n > max {
+			n = max
+		}
 	}
 	return n
 }
 
 func (f *ResourceForm) ensureVisible() {
-	vis := f.visibleFields()
-	if f.focus < f.scroll {
-		f.scroll = f.focus
+	active := f.activeFieldIndices()
+	if len(active) == 0 {
+		return
 	}
-	if f.focus >= f.scroll+vis {
-		f.scroll = f.focus - vis + 1
+	vis := f.visibleFields()
+	pos := f.focusPosition(active)
+	if pos < f.scroll {
+		f.scroll = pos
+	}
+	if pos >= f.scroll+vis {
+		f.scroll = pos - vis + 1
 	}
 }
 
@@ -312,11 +343,19 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			return f, func() tea.Msg { return PopScreenMsg{} }
 		case "tab", "down":
-			f.focus = (f.focus + 1) % len(f.inputs)
+			active := f.activeFieldIndices()
+			if len(active) > 0 {
+				pos := (f.focusPosition(active) + 1) % len(active)
+				f.focus = active[pos]
+			}
 			f.ensureVisible()
 			return f, f.updateFocus()
 		case "shift+tab", "up":
-			f.focus = (f.focus - 1 + len(f.inputs)) % len(f.inputs)
+			active := f.activeFieldIndices()
+			if len(active) > 0 {
+				pos := (f.focusPosition(active) - 1 + len(active)) % len(active)
+				f.focus = active[pos]
+			}
 			f.ensureVisible()
 			return f, f.updateFocus()
 		case "enter":
@@ -325,12 +364,14 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				f.openPicker()
 				return f, nil
 			}
-			// If on last field, submit
-			if f.focus == len(f.inputs)-1 {
+			// If on last active field, submit
+			active := f.activeFieldIndices()
+			if len(active) == 0 || f.focusPosition(active) == len(active)-1 {
 				return f, f.submit()
 			}
-			// Otherwise move to next field
-			f.focus = (f.focus + 1) % len(f.inputs)
+			// Otherwise move to next active field
+			pos := (f.focusPosition(active) + 1) % len(active)
+			f.focus = active[pos]
 			f.ensureVisible()
 			return f, f.updateFocus()
 		case "ctrl+s":
@@ -460,10 +501,14 @@ func (f ResourceForm) View() string {
 	}
 	b.WriteString(TitleStyle.Render(action+" "+f.def.Name) + "\n")
 
+	active := f.activeFieldIndices()
 	vis := f.visibleFields()
+	if f.scroll > len(active) {
+		f.scroll = 0
+	}
 	end := f.scroll + vis
-	if end > len(f.def.Fields) {
-		end = len(f.def.Fields)
+	if end > len(active) {
+		end = len(active)
 	}
 
 	pickerHintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
@@ -477,7 +522,7 @@ func (f ResourceForm) View() string {
 		}
 	}
 
-	for i := f.scroll; i < end; i++ {
+	for _, i := range active[f.scroll:end] {
 		field := f.def.Fields[i]
 		label := field.Label
 		if field.Required {
@@ -514,9 +559,9 @@ func (f ResourceForm) View() string {
 		}
 	}
 
-	// Show scroll indicator if not all fields are visible.
-	if len(f.def.Fields) > vis {
-		b.WriteString(HelpStyle.Render(fmt.Sprintf("  [%d/%d fields]", f.focus+1, len(f.def.Fields))) + "\n")
+	// Show scroll indicator if not all active fields are visible.
+	if len(active) > vis {
+		b.WriteString(HelpStyle.Render(fmt.Sprintf("  [%d/%d fields]", f.focusPosition(active)+1, len(active))) + "\n")
 	}
 
 	if f.err != nil {
@@ -615,19 +660,29 @@ func (f ResourceForm) updateFocus() tea.Cmd {
 }
 
 func (f ResourceForm) submit() tea.Cmd {
-	// Validate required fields.
+	active := f.activeFieldIndices()
+	activeSet := make(map[int]bool, len(active))
+	for _, i := range active {
+		activeSet[i] = true
+	}
+
+	// Validate required fields (only active ones).
 	for i, field := range f.def.Fields {
-		if field.Required && strings.TrimSpace(f.inputs[i].Value()) == "" {
+		if activeSet[i] && field.Required && strings.TrimSpace(f.inputs[i].Value()) == "" {
 			return func() tea.Msg {
 				return formErrorMsg{err: fmt.Errorf("%s is required", field.Label)}
 			}
 		}
 	}
 
-	// Collect data.
+	// Collect data. Hidden fields are sent as empty so the backend clears them.
 	data := make(map[string]string)
 	for i, field := range f.def.Fields {
-		data[field.Key] = f.inputs[i].Value()
+		if activeSet[i] {
+			data[field.Key] = f.inputs[i].Value()
+		} else {
+			data[field.Key] = ""
+		}
 	}
 
 	def := f.def

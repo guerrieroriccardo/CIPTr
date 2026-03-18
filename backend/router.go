@@ -193,6 +193,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	{
 		devices.GET("", deviceHandler.List)
 		devices.GET("/next-hostname", deviceHandler.NextHostname)
+		devices.GET("/next-vm-id", deviceHandler.NextVmID)
 		devices.POST("", write, deviceHandler.Create)
 		devices.GET("/:id", deviceHandler.GetByID)
 		devices.PUT("/:id", write, deviceHandler.Update)

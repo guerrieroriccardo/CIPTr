@@ -18,13 +18,19 @@ func init() {
 			{Title: "ID", Width: 6},
 			{Title: "Name", Width: 30},
 			{Title: "Short Code", Width: 12},
+			{Title: "Track VM ID", Width: 11},
 		},
 		ToRow: func(raw any) table.Row {
 			c := raw.(*models.Category)
+			trackVmID := "no"
+			if c.TrackVmID {
+				trackVmID = "yes"
+			}
 			return table.Row{
 				fmt.Sprintf("%d", c.ID),
 				c.Name,
 				c.ShortCode,
+				trackVmID,
 			}
 		},
 		GetID: func(raw any) string {
@@ -34,6 +40,7 @@ func init() {
 		Fields: []Field{
 			{Key: "name", Label: "Name", Required: true},
 			{Key: "short_code", Label: "Short Code", Required: true},
+			{Key: "track_vm_id", Label: "Track VM ID", PickerOptions: []string{"false", "true"}},
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
@@ -48,13 +55,13 @@ func init() {
 			return result, nil
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
-			input := models.CategoryInput{Name: data["name"], ShortCode: data["short_code"]}
+			input := models.CategoryInput{Name: data["name"], ShortCode: data["short_code"], TrackVmID: boolPtr(data["track_vm_id"])}
 			var created models.Category
 			err := client.Post("/categories", input, &created)
 			return &created, err
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
-			input := models.CategoryInput{Name: data["name"], ShortCode: data["short_code"]}
+			input := models.CategoryInput{Name: data["name"], ShortCode: data["short_code"], TrackVmID: boolPtr(data["track_vm_id"])}
 			var updated models.Category
 			err := client.Put("/categories/"+id, input, &updated)
 			return &updated, err

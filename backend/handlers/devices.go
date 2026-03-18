@@ -34,7 +34,7 @@ const deviceSelectSQL = `SELECT id, site_id, location_id, model_id,
 	category_id, status, is_up,
 	os_id, has_rmm, has_antivirus, supplier_id,
 	installation_date, is_reserved,
-	notes, created_at, updated_at
+	vm_id, notes, created_at, updated_at
 	FROM devices`
 
 // scanDevice reads one row into a Device struct.
@@ -46,7 +46,7 @@ func scanDevice(row interface{ Scan(...any) error }) (models.Device, error) {
 		&d.CategoryID, &d.Status, &d.IsUp,
 		&d.OsID, &d.HasRmm, &d.HasAntivirus, &d.SupplierID,
 		&d.InstallationDate, &d.IsReserved,
-		&d.Notes, &d.CreatedAt, &d.UpdatedAt,
+		&d.VmID, &d.Notes, &d.CreatedAt, &d.UpdatedAt,
 	)
 	return d, err
 }
@@ -302,6 +302,51 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 	ok(c, http.StatusOK, result)
 }
 
+// recordVmID inserts the given vm_id into used_vm_ids for the client that owns siteID.
+// Uses ON CONFLICT DO NOTHING so it is safe to call on updates where the ID hasn't changed.
+func (h *DeviceHandler) recordVmID(ctx context.Context, siteID int64, vmID int64) error {
+	_, err := h.db.ExecContext(ctx,
+		`INSERT INTO used_vm_ids (client_id, vm_id)
+		 SELECT s.client_id, $2 FROM sites s WHERE s.id = $1
+		 ON CONFLICT DO NOTHING`,
+		siteID, vmID)
+	return err
+}
+
+// NextVmID handles GET /devices/next-vm-id?client_id=X
+// Returns the lowest available Proxmox VM ID (>= 100) across all sites of the given client.
+// VM IDs are unique per client since a Proxmox cluster belongs to one client.
+func (h *DeviceHandler) NextVmID(c *gin.Context) {
+	clientIDStr := c.Query("client_id")
+	if clientIDStr == "" {
+		fail(c, http.StatusBadRequest, errors.New("client_id is required"))
+		return
+	}
+
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT vm_id FROM used_vm_ids WHERE client_id = $1`, clientIDStr)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer rows.Close()
+
+	taken := map[int]bool{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err == nil {
+			taken[id] = true
+		}
+	}
+
+	next := 100
+	for taken[next] {
+		next++
+	}
+
+	ok(c, http.StatusOK, gin.H{"vm_id": next})
+}
+
 // Create handles POST /devices
 // site_id, hostname, and category_id are required.
 func (h *DeviceHandler) Create(c *gin.Context) {
@@ -327,23 +372,30 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
 			os_id, has_rmm, has_antivirus, supplier_id,
-			installation_date, is_reserved, notes
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+			installation_date, is_reserved, vm_id, notes
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
 			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
-			notes, created_at, updated_at`,
+			vm_id, notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
 		input.CategoryID, status, input.IsUp,
 		input.OsID, input.HasRmm, input.HasAntivirus, input.SupplierID,
-		input.InstallationDate, input.IsReserved, input.Notes,
+		input.InstallationDate, input.IsReserved, input.VmID, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	if d.VmID != nil {
+		if err := h.recordVmID(c.Request.Context(), d.SiteID, *d.VmID); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "create", "devices", d.ID, fmt.Sprintf("Created device '%s'", d.Hostname))
@@ -381,19 +433,19 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 			hostname = $4, dns_name = $5, serial_number = $6, asset_tag = $7,
 			category_id = $8, status = $9, is_up = $10,
 			os_id = $11, has_rmm = $12, has_antivirus = $13, supplier_id = $14,
-			installation_date = $15, is_reserved = $16, notes = $17
-		WHERE id = $18
+			installation_date = $15, is_reserved = $16, vm_id = $17, notes = $18
+		WHERE id = $19
 		RETURNING id, site_id, location_id, model_id,
 			hostname, dns_name, serial_number, asset_tag,
 			category_id, status, is_up,
 			os_id, has_rmm, has_antivirus, supplier_id,
 			installation_date, is_reserved,
-			notes, created_at, updated_at`,
+			vm_id, notes, created_at, updated_at`,
 		input.SiteID, input.LocationID, input.ModelID,
 		input.Hostname, input.DnsName, input.SerialNumber, input.AssetTag,
 		input.CategoryID, status, input.IsUp,
 		input.OsID, input.HasRmm, input.HasAntivirus, input.SupplierID,
-		input.InstallationDate, input.IsReserved, input.Notes, id,
+		input.InstallationDate, input.IsReserved, input.VmID, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("device not found"))
@@ -402,6 +454,13 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	if d.VmID != nil {
+		if err := h.recordVmID(c.Request.Context(), d.SiteID, *d.VmID); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "update", "devices", id, fmt.Sprintf("Updated device '%s'", d.Hostname))
