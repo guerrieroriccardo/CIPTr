@@ -46,6 +46,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	deviceGroupHandler      := handlers.NewDeviceGroupHandler(database)
 	deviceGroupMemberHandler := handlers.NewDeviceGroupMemberHandler(database)
 	firewallRuleHandler     := handlers.NewFirewallRuleHandler(database)
+	backupPolicyHandler     := handlers.NewBackupPolicyHandler(database)
 	settingsHandler         := handlers.NewSettingsHandler(database)
 	auditHandler            := handlers.NewAuditHandler(database)
 
@@ -74,6 +75,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		clients.PUT("/:id", write, clientHandler.Update)
 		clients.DELETE("/:id", write, clientHandler.Delete)
 		clients.GET("/:id/sites", siteHandler.ListByClient)
+		clients.GET("/:id/backup-policies", backupPolicyHandler.ListByClient)
 	}
 
 	sites := api.Group("/sites")
@@ -254,6 +256,15 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		deviceGroups.PUT("/:id", write, deviceGroupHandler.Update)
 		deviceGroups.DELETE("/:id", write, deviceGroupHandler.Delete)
 		deviceGroups.GET("/:id/members", deviceGroupMemberHandler.ListByGroup)
+	}
+
+	backupPolicies := api.Group("/backup-policies")
+	{
+		backupPolicies.GET("", backupPolicyHandler.List)
+		backupPolicies.POST("", write, backupPolicyHandler.Create)
+		backupPolicies.GET("/:id", backupPolicyHandler.GetByID)
+		backupPolicies.PUT("/:id", write, backupPolicyHandler.Update)
+		backupPolicies.DELETE("/:id", write, backupPolicyHandler.Delete)
 	}
 
 	firewallRules := api.Group("/firewall-rules")
