@@ -41,7 +41,11 @@ func main() {
 
 	apiURL := os.Getenv("CIPTR_API_URL")
 	if apiURL == "" {
-		apiURL = defaultAPIURL
+		if saved := auth.LoadServerURL(); saved != "" {
+			apiURL = saved + "/api/v1"
+		} else {
+			apiURL = defaultAPIURL
+		}
 	}
 
 	client := apiclient.New(apiURL)

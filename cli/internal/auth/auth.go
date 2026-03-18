@@ -30,3 +30,24 @@ func LoadToken() string {
 func ClearToken() error {
 	return os.Remove(TokenPath())
 }
+
+func ServerURLPath() string {
+	dir, _ := os.UserConfigDir()
+	return filepath.Join(dir, "ciptr", "server")
+}
+
+func SaveServerURL(url string) error {
+	p := ServerURLPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
+		return err
+	}
+	return os.WriteFile(p, []byte(url), 0600)
+}
+
+func LoadServerURL() string {
+	data, err := os.ReadFile(ServerURLPath())
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}

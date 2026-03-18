@@ -15,33 +15,42 @@ type loginSuccessMsg struct{}
 type loginErrorMsg struct{ err error }
 
 type LoginScreen struct {
-	client   *apiclient.Client
-	username textinput.Model
-	password textinput.Model
-	focus    int // 0=username, 1=password
-	err      error
-	loading  bool
-	width    int
+	client    *apiclient.Client
+	serverURL textinput.Model
+	username  textinput.Model
+	password  textinput.Model
+	focus     int // 0=serverURL, 1=username, 2=password
+	err       error
+	loading   bool
+	width     int
 }
 
 func NewLoginScreen(client *apiclient.Client) *LoginScreen {
+	s := textinput.New()
+	s.Placeholder = "https://your-server.example.com"
+	s.Focus()
+	s.CharLimit = 256
+	s.Width = 40
+	// Pre-fill with the current base URL (strip /api/v1 suffix for cleaner display).
+	s.SetValue(strings.TrimSuffix(client.BaseURL, "/api/v1"))
+
 	u := textinput.New()
 	u.Placeholder = "username"
-	u.Focus()
 	u.CharLimit = 64
-	u.Width = 30
+	u.Width = 40
 
 	p := textinput.New()
 	p.Placeholder = "password (empty for guest)"
 	p.EchoMode = textinput.EchoPassword
 	p.EchoCharacter = '*'
 	p.CharLimit = 128
-	p.Width = 30
+	p.Width = 40
 
 	return &LoginScreen{
-		client:   client,
-		username: u,
-		password: p,
+		client:    client,
+		serverURL: s,
+		username:  u,
+		password:  p,
 	}
 }
 
@@ -57,6 +66,7 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if inputWidth < 20 {
 			inputWidth = 20
 		}
+		l.serverURL.Width = inputWidth
 		l.username.Width = inputWidth
 		l.password.Width = inputWidth
 		return l, nil
@@ -64,34 +74,68 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "tab", "down":
-			if l.focus == 0 {
-				l.focus = 1
-				l.username.Blur()
+			l.focus = (l.focus + 1) % 3
+			l.serverURL.Blur()
+			l.username.Blur()
+			l.password.Blur()
+			switch l.focus {
+			case 0:
+				l.serverURL.Focus()
+			case 1:
+				l.username.Focus()
+			case 2:
 				l.password.Focus()
 			}
 			return l, nil
 		case "shift+tab", "up":
-			if l.focus == 1 {
-				l.focus = 0
-				l.password.Blur()
+			l.focus = (l.focus + 2) % 3
+			l.serverURL.Blur()
+			l.username.Blur()
+			l.password.Blur()
+			switch l.focus {
+			case 0:
+				l.serverURL.Focus()
+			case 1:
 				l.username.Focus()
+			case 2:
+				l.password.Focus()
 			}
 			return l, nil
 		case "enter":
 			if l.loading {
 				return l, nil
 			}
-			u := strings.TrimSpace(l.username.Value())
-			p := l.password.Value()
-			if u == "" {
-				l.err = fmt.Errorf("username is required")
+			// Advance through fields until all are filled.
+			srv := strings.TrimRight(strings.TrimSpace(l.serverURL.Value()), "/")
+			if srv == "" {
+				l.err = fmt.Errorf("server URL is required")
 				return l, nil
 			}
+			if l.focus < 1 {
+				l.focus = 1
+				l.serverURL.Blur()
+				l.username.Focus()
+				return l, nil
+			}
+			u := strings.TrimSpace(l.username.Value())
+			if u == "" {
+				l.err = fmt.Errorf("username is required")
+				if l.focus != 1 {
+					l.focus = 1
+					l.serverURL.Blur()
+					l.password.Blur()
+					l.username.Focus()
+				}
+				return l, nil
+			}
+			p := l.password.Value()
 			l.loading = true
 			l.err = nil
+			// Update client base URL to what the user entered.
+			l.client.BaseURL = srv + "/api/v1"
 			client := l.client
+			serverURL := srv
 			if p == "" {
-				// Guest login (no password).
 				return l, func() tea.Msg {
 					token, err := client.GuestLogin(u)
 					if err != nil {
@@ -99,6 +143,7 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					client.Token = token
 					_ = auth.SaveToken(token)
+					_ = auth.SaveServerURL(serverURL)
 					return loginSuccessMsg{}
 				}
 			}
@@ -109,6 +154,7 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				client.Token = token
 				_ = auth.SaveToken(token)
+				_ = auth.SaveServerURL(serverURL)
 				return loginSuccessMsg{}
 			}
 		}
@@ -126,9 +172,12 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	if l.focus == 0 {
+	switch l.focus {
+	case 0:
+		l.serverURL, cmd = l.serverURL.Update(msg)
+	case 1:
 		l.username, cmd = l.username.Update(msg)
-	} else {
+	case 2:
 		l.password, cmd = l.password.Update(msg)
 	}
 	return l, cmd
@@ -138,6 +187,8 @@ func (l *LoginScreen) View() string {
 	var b strings.Builder
 	b.WriteString(TitleStyle.Render("CIPTr Login"))
 	b.WriteString("\n\n")
+	b.WriteString("Server:   " + l.serverURL.View())
+	b.WriteString("\n")
 	b.WriteString("Username: " + l.username.View())
 	b.WriteString("\n")
 	b.WriteString("Password: " + l.password.View())
