@@ -302,6 +302,17 @@ func (h *DeviceHandler) NextHostname(c *gin.Context) {
 	ok(c, http.StatusOK, result)
 }
 
+// recordVmID inserts the given vm_id into used_vm_ids for the client that owns siteID.
+// Uses ON CONFLICT DO NOTHING so it is safe to call on updates where the ID hasn't changed.
+func (h *DeviceHandler) recordVmID(ctx context.Context, siteID int64, vmID int64) error {
+	_, err := h.db.ExecContext(ctx,
+		`INSERT INTO used_vm_ids (client_id, vm_id)
+		 SELECT s.client_id, $2 FROM sites s WHERE s.id = $1
+		 ON CONFLICT DO NOTHING`,
+		siteID, vmID)
+	return err
+}
+
 // NextVmID handles GET /devices/next-vm-id?client_id=X
 // Returns the lowest available Proxmox VM ID (>= 100) across all sites of the given client.
 // VM IDs are unique per client since a Proxmox cluster belongs to one client.
@@ -313,9 +324,7 @@ func (h *DeviceHandler) NextVmID(c *gin.Context) {
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		`SELECT d.vm_id FROM devices d
-		 JOIN sites s ON s.id = d.site_id
-		 WHERE s.client_id = $1 AND d.vm_id IS NOT NULL`, clientIDStr)
+		`SELECT vm_id FROM used_vm_ids WHERE client_id = $1`, clientIDStr)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -382,6 +391,13 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if d.VmID != nil {
+		if err := h.recordVmID(c.Request.Context(), d.SiteID, *d.VmID); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
 	logAudit(c.Request.Context(), h.db, c, "create", "devices", d.ID, fmt.Sprintf("Created device '%s'", d.Hostname))
 	ok(c, http.StatusCreated, d)
 }
@@ -438,6 +454,13 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	if d.VmID != nil {
+		if err := h.recordVmID(c.Request.Context(), d.SiteID, *d.VmID); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "update", "devices", id, fmt.Sprintf("Updated device '%s'", d.Hostname))
