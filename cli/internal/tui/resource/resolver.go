@@ -53,6 +53,7 @@ type Resolver struct {
 	DeviceGroupSite     map[int64]int64  // device group ID → site ID
 	InterfaceMAC        map[int64]string // interface ID → MAC address
 	UsedMACs            map[string]bool  // MAC addresses already restricted on a switch port
+	CategoryTrackVmID   map[int64]bool   // category ID → true if VM ID tracking is enabled
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -99,6 +100,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceGroupSite:     make(map[int64]int64),
 			InterfaceMAC:        make(map[int64]string),
 			UsedMACs:            make(map[string]bool),
+			CategoryTrackVmID:   make(map[int64]bool),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -124,6 +126,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			for _, v := range categories {
 				label := v.ShortCode + " - " + v.Name
 				r.Categories[v.ID] = label
+				r.CategoryTrackVmID[v.ID] = v.TrackVmID
 			}
 		}
 
