@@ -302,7 +302,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		pdf.SetFont("Helvetica", "I", 7)
 		pdf.SetTextColor(128, 128, 128)
 		pdf.SetXY(pdfMargin, 3)
-		pdf.CellFormat(pdfContentW, 5, client.Name+" — Export "+time.Now().Format("2006-01-02"), "", 0, "L", false, 0, "")
+		pdf.CellFormat(pdfContentW, 5, client.Name+" - Export "+time.Now().Format("2006-01-02"), "", 0, "L", false, 0, "")
 		pdf.SetTextColor(0, 0, 0)
 	}, true)
 	pdf.SetFooterFunc(func() {
@@ -524,7 +524,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 				pdfCheckPageBreak(pdf, 20)
 				pdf.SetFont("Helvetica", "B", pdfFontSize)
-				pdf.CellFormat(pdfContentW, pdfRowH, "  "+d.Hostname+" — Details", "", 1, "L", false, 0, "")
+				pdf.CellFormat(pdfContentW, pdfRowH, "  "+d.Hostname+" - Details", "", 1, "L", false, 0, "")
 
 				if len(ifaces) > 0 {
 					pdfTable(pdf, []string{"Interface", "MAC Address"},
