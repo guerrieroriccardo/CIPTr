@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -84,6 +85,8 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		return
 	}
 
+	input.ShortCode = strings.ToUpper(input.ShortCode)
+
 	trackVmID := false
 	if input.TrackVmID != nil {
 		trackVmID = *input.TrackVmID
@@ -116,6 +119,8 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
+
+	input.ShortCode = strings.ToUpper(input.ShortCode)
 
 	trackVmID := false
 	if input.TrackVmID != nil {
