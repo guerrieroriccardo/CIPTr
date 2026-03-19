@@ -182,6 +182,7 @@ Base URL: `http://localhost:8080/api/v1`
 | PUT | `/clients/:id` | Aggiorna cliente |
 | DELETE | `/clients/:id` | Elimina cliente |
 | GET | `/clients/:id/sites` | Sedi del cliente |
+| GET | `/clients/:id/export` | Esporta tutto il cliente in PDF |
 
 ### Sites
 | Metodo | Path | Descrizione |
@@ -372,6 +373,9 @@ TUI interattiva per gestire i dati via REST API (senza frontend web).
 - Connessione DB via env `DATABASE_URL` (default `postgres://ciptr:ciptr@localhost:5432/ciptr`)
 - Server di default porta `8080` (configurabile via env `PORT`)
 - Nessun framework ORM: SQL diretto con `database/sql`
+- **Audit trail obbligatorio**: ogni handler che esegue una mutazione (Create, Update, Delete) o un'azione significativa (Export, ecc.) **deve** chiamare `logAudit()` dopo il successo. Non dimenticare mai di aggiungere il log per nuovi handler.
+- **PDF (go-pdf/fpdf)**: i font built-in (Helvetica) supportano solo Latin-1. Non usare caratteri UTF-8 multi-byte (es. `—`, `€`, lettere accentate non-Latin-1) nei testi del PDF — usare alternative ASCII (es. `-` al posto di `—`).
+- **Export PDF sempre aggiornato**: `backend/handlers/client_export.go` genera un PDF completo di tutti i dati del cliente. Quando si aggiungono nuove risorse, nuovi campi o si modificano tabelle esistenti, **aggiornare anche l'export PDF** affinché rifletta le modifiche (query SQL, struct interne, rendering tabelle).
 
 ### CLI (bubbletea)
 - Binario separato in `cli/`, chiama la REST API (non accede al DB direttamente)
