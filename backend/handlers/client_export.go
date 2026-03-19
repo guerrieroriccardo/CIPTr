@@ -619,6 +619,8 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		return
 	}
 
+	logAudit(ctx, h.db, c, "export", "clients", id, fmt.Sprintf("Exported client '%s' to PDF", client.Name))
+
 	filename := fmt.Sprintf("export-%s.pdf", strings.ToLower(client.ShortCode))
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	c.Data(http.StatusOK, "application/pdf", buf.Bytes())
