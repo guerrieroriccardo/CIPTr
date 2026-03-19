@@ -41,7 +41,7 @@ func (cd ConfirmDelete) Init() tea.Cmd { return nil }
 func (cd ConfirmDelete) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case deleteSuccessMsg:
-		return cd, func() tea.Msg { return PopScreenMsg{} }
+		return cd, func() tea.Msg { return MutationPopMsg{} }
 
 	case deleteErrorMsg:
 		cd.err = msg.err
