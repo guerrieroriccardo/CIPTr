@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -64,11 +66,13 @@ func (ce ConfirmExport) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					return exportClientErrorMsg{err: err}
 				}
-				filename := fmt.Sprintf("export-%s.pdf", strings.ToLower(shortCode))
-				if err := os.WriteFile(filename, data, 0644); err != nil {
+				dir := downloadsDir()
+				os.MkdirAll(dir, 0755)
+				path := filepath.Join(dir, fmt.Sprintf("export-%s.pdf", strings.ToLower(shortCode)))
+				if err := os.WriteFile(path, data, 0644); err != nil {
 					return exportClientErrorMsg{err: fmt.Errorf("save file: %w", err)}
 				}
-				return exportClientSuccessMsg{path: filename}
+				return exportClientSuccessMsg{path: path}
 			}
 		case "n", "N", "esc":
 			return ce, func() tea.Msg { return PopScreenMsg{} }
@@ -95,4 +99,20 @@ func (ce ConfirmExport) View() string {
 		ce.name,
 		HelpStyle.Render("y confirm • n/esc cancel"),
 	)
+}
+
+// downloadsDir returns the user's Downloads folder (cross-platform).
+func downloadsDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "."
+	}
+	if runtime.GOOS == "windows" {
+		return filepath.Join(home, "Downloads")
+	}
+	// XDG user dirs on Linux; fallback to ~/Downloads.
+	if xdg := os.Getenv("XDG_DOWNLOAD_DIR"); xdg != "" {
+		return xdg
+	}
+	return filepath.Join(home, "Downloads")
 }

@@ -3,6 +3,8 @@ package resource
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/guerrieroriccardo/CIPTr/backend/models"
@@ -80,7 +82,9 @@ func init() {
 			if err != nil {
 				return "", err
 			}
-			path := fmt.Sprintf("label-device-%s.pdf", id)
+			dir := deviceDownloadsDir()
+			os.MkdirAll(dir, 0755)
+			path := filepath.Join(dir, fmt.Sprintf("label-device-%s.pdf", id))
 			return path, os.WriteFile(path, data, 0644)
 		},
 
@@ -230,4 +234,18 @@ func init() {
 			return client.Delete("/devices/" + id)
 		},
 	})
+}
+
+func deviceDownloadsDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "."
+	}
+	if runtime.GOOS == "windows" {
+		return filepath.Join(home, "Downloads")
+	}
+	if xdg := os.Getenv("XDG_DOWNLOAD_DIR"); xdg != "" {
+		return xdg
+	}
+	return filepath.Join(home, "Downloads")
 }
