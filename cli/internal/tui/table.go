@@ -56,8 +56,14 @@ type ResourceTable struct {
 	filtering   bool
 	filterInput textinput.Model
 	filterText  string
-	allRows     []table.Row // unfiltered rows
+	allRows     []table.Row // rows in current sort order
 	filtered    []int       // indices into items for currently visible rows
+
+	// Sorting
+	sorting    bool // sort picker open
+	sortCol    int  // -1 = none
+	sortAsc    bool
+	sortCursor int
 }
 
 // NewResourceTable creates a table screen for the given resource definition.
@@ -90,6 +96,8 @@ func NewResourceTable(def *resource.Def, client *apiclient.Client) ResourceTable
 		table:       t,
 		filterInput: fi,
 		seq:         atomic.AddUint64(&globalTableSeq, 1),
+		sortCol:     -1,
+		sortAsc:     true,
 	}
 }
 
@@ -128,6 +136,7 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i, item := range msg.items {
 			rt.allRows[i] = rt.def.ToRow(item)
 		}
+		rt.applySort()
 		rt.applyFilter()
 		rt.table.GotoTop()
 
@@ -170,6 +179,33 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// When sort picker is open, handle navigation.
+		if rt.sorting {
+			switch msg.String() {
+			case "esc":
+				rt.sorting = false
+			case "up", "k":
+				if rt.sortCursor > 0 {
+					rt.sortCursor--
+				}
+			case "down", "j":
+				if rt.sortCursor < len(rt.def.Columns)-1 {
+					rt.sortCursor++
+				}
+			case "enter":
+				rt.sorting = false
+				if rt.sortCol == rt.sortCursor {
+					rt.sortAsc = !rt.sortAsc
+				} else {
+					rt.sortCol = rt.sortCursor
+					rt.sortAsc = true
+				}
+				rt.applySort()
+				rt.applyFilter()
+			}
+			return rt, nil
+		}
+
 		switch msg.String() {
 		case "esc":
 			if rt.filterText != "" {
@@ -183,6 +219,14 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			rt.filtering = true
 			rt.filterInput.Focus()
 			return rt, textinput.Blink
+		case "s":
+			rt.sorting = true
+			if rt.sortCol >= 0 {
+				rt.sortCursor = rt.sortCol
+			} else {
+				rt.sortCursor = 0
+			}
+			return rt, nil
 		case "n":
 			if rt.def.Create == nil {
 				break
@@ -261,7 +305,38 @@ func (rt ResourceTable) View() string {
 		return "Loading " + rt.def.Plural + "..."
 	}
 
-	title := TitleStyle.Render(fmt.Sprintf("%s (%d)", rt.def.Plural, len(rt.filtered)))
+	sortIndicator := ""
+	if rt.sortCol >= 0 && rt.sortCol < len(rt.def.Columns) {
+		dir := "↑"
+		if !rt.sortAsc {
+			dir = "↓"
+		}
+		sortIndicator = fmt.Sprintf(" [%s %s]", rt.def.Columns[rt.sortCol].Title, dir)
+	}
+	title := TitleStyle.Render(fmt.Sprintf("%s (%d)%s", rt.def.Plural, len(rt.filtered), sortIndicator))
+
+	// Sort picker overlay.
+	if rt.sorting {
+		var sb strings.Builder
+		sb.WriteString(title + "\n")
+		sb.WriteString(HelpStyle.Render("Sort by: ↑↓ navigate • enter select • esc cancel") + "\n\n")
+		for i, col := range rt.def.Columns {
+			prefix := "  "
+			if i == rt.sortCursor {
+				prefix = "> "
+			}
+			suffix := ""
+			if i == rt.sortCol {
+				if rt.sortAsc {
+					suffix = " ↑"
+				} else {
+					suffix = " ↓"
+				}
+			}
+			sb.WriteString(fmt.Sprintf("%s%s%s\n", prefix, col.Title, suffix))
+		}
+		return sb.String()
+	}
 
 	var filterLine string
 	if rt.filtering {
@@ -270,9 +345,9 @@ func (rt ResourceTable) View() string {
 		filterLine = HelpStyle.Render(fmt.Sprintf("filter: %s (esc to clear)", rt.filterText)) + "\n"
 	}
 
-	helpText := "/ filter • n new • enter edit • d delete • r refresh • esc back"
+	helpText := "/ filter • s sort • n new • enter edit • d delete • r refresh • esc back"
 	if rt.onSelect != nil {
-		helpText = "/ filter • n new • enter open • e edit • d delete • r refresh • esc back"
+		helpText = "/ filter • s sort • n new • enter open • e edit • d delete • r refresh • esc back"
 	}
 	if rt.def.ExportLabel != nil {
 		helpText = "l label • " + helpText
@@ -297,6 +372,53 @@ func (rt ResourceTable) loadData() tea.Cmd {
 			return dataErrorMsg{err: err, seq: seq}
 		}
 		return dataLoadedMsg{items: items, seq: seq}
+	}
+}
+
+// applySort sorts allRows and items together by the selected column.
+func (rt *ResourceTable) applySort() {
+	if rt.sortCol < 0 || rt.sortCol >= len(rt.def.Columns) {
+		return
+	}
+	col := rt.sortCol
+	asc := rt.sortAsc
+	// Build a combined index so we can sort items and allRows in parallel.
+	n := len(rt.allRows)
+	indices := make([]int, n)
+	for i := range indices {
+		indices[i] = i
+	}
+	// Stable sort to preserve API order for equal values.
+	stableSort(indices, func(a, b int) bool {
+		va := ""
+		vb := ""
+		if col < len(rt.allRows[a]) {
+			va = rt.allRows[a][col]
+		}
+		if col < len(rt.allRows[b]) {
+			vb = rt.allRows[b][col]
+		}
+		if asc {
+			return strings.ToLower(va) < strings.ToLower(vb)
+		}
+		return strings.ToLower(va) > strings.ToLower(vb)
+	})
+	newRows := make([]table.Row, n)
+	newItems := make([]any, n)
+	for i, idx := range indices {
+		newRows[i] = rt.allRows[idx]
+		newItems[i] = rt.items[idx]
+	}
+	rt.allRows = newRows
+	rt.items = newItems
+}
+
+// stableSort is a simple insertion sort (stable, adequate for typical list sizes).
+func stableSort(indices []int, less func(a, b int) bool) {
+	for i := 1; i < len(indices); i++ {
+		for j := i; j > 0 && less(indices[j], indices[j-1]); j-- {
+			indices[j], indices[j-1] = indices[j-1], indices[j]
+		}
 	}
 }
 
