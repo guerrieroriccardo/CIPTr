@@ -316,7 +316,7 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return f, nil
 
 	case formSavedMsg:
-		return f, func() tea.Msg { return PopScreenMsg{} }
+		return f, func() tea.Msg { return MutationPopMsg{} }
 
 	case formErrorMsg:
 		f.err = msg.err
