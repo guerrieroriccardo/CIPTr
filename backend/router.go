@@ -76,6 +76,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		clients.DELETE("/:id", write, clientHandler.Delete)
 		clients.GET("/:id/sites", siteHandler.ListByClient)
 		clients.GET("/:id/backup-policies", backupPolicyHandler.ListByClient)
+		clients.GET("/:id/export", clientHandler.Export)
 	}
 
 	sites := api.Group("/sites")

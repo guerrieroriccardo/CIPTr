@@ -556,6 +556,9 @@ func newClientScopeMenu(client *models.Client, apiClient *apiclient.Client) Scop
 			{label: "Backup Policies", build: func() Screen {
 				return NewResourceTable(scopedBackupPolicies(clientID), apiClient)
 			}},
+			{label: "Export to PDF", build: func() Screen {
+				return NewConfirmExport(apiClient, clientID, client.Name, client.ShortCode)
+			}},
 		},
 	}
 }
