@@ -12,7 +12,8 @@ func init() {
 	Register("categories", &Def{
 		Name:    "Category",
 		Plural:  "Categories",
-		APIPath: "/categories",
+		APIPath:  "/categories",
+		Defaults: map[string]string{"track_vm_id": "false"},
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
