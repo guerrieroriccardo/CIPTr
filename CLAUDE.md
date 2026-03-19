@@ -411,11 +411,16 @@ TUI interattiva per gestire i dati via REST API (senza frontend web).
 - Gli utenti ricevono l'aggiornamento tramite `ciptr-cli update`
 
 ### Versione Minima CLI
+
+> ⚠️ **REGOLA OBBLIGATORIA PER AGENTI AI**: Prima di ogni commit che modifica il comportamento della CLI o dell'API, valutare se aggiornare `MinCLIVersion`. Non saltare questo passaggio.
+
 - Il backend ha una costante `MinCLIVersion` in `backend/handlers/version_middleware.go`
 - La CLI invia `X-CLI-Version` header su ogni richiesta; il middleware confronta con `MinCLIVersion`
 - Se la versione è troppo vecchia → HTTP `426 Upgrade Required` con messaggio chiaro
 - Richieste senza header (browser, curl, webapp) passano senza controllo
 - **Quando si fanno breaking changes all'API, aggiornare `MinCLIVersion` e bumpare la versione della CLI** (nuovo tag `v<MAJOR>.<MINOR>.<PATCH>`)
+- **Quando NON aggiornare**: feature CLI-only senza cambiamenti all'API (es. sort, filtri, UI) → `MinCLIVersion` rimane invariato
+- **Quando aggiornare**: nuovi campi obbligatori nell'API, endpoint rimossi/rinominati, cambi nel formato delle richieste/risposte → aggiornare `MinCLIVersion` alla nuova versione del tag
 
 ### Database
 - PostgreSQL 18 — FK enforcement è attivo di default
