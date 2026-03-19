@@ -365,17 +365,19 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		pdfSectionTitle(pdf, fmt.Sprintf("Site: %s", site.Name))
 
 		// Site details
-		pdf.SetFont("Helvetica", "", 9)
+		siteRows := [][]string{}
 		if site.Address != "" {
-			pdf.CellFormat(pdfContentW, 5, "Address: "+site.Address, "", 1, "L", false, 0, "")
+			siteRows = append(siteRows, []string{"Address", site.Address})
 		}
 		if site.Domain != "" {
-			pdf.CellFormat(pdfContentW, 5, "Domain: "+site.Domain, "", 1, "L", false, 0, "")
+			siteRows = append(siteRows, []string{"Domain", site.Domain})
 		}
 		if site.Notes != "" {
-			pdf.CellFormat(pdfContentW, 5, "Notes: "+site.Notes, "", 1, "L", false, 0, "")
+			siteRows = append(siteRows, []string{"Notes", site.Notes})
 		}
-		pdf.Ln(3)
+		if len(siteRows) > 0 {
+			pdfTable(pdf, []string{"Property", "Value"}, []float64{40, 150}, siteRows)
+		}
 
 		// Locations
 		locs := locationsBySite[site.ID]
@@ -563,24 +565,16 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		groups := groupsBySite[site.ID]
 		if len(groups) > 0 {
 			pdfSubsectionTitle(pdf, "Device Groups")
-			for _, g := range groups {
-				pdf.SetFont("Helvetica", "B", pdfFontSize)
-				pdf.CellFormat(pdfContentW, pdfRowH, g.Name, "", 1, "L", false, 0, "")
-				if g.Description != "" {
-					pdf.SetFont("Helvetica", "I", pdfFontSize)
-					pdf.CellFormat(pdfContentW, pdfRowH, "  "+g.Description, "", 1, "L", false, 0, "")
-				}
+			groupRows := make([][]string, len(groups))
+			for i, g := range groups {
 				members := membersByGroup[g.ID]
-				if len(members) > 0 {
-					pdf.SetFont("Helvetica", "", pdfFontSize)
-					hostnames := make([]string, len(members))
-					for i, m := range members {
-						hostnames[i] = m.DeviceHostname
-					}
-					pdf.CellFormat(pdfContentW, pdfRowH, "  Members: "+strings.Join(hostnames, ", "), "", 1, "L", false, 0, "")
+				hostnames := make([]string, len(members))
+				for j, m := range members {
+					hostnames[j] = m.DeviceHostname
 				}
-				pdf.Ln(2)
+				groupRows[i] = []string{g.Name, g.Description, strings.Join(hostnames, ", ")}
 			}
+			pdfTable(pdf, []string{"Group", "Description", "Members"}, []float64{40, 50, 100}, groupRows)
 		}
 
 		// Firewall Rules
@@ -606,25 +600,17 @@ func (h *ClientHandler) Export(c *gin.Context) {
 	if len(backupPolicies) > 0 {
 		pdf.AddPage()
 		pdfSectionTitle(pdf, "Backup Policies")
-		for _, bp := range backupPolicies {
-			pdfSubsectionTitle(pdf, bp.Name)
-			pdf.SetFont("Helvetica", "", pdfFontSize)
-			pdf.CellFormat(pdfContentW, pdfRowH, "Destination: "+bp.Destination, "", 1, "L", false, 0, "")
-			if bp.Source != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Source: "+bp.Source, "", 1, "L", false, 0, "")
-			}
-			pdf.CellFormat(pdfContentW, pdfRowH, "Enabled: "+boolStr(bp.Enabled), "", 1, "L", false, 0, "")
-			if bp.ScheduleTimes != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Schedule: "+bp.ScheduleTimes, "", 1, "L", false, 0, "")
-			}
-			retention := fmt.Sprintf("Retention — Last: %d, Hourly: %d, Daily: %d, Weekly: %d, Monthly: %d, Yearly: %d",
+		bpRows := make([][]string, len(backupPolicies))
+		for i, bp := range backupPolicies {
+			retention := fmt.Sprintf("L:%d H:%d D:%d W:%d M:%d Y:%d",
 				bp.RetainLast, bp.RetainHourly, bp.RetainDaily, bp.RetainWeekly, bp.RetainMonthly, bp.RetainYearly)
-			pdf.CellFormat(pdfContentW, pdfRowH, retention, "", 1, "L", false, 0, "")
-			if bp.Notes != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Notes: "+bp.Notes, "", 1, "L", false, 0, "")
+			bpRows[i] = []string{
+				bp.Name, bp.Destination, bp.Source,
+				boolStr(bp.Enabled), bp.ScheduleTimes, retention, bp.Notes,
 			}
-			pdf.Ln(3)
 		}
+		pdfTable(pdf, []string{"Name", "Destination", "Source", "On", "Schedule", "Retention", "Notes"},
+			[]float64{30, 30, 25, 14, 25, 40, 26}, bpRows)
 	}
 
 	var buf bytes.Buffer
