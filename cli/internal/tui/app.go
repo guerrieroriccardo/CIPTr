@@ -22,8 +22,11 @@ type PushScreenMsg struct {
 	Screen Screen
 }
 
-// PopScreenMsg tells the app to pop the current screen.
+// PopScreenMsg tells the app to pop the current screen (no data changed).
 type PopScreenMsg struct{}
+
+// MutationPopMsg tells the app to pop and refresh data (after create/update/delete).
+type MutationPopMsg struct{}
 
 // App is the root bubbletea model that manages the navigation stack.
 type App struct {
@@ -108,8 +111,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PopScreenMsg:
 		if a.nav.Len() > 1 {
 			a.nav.Pop()
-			// Re-init to refresh data after create/edit/delete.
-			// Also refresh the resolver so newly created entities appear in pickers.
+			// No data changed — preserve existing screen state, just fix layout.
+			return a, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			}
+		}
+
+	case MutationPopMsg:
+		if a.nav.Len() > 1 {
+			a.nav.Pop()
+			// Data changed — re-fetch table data and refresh resolver for pickers.
 			return a, tea.Batch(
 				a.nav.Current().Init(),
 				resource.InitResolver(a.client),
