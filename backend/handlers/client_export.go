@@ -1156,8 +1156,8 @@ func fetchExportBackupPolicies(ctx context.Context, db *sql.DB, clientID int64) 
 		        bp.retain_weekly, bp.retain_monthly, bp.retain_yearly,
 		        COALESCE(bp.notes, ''),
 		        COALESCE(
-		          (SELECT string_agg(bst.time_value, ', ' ORDER BY bst.time_value)
-		           FROM backup_schedule_times bst WHERE bst.backup_policy_id = bp.id), '')
+		          (SELECT string_agg(bst.run_at, ', ' ORDER BY bst.run_at)
+		           FROM backup_schedule_times bst WHERE bst.policy_id = bp.id), '')
 		 FROM backup_policies bp WHERE bp.client_id = $1 ORDER BY bp.name`, clientID)
 	if err != nil {
 		return nil, err
