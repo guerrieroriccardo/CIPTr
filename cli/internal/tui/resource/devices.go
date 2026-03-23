@@ -93,6 +93,22 @@ func init() {
 				return items
 			}
 			switch key {
+			case "site_id":
+				if values["site_id"] == "" {
+					return items
+				}
+				siteID := mustInt64(values["site_id"])
+				clientID := Resolve.SiteClient[siteID]
+				if clientID == 0 {
+					return items
+				}
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.SiteClient[id] == clientID {
+						filtered[id] = name
+					}
+				}
+				return filtered
 			case "location_id":
 				if values["site_id"] == "" {
 					return items
