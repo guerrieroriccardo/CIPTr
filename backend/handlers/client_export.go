@@ -704,6 +704,18 @@ func derefInt64(n *int64) string {
 	return ""
 }
 
+// inPlaceholders builds "($1, $2, ...)" and the corresponding []any args
+// for use in SQL IN clauses with database/sql (which doesn't support array params).
+func inPlaceholders(ids []int64) (string, []any) {
+	ph := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		ph[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	return "(" + strings.Join(ph, ", ") + ")", args
+}
+
 func boolStr(b bool) string {
 	if b {
 		return "Yes"
@@ -747,9 +759,10 @@ func fetchExportSites(ctx context.Context, db *sql.DB, clientID int64) ([]export
 }
 
 func fetchExportLocations(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportLocation, error) {
+	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx,
 		`SELECT site_id, name, COALESCE(floor, ''), COALESCE(notes, '')
-		 FROM locations WHERE site_id = ANY($1) ORDER BY name`, siteIDs)
+		 FROM locations WHERE site_id IN `+ph+` ORDER BY name`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -768,9 +781,10 @@ func fetchExportLocations(ctx context.Context, db *sql.DB, siteIDs []int64) (map
 }
 
 func fetchExportAddressBlocks(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportAddressBlock, error) {
+	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx,
 		`SELECT site_id, network::text, COALESCE(description, ''), COALESCE(notes, '')
-		 FROM address_blocks WHERE site_id = ANY($1) ORDER BY network`, siteIDs)
+		 FROM address_blocks WHERE site_id IN `+ph+` ORDER BY network`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -789,13 +803,14 @@ func fetchExportAddressBlocks(ctx context.Context, db *sql.DB, siteIDs []int64) 
 }
 
 func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportVLAN, error) {
+	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx,
 		`SELECT v.site_id, v.vlan_id, v.name, COALESCE(v.subnet::text, ''),
 		        COALESCE(dip.ip_address::text, ''),
 		        COALESCE(v.dhcp_start::text, ''), COALESCE(v.dhcp_end::text, '')
 		 FROM vlans v
 		 LEFT JOIN device_ips dip ON dip.id = v.gateway_device_ip_id
-		 WHERE v.site_id = ANY($1) ORDER BY v.vlan_id`, siteIDs)
+		 WHERE v.site_id IN `+ph+` ORDER BY v.vlan_id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -814,7 +829,7 @@ func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int
 }
 
 func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportSwitch, map[int64][]exportSwitchPort, error) {
-	// Switches
+	ph, args := inPlaceholders(siteIDs)
 	srows, err := db.QueryContext(ctx,
 		`SELECT s.id, s.site_id, s.hostname, COALESCE(s.ip_address::text, ''),
 		        COALESCE(CONCAT(m.name, ' ', dm.model_name), ''),
@@ -823,7 +838,7 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 		 LEFT JOIN device_models dm ON dm.id = s.model_id
 		 LEFT JOIN manufacturers m ON m.id = dm.manufacturer_id
 		 LEFT JOIN locations l ON l.id = s.location_id
-		 WHERE s.site_id = ANY($1) ORDER BY s.hostname`, siteIDs)
+		 WHERE s.site_id IN `+ph+` ORDER BY s.hostname`, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -847,10 +862,11 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 	// Switch ports
 	portsBySwitch := map[int64][]exportSwitchPort{}
 	if len(switchIDs) > 0 {
+		ph, args := inPlaceholders(switchIDs)
 		prows, err := db.QueryContext(ctx,
 			`SELECT switch_id, port_number, COALESCE(port_label, ''), COALESCE(speed, ''),
 			        COALESCE(is_uplink, false), COALESCE(notes, '')
-			 FROM switch_ports WHERE switch_id = ANY($1) ORDER BY port_number`, switchIDs)
+			 FROM switch_ports WHERE switch_id IN `+ph+` ORDER BY port_number`, args...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -872,11 +888,12 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 }
 
 func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportPatchPanel, map[int64][]exportPatchPanelPort, error) {
+	ph, args := inPlaceholders(siteIDs)
 	pprows, err := db.QueryContext(ctx,
 		`SELECT pp.id, pp.site_id, pp.name, pp.total_ports, COALESCE(l.name, ''), COALESCE(pp.notes, '')
 		 FROM patch_panels pp
 		 LEFT JOIN locations l ON l.id = pp.location_id
-		 WHERE pp.site_id = ANY($1) ORDER BY pp.name`, siteIDs)
+		 WHERE pp.site_id IN `+ph+` ORDER BY pp.name`, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -899,6 +916,7 @@ func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 
 	portsByPanel := map[int64][]exportPatchPanelPort{}
 	if len(panelIDs) > 0 {
+		ph, args := inPlaceholders(panelIDs)
 		prows, err := db.QueryContext(ctx,
 			`SELECT ppp.patch_panel_id, ppp.port_number, COALESCE(ppp.port_label, ''),
 			        COALESCE(lpp.name || ' #' || lppp.port_number::text, ''),
@@ -906,7 +924,7 @@ func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 			 FROM patch_panel_ports ppp
 			 LEFT JOIN patch_panel_ports lppp ON lppp.id = ppp.linked_port_id
 			 LEFT JOIN patch_panels lpp ON lpp.id = lppp.patch_panel_id
-			 WHERE ppp.patch_panel_id = ANY($1) ORDER BY ppp.port_number`, panelIDs)
+			 WHERE ppp.patch_panel_id IN `+ph+` ORDER BY ppp.port_number`, args...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -934,6 +952,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 	map[int64][]exportDeviceConnection,
 	error,
 ) {
+	ph, args := inPlaceholders(siteIDs)
 	drows, err := db.QueryContext(ctx,
 		`SELECT d.id, d.site_id, d.hostname, COALESCE(d.dns_name, ''),
 		        COALESCE(d.serial_number, ''), COALESCE(d.asset_tag, ''),
@@ -952,7 +971,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 		 LEFT JOIN device_models dm ON dm.id = d.model_id
 		 LEFT JOIN manufacturers m ON m.id = dm.manufacturer_id
 		 LEFT JOIN locations l ON l.id = d.location_id
-		 WHERE d.site_id = ANY($1) ORDER BY d.hostname`, siteIDs)
+		 WHERE d.site_id IN `+ph+` ORDER BY d.hostname`, args...)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -982,9 +1001,10 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 
 	if len(deviceIDs) > 0 {
 		// Interfaces
+		ph, args := inPlaceholders(deviceIDs)
 		irows, err := db.QueryContext(ctx,
 			`SELECT device_id, name, COALESCE(mac_address::text, '')
-			 FROM device_interfaces WHERE device_id = ANY($1) ORDER BY name`, deviceIDs)
+			 FROM device_interfaces WHERE device_id IN `+ph+` ORDER BY name`, args...)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -1008,7 +1028,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 			 FROM device_ips dip
 			 JOIN device_interfaces di ON di.id = dip.interface_id
 			 LEFT JOIN vlans v ON v.id = dip.vlan_id
-			 WHERE di.device_id = ANY($1) ORDER BY dip.ip_address`, deviceIDs)
+			 WHERE di.device_id IN `+ph+` ORDER BY dip.ip_address`, args...)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -1035,7 +1055,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 			 LEFT JOIN switches sw ON sw.id = sp.switch_id
 			 LEFT JOIN patch_panel_ports ppp ON ppp.id = dc.patch_panel_port_id
 			 LEFT JOIN patch_panels pp ON pp.id = ppp.patch_panel_id
-			 WHERE di.device_id = ANY($1) ORDER BY di.name`, deviceIDs)
+			 WHERE di.device_id IN `+ph+` ORDER BY di.name`, args...)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -1056,9 +1076,10 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 }
 
 func fetchExportDeviceGroups(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportDeviceGroup, map[int64][]exportDeviceGroupMember, error) {
+	ph, args := inPlaceholders(siteIDs)
 	grows, err := db.QueryContext(ctx,
 		`SELECT id, site_id, name, COALESCE(description, '')
-		 FROM device_groups WHERE site_id = ANY($1) ORDER BY name`, siteIDs)
+		 FROM device_groups WHERE site_id IN `+ph+` ORDER BY name`, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1081,11 +1102,12 @@ func fetchExportDeviceGroups(ctx context.Context, db *sql.DB, siteIDs []int64) (
 
 	membersByGroup := map[int64][]exportDeviceGroupMember{}
 	if len(groupIDs) > 0 {
+		ph, args := inPlaceholders(groupIDs)
 		mrows, err := db.QueryContext(ctx,
 			`SELECT dgm.group_id, d.hostname
 			 FROM device_group_members dgm
 			 JOIN devices d ON d.id = dgm.device_id
-			 WHERE dgm.group_id = ANY($1) ORDER BY d.hostname`, groupIDs)
+			 WHERE dgm.group_id IN `+ph+` ORDER BY d.hostname`, args...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1106,6 +1128,7 @@ func fetchExportDeviceGroups(ctx context.Context, db *sql.DB, siteIDs []int64) (
 }
 
 func fetchExportFirewallRules(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportFirewallRule, error) {
+	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx,
 		`SELECT fr.site_id, fr.position, fr.protocol, fr.src_port, fr.dst_port,
 		        COALESCE(sd.hostname, sg.name, sv.name || ' (' || sv.vlan_id::text || ')', fr.src_cidr::text, 'any'),
@@ -1118,7 +1141,7 @@ func fetchExportFirewallRules(ctx context.Context, db *sql.DB, siteIDs []int64) 
 		 LEFT JOIN devices dd ON dd.id = fr.dst_device_id
 		 LEFT JOIN device_groups dg ON dg.id = fr.dst_group_id
 		 LEFT JOIN vlans dv ON dv.id = fr.dst_vlan_id
-		 WHERE fr.site_id = ANY($1) ORDER BY fr.position`, siteIDs)
+		 WHERE fr.site_id IN `+ph+` ORDER BY fr.position`, args...)
 	if err != nil {
 		return nil, err
 	}
