@@ -954,7 +954,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 ) {
 	ph, args := inPlaceholders(siteIDs)
 	drows, err := db.QueryContext(ctx,
-		`SELECT d.id, d.site_id, d.hostname, COALESCE(d.dns_name, ''),
+		`SELECT d.site_id, d.id, d.hostname, COALESCE(d.dns_name, ''),
 		        COALESCE(d.serial_number, ''), COALESCE(d.asset_tag, ''),
 		        COALESCE(c.name, ''), d.status, COALESCE(d.is_up, false),
 		        COALESCE(os.name, ''), COALESCE(d.has_rmm, false), COALESCE(d.has_antivirus, false),
