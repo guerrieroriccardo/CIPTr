@@ -1,57 +1,69 @@
 # CIPTr
 
-Do you work for an MSP and can't stand yet another spreadsheet to enter your devices information into?  
-Or are you a solo IT admin and you randomly choose a hostname every time and hope it's not already taken?  
+Do you work for an MSP and can't stand yet another spreadsheet to enter your devices information into?
+Or are you a solo IT admin and you randomly choose a hostname every time and hope it's not already taken?
 
-### **C**lient **IP** **Tr**acker is here to help you better manage your infrastructure and focus on what's really important.
+**C**lient **IP** **Tr**acker is here to help you better manage your infrastructure and focus on what's really important.
 
-> [!NOTE]  
-> This project is, at the moment of writing, purely vibecoded. It is used by a real organization to track more than a hunderds network and thousand of devices, but bugs are expected and can be reported.
+> [!NOTE]
+> This project is, at the moment of writing, purely vibecoded. It is used by a real organization to track hundreds of networks and thousands of devices, but bugs are expected and can be reported.
 
-> [!CAUTION]  
-> This project is under heavy development and use in production is not recommended. If you really want to deploy this project make sure your backup are working as intended and are restorable.
+> [!CAUTION]
+> This project is under heavy development and use in production is not recommended. If you really want to deploy this project, make sure your backups are working as intended and are restorable.
 
 ## Features
-CIPTr gives you a fully featured terminal UI experience to better manage your infrastructure.  
-Using hierarchical or absolute view, you can easely navigate across all your devices without loosing track of what matters.
+
+CIPTr gives you a fully featured terminal UI experience to manage your infrastructure.
+Using hierarchical or absolute navigation, you can easily browse all your devices without losing track of what matters.
 
 ### Views
-CIPTr gives you different workflow style, both hierarchical
+
+Navigate your infrastructure the way you prefer — drill down from client to site to device, or jump straight to any resource.
+
 ![Hierarchical](./tapes/browse.gif)
-and absolute
 ![Absolute](./tapes/sections.gif)
 
-### Multiple users with audit
-CIPTr natively supports multiple user, each one with its own role, allowing you to limit feature access and record audit trail.  
-All of this in a nicely packed login screen
+### Multi-user with audit trail
+
+Role-based access control lets you decide who can do what, while every change is automatically logged for full traceability.
 
 ![Authentication](./tapes/authentication.gif)
 
-### Find what you're searching, easely
-Every table fully support filtering every field for an even faster search experience/
+### Instant filtering
+
+Every table supports real-time filtering across all fields — just press `/` and start typing.
 
 ![Filter](./tapes/filter.gif)
 
-### Custom TUI form for entity creation / updates
-No unhandy button or slow graphical web application (yet!).  
-Handle all your entity directly inside the terminal UI.
+### TUI-native forms
+
+No clunky buttons or slow web pages (yet!). Create and edit any entity directly from the terminal.
 
 ![Form](./tapes/form.gif)
 
+### Self-updating
 
-### New version? You're covered
-CIPTr can update itself by running a simple command
+CIPTr can update itself with a single command — no need to re-download anything.
 
 ![version](./tapes/version.gif)
 
-
-You can start by visiting the [Installation](#installation) section.
-
-
-
-
 ## Installation
+
+### CLI (Linux / Windows)
 
 ```sh
 curl -sSfL https://raw.githubusercontent.com/guerrieroriccardo/CIPTr/main/scripts/install.sh | sh
 ```
+
+Or download the latest binary from [GitHub Releases](https://github.com/guerrieroriccardo/CIPTr/releases).
+
+### Server (Docker Compose)
+
+Make sure you have [Docker](https://docs.docker.com/get-docker/) installed, then:
+
+```sh
+curl -O https://raw.githubusercontent.com/guerrieroriccardo/CIPTr/main/compose.yml
+docker compose up -d
+```
+
+The backend API will be available at `http://localhost:8080`.
