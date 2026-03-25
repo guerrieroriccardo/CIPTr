@@ -556,6 +556,9 @@ func newClientScopeMenu(client *models.Client, apiClient *apiclient.Client) Scop
 			{label: "Backup Policies", build: func() Screen {
 				return NewResourceTable(scopedBackupPolicies(clientID), apiClient)
 			}},
+			{label: "IP Address Space", build: func() Screen {
+				return NewIPUsageScreen(apiClient, "client", "?client_id="+clientID)
+			}},
 			{label: "Export to PDF", build: func() Screen {
 				return NewConfirmExport(apiClient, clientID, client.Name, client.ShortCode)
 			}},
@@ -591,6 +594,9 @@ func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu 
 			}},
 			{label: "Firewall Rules", build: func() Screen {
 				return NewResourceTable(scopedFirewallRules(siteID), apiClient)
+			}},
+			{label: "IP Address Space", build: func() Screen {
+				return NewIPUsageScreen(apiClient, "site", "?site_id="+siteID)
 			}},
 		},
 	}
