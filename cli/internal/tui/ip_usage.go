@@ -187,6 +187,10 @@ func (s *IPUsageScreen) rowToTableRow(r ipUsageRow) table.Row {
 
 	totalStr := "-"
 	usedStr := strconv.Itoa(r.node.UsedIPs)
+	if r.node.DHCPIPs > 0 {
+		static := r.node.UsedIPs - r.node.DHCPIPs
+		usedStr = fmt.Sprintf("%d (%d+%dD)", r.node.UsedIPs, static, r.node.DHCPIPs)
+	}
 	pctStr := "-"
 	barStr := ""
 

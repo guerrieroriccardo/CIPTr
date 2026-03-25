@@ -705,7 +705,7 @@ func pdfCheckPageBreak(pdf *fpdf.Fpdf, h float64) {
 // pdfIPUtilizationTable renders a table with VLAN usage and colored utilization bars.
 func pdfIPUtilizationTable(pdf *fpdf.Fpdf, vlans []exportVLAN, vlanIPCount map[int64]int) {
 	headers := []string{"VLAN", "Subnet", "Used", "Total", "%", "Usage"}
-	widths := []float64{30, 40, 18, 18, 14, 70}
+	widths := []float64{30, 35, 30, 18, 14, 63}
 	barCol := 5 // index of the "Usage" column
 	barW := widths[barCol] - 2 // inner bar width (1mm padding each side)
 
@@ -731,7 +731,9 @@ func pdfIPUtilizationTable(pdf *fpdf.Fpdf, vlans []exportVLAN, vlanIPCount map[i
 			pdf.SetFillColor(255, 255, 255)
 		}
 
-		used := vlanIPCount[v.ID]
+		staticIPs := vlanIPCount[v.ID]
+		dhcp := dhcpRangeSize(v.DHCPStart, v.DHCPEnd)
+		used := staticIPs + dhcp
 		total := subnetSize(v.Subnet)
 		pctStr := "-"
 		var pct float64
@@ -740,10 +742,15 @@ func pdfIPUtilizationTable(pdf *fpdf.Fpdf, vlans []exportVLAN, vlanIPCount map[i
 			pctStr = fmt.Sprintf("%.0f%%", pct)
 		}
 
+		usedStr := strconv.Itoa(used)
+		if dhcp > 0 {
+			usedStr = fmt.Sprintf("%d (%d+%dD)", used, staticIPs, dhcp)
+		}
+
 		cells := []string{
 			fmt.Sprintf("%d - %s", v.VlanID, v.Name),
 			v.Subnet,
-			strconv.Itoa(used),
+			usedStr,
 			strconv.Itoa(total),
 			pctStr,
 		}

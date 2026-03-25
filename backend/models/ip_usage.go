@@ -8,6 +8,7 @@ type IPUsageNode struct {
 	Type     string         `json:"type"`
 	TotalIPs int            `json:"total_ips,omitempty"`
 	UsedIPs  int            `json:"used_ips,omitempty"`
+	DHCPIPs  int            `json:"dhcp_ips,omitempty"`
 	Children []IPUsageNode  `json:"children,omitempty"`
 }
 

@@ -44,6 +44,29 @@ func subnetSize(cidr string) int {
 	return total - 2
 }
 
+// dhcpRangeSize returns the number of IPs in a DHCP range (inclusive).
+func dhcpRangeSize(start, end string) int {
+	if start == "" || end == "" {
+		return 0
+	}
+	s := net.ParseIP(start)
+	e := net.ParseIP(end)
+	if s == nil || e == nil {
+		return 0
+	}
+	s = s.To4()
+	e = e.To4()
+	if s == nil || e == nil {
+		return 0
+	}
+	sInt := int(s[0])<<24 | int(s[1])<<16 | int(s[2])<<8 | int(s[3])
+	eInt := int(e[0])<<24 | int(e[1])<<16 | int(e[2])<<8 | int(e[3])
+	if eInt < sInt {
+		return 0
+	}
+	return eInt - sInt + 1
+}
+
 // GetUsage handles GET /ip-usage
 // Query params (use at most one): vlan_id, site_id, client_id.
 func (h *IPUsageHandler) GetUsage(c *gin.Context) {
@@ -84,10 +107,10 @@ func (h *IPUsageHandler) GetUsage(c *gin.Context) {
 func (h *IPUsageHandler) vlanLevel(c *gin.Context, ctx context.Context, vlanID int64) {
 	var vlanTag int64
 	var vlanName string
-	var subnet sql.NullString
+	var subnet, dhcpStart, dhcpEnd sql.NullString
 	err := h.db.QueryRowContext(ctx,
-		`SELECT vlan_id, name, subnet FROM vlans WHERE id = $1`, vlanID,
-	).Scan(&vlanTag, &vlanName, &subnet)
+		`SELECT vlan_id, name, subnet, dhcp_start, dhcp_end FROM vlans WHERE id = $1`, vlanID,
+	).Scan(&vlanTag, &vlanName, &subnet, &dhcpStart, &dhcpEnd)
 	if err != nil {
 		fail(c, http.StatusNotFound, fmt.Errorf("vlan not found"))
 		return
@@ -138,6 +161,11 @@ func (h *IPUsageHandler) vlanLevel(c *gin.Context, ctx context.Context, vlanID i
 		label += " (" + subnet.String + ")"
 	}
 
+	dhcp := 0
+	if dhcpStart.Valid && dhcpEnd.Valid {
+		dhcp = dhcpRangeSize(dhcpStart.String, dhcpEnd.String)
+	}
+
 	ok(c, http.StatusOK, models.IPUsageResponse{
 		Level: "vlan",
 		Items: []models.IPUsageNode{{
@@ -145,7 +173,8 @@ func (h *IPUsageHandler) vlanLevel(c *gin.Context, ctx context.Context, vlanID i
 			Label:    label,
 			Type:     "vlan",
 			TotalIPs: total,
-			UsedIPs:  len(children),
+			UsedIPs:  len(children) + dhcp,
+			DHCPIPs:  dhcp,
 			Children: children,
 		}},
 	})
@@ -382,7 +411,10 @@ type vlanUsage struct {
 	vlanTag        int64
 	name           string
 	subnet         sql.NullString
+	dhcpStart      sql.NullString
+	dhcpEnd        sql.NullString
 	usedIPs        int
+	dhcpIPs        int // computed from dhcp_start/dhcp_end range
 }
 
 // fetchBlocks fetches address blocks. Pass empty whereClause for no filter.
@@ -415,11 +447,13 @@ func (h *IPUsageHandler) fetchBlocks(ctx context.Context, whereClause string, ar
 func (h *IPUsageHandler) fetchVLANUsage(ctx context.Context, whereClause string, arg int64) ([]vlanUsage, error) {
 	q := `
 		SELECT v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet,
+		       v.dhcp_start, v.dhcp_end,
 		       COUNT(dip.id) AS used_ips
 		FROM vlans v
 		LEFT JOIN device_ips dip ON dip.vlan_id = v.id
 		` + whereClause + `
-		GROUP BY v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet
+		GROUP BY v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet,
+		         v.dhcp_start, v.dhcp_end
 		ORDER BY v.vlan_id
 	`
 	var rows *sql.Rows
@@ -437,8 +471,11 @@ func (h *IPUsageHandler) fetchVLANUsage(ctx context.Context, whereClause string,
 	var result []vlanUsage
 	for rows.Next() {
 		var v vlanUsage
-		if err := rows.Scan(&v.id, &v.siteID, &v.addressBlockID, &v.vlanTag, &v.name, &v.subnet, &v.usedIPs); err != nil {
+		if err := rows.Scan(&v.id, &v.siteID, &v.addressBlockID, &v.vlanTag, &v.name, &v.subnet, &v.dhcpStart, &v.dhcpEnd, &v.usedIPs); err != nil {
 			return nil, err
+		}
+		if v.dhcpStart.Valid && v.dhcpEnd.Valid {
+			v.dhcpIPs = dhcpRangeSize(v.dhcpStart.String, v.dhcpEnd.String)
 		}
 		result = append(result, v)
 	}
@@ -474,12 +511,14 @@ func buildBlockTree(blocks []blockInfo, vlans []vlanUsage) []models.IPUsageNode 
 			Label:    label,
 			Type:     "vlan",
 			TotalIPs: total,
-			UsedIPs:  v.usedIPs,
+			UsedIPs:  v.usedIPs + v.dhcpIPs,
+			DHCPIPs:  v.dhcpIPs,
 		}
 
 		if v.addressBlockID.Valid {
 			if bn, ok := blockMap[v.addressBlockID.Int64]; ok {
-				bn.UsedIPs += v.usedIPs
+				bn.UsedIPs += v.usedIPs + v.dhcpIPs
+				bn.DHCPIPs += v.dhcpIPs
 				bn.Children = append(bn.Children, vNode)
 				continue
 			}
