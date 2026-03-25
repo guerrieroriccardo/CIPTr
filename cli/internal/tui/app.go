@@ -159,6 +159,14 @@ func (a App) View() string {
 
 // handleMenuSelection maps a menu key to a resource table screen.
 func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
+	// IP Address Space visualization.
+	if key == "ip_usage" {
+		screen := NewIPUsageScreen(a.client, "global", "")
+		return a, func() tea.Msg {
+			return PushScreenMsg{Screen: screen}
+		}
+	}
+
 	// Hierarchical browse entry point.
 	if key == "browse_clients" {
 		screen := NewBrowseByClientScreen(a.client)

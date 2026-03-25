@@ -39,6 +39,8 @@ func NewMenu() Menu {
 	items := []list.Item{
 		// Hierarchical entry point
 		MenuItem{name: "Browse by Client", desc: "Navigate clients → sites → resources", key: "browse_clients"},
+		// Visualization
+		MenuItem{name: "IP Address Space", desc: "Visualize IP usage across all networks", key: "ip_usage"},
 		// Flat resource access
 		MenuItem{name: "All Clients", desc: "List all clients", key: "clients"},
 		MenuItem{name: "All Sites", desc: "List all sites", key: "sites"},
