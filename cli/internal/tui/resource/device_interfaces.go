@@ -16,8 +16,8 @@ func init() {
 
 		Columns: []table.Column{
 			{Title: "ID", Width: 6},
-			{Title: "Device", Width: 20},
 			{Title: "Name", Width: 20},
+			{Title: "Device", Width: 20},
 			{Title: "MAC Address", Width: 20},
 			{Title: "Notes", Width: 20},
 		},
@@ -25,8 +25,8 @@ func init() {
 			di := raw.(*models.DeviceInterface)
 			return table.Row{
 				fmt.Sprintf("%d", di.ID),
-				DeviceName(di.DeviceID),
 				di.Name,
+				DeviceName(di.DeviceID),
 				derefStr(di.MacAddress),
 				derefStr(di.Notes),
 			}
