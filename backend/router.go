@@ -49,6 +49,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	backupPolicyHandler     := handlers.NewBackupPolicyHandler(database)
 	settingsHandler         := handlers.NewSettingsHandler(database)
 	auditHandler            := handlers.NewAuditHandler(database)
+	ipUsageHandler          := handlers.NewIPUsageHandler(database)
 
 	api := r.Group("/api/v1")
 	api.Use(handlers.CLIVersionRequired())
@@ -63,6 +64,9 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	api.POST("/register", handlers.RoleRequired("admin"), authHandler.Register)
 	api.GET("/users", handlers.RoleRequired("admin"), authHandler.ListUsers)
 	api.PUT("/users/:id", handlers.RoleRequired("admin"), authHandler.UpdateUser)
+
+	// Read-only aggregation endpoints.
+	api.GET("/ip-usage", ipUsageHandler.GetUsage)
 
 	// Shorthand for technician-level write protection.
 	write := handlers.RoleRequired("technician")
