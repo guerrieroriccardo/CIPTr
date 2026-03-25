@@ -50,6 +50,7 @@ type exportAddressBlock struct {
 }
 
 type exportVLAN struct {
+	ID        int64
 	VlanID    int64
 	Name      string
 	Subnet    string
@@ -236,6 +237,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		groupsBySite        = map[int64][]exportDeviceGroup{}
 		membersByGroup      = map[int64][]exportDeviceGroupMember{}
 		firewallsBySite     = map[int64][]exportFirewallRule{}
+		vlanIPCount         = map[int64]int{} // vlan_id -> used IP count
 	)
 
 	if len(siteIDs) > 0 {
@@ -268,6 +270,10 @@ func (h *ClientHandler) Export(c *gin.Context) {
 			return
 		}
 		if firewallsBySite, err = fetchExportFirewallRules(ctx, h.db, siteIDs); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
+		if vlanIPCount, err = fetchExportVLANIPCount(ctx, h.db, siteIDs); err != nil {
 			fail(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -420,6 +426,12 @@ func (h *ClientHandler) Export(c *gin.Context) {
 					}
 					return rows
 				}())
+		}
+
+		// IP Utilization
+		if len(vlans) > 0 {
+			pdfSubsectionTitle(pdf, "IP Utilization")
+			pdfIPUtilizationTable(pdf, vlans, vlanIPCount)
 		}
 
 		// Switches
@@ -690,6 +702,119 @@ func pdfCheckPageBreak(pdf *fpdf.Fpdf, h float64) {
 	}
 }
 
+// pdfIPUtilizationTable renders a table with VLAN usage and colored utilization bars.
+func pdfIPUtilizationTable(pdf *fpdf.Fpdf, vlans []exportVLAN, vlanIPCount map[int64]int) {
+	headers := []string{"VLAN", "Subnet", "Used", "Total", "%", "Usage"}
+	widths := []float64{30, 40, 18, 18, 14, 70}
+	barCol := 5 // index of the "Usage" column
+	barW := widths[barCol] - 2 // inner bar width (1mm padding each side)
+
+	pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
+
+	// Header
+	pdf.SetFillColor(60, 60, 60)
+	pdf.SetTextColor(255, 255, 255)
+	pdf.SetFont("Helvetica", "B", pdfFontSize)
+	for i, h := range headers {
+		pdf.CellFormat(widths[i], pdfHeaderH, " "+h, "1", 0, "L", true, 0, "")
+	}
+	pdf.Ln(-1)
+	pdf.SetTextColor(0, 0, 0)
+
+	// Rows
+	pdf.SetFont("Helvetica", "", pdfFontSize)
+	for r, v := range vlans {
+		pdfCheckPageBreak(pdf, pdfRowH)
+		if r%2 == 0 {
+			pdf.SetFillColor(245, 245, 245)
+		} else {
+			pdf.SetFillColor(255, 255, 255)
+		}
+
+		used := vlanIPCount[v.ID]
+		total := subnetSize(v.Subnet)
+		pctStr := "-"
+		var pct float64
+		if total > 0 {
+			pct = float64(used) / float64(total) * 100
+			pctStr = fmt.Sprintf("%.0f%%", pct)
+		}
+
+		cells := []string{
+			fmt.Sprintf("%d - %s", v.VlanID, v.Name),
+			v.Subnet,
+			strconv.Itoa(used),
+			strconv.Itoa(total),
+			pctStr,
+		}
+		for i, cell := range cells {
+			pdf.CellFormat(widths[i], pdfRowH, " "+cell, "1", 0, "L", true, 0, "")
+		}
+
+		// Draw utilization bar in the last column.
+		barX := pdf.GetX() + 1
+		barY := pdf.GetY() + 0.5
+		barH := pdfRowH - 1
+
+		// Background (empty bar)
+		pdf.SetFillColor(220, 220, 220)
+		pdf.Rect(barX, barY, barW, barH, "F")
+		// Border for the cell
+		pdf.CellFormat(widths[barCol], pdfRowH, "", "1", 0, "L", false, 0, "")
+
+		// Filled portion
+		if total > 0 && used > 0 {
+			filledW := barW * pct / 100
+			if filledW > barW {
+				filledW = barW
+			}
+			// Color: green <50%, yellow 50-80%, red >80%
+			switch {
+			case pct > 80:
+				pdf.SetFillColor(220, 50, 50) // red
+			case pct > 50:
+				pdf.SetFillColor(220, 180, 50) // yellow
+			default:
+				pdf.SetFillColor(50, 180, 80) // green
+			}
+			pdf.Rect(barX, barY, filledW, barH, "F")
+		}
+
+		pdf.Ln(-1)
+	}
+	pdf.Ln(3)
+}
+
+// fetchExportVLANIPCount returns the number of assigned IPs per VLAN (keyed by vlans.id PK).
+func fetchExportVLANIPCount(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64]int, error) {
+	if len(siteIDs) == 0 {
+		return map[int64]int{}, nil
+	}
+	ph, args := inPlaceholders(siteIDs)
+	rows, err := db.QueryContext(ctx, `
+		SELECT v.id, COUNT(dip.id)
+		FROM vlans v
+		LEFT JOIN device_ips dip ON dip.vlan_id = v.id
+		WHERE v.site_id IN `+ph+`
+		GROUP BY v.id
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := map[int64]int{}
+	for rows.Next() {
+		var vlanID int64
+		var count int
+		if err := rows.Scan(&vlanID, &count); err != nil {
+			return nil, err
+		}
+		result[vlanID] = count
+	}
+	return result, rows.Err()
+}
+
 func deref(s *string) string {
 	if s != nil {
 		return *s
@@ -805,7 +930,7 @@ func fetchExportAddressBlocks(ctx context.Context, db *sql.DB, siteIDs []int64) 
 func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportVLAN, error) {
 	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx,
-		`SELECT v.site_id, v.vlan_id, v.name, COALESCE(v.subnet::text, ''),
+		`SELECT v.id, v.site_id, v.vlan_id, v.name, COALESCE(v.subnet::text, ''),
 		        COALESCE(dip.ip_address::text, ''),
 		        COALESCE(v.dhcp_start::text, ''), COALESCE(v.dhcp_end::text, '')
 		 FROM vlans v
@@ -820,7 +945,7 @@ func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int
 	for rows.Next() {
 		var siteID int64
 		var v exportVLAN
-		if err := rows.Scan(&siteID, &v.VlanID, &v.Name, &v.Subnet, &v.Gateway, &v.DHCPStart, &v.DHCPEnd); err != nil {
+		if err := rows.Scan(&v.ID, &siteID, &v.VlanID, &v.Name, &v.Subnet, &v.Gateway, &v.DHCPStart, &v.DHCPEnd); err != nil {
 			return nil, err
 		}
 		result[siteID] = append(result[siteID], v)
