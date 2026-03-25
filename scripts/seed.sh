@@ -3,6 +3,14 @@ set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:8080/api/v1}"
 
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 <username> <password>"
+  exit 1
+fi
+
+SEED_USER="$1"
+SEED_PASS="$2"
+
 echo "==> Seeding via API at $API_URL"
 
 # Check API is reachable
@@ -11,11 +19,24 @@ if ! curl -sf "$API_URL/health" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Obtain JWT token
+echo "==> Logging in as $SEED_USER..."
+TOKEN=$(curl -sf -X POST "$API_URL/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$SEED_USER\",\"password\":\"$SEED_PASS\"}" \
+  | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+if [ -z "$TOKEN" ]; then
+  echo "ERROR: Failed to obtain JWT token. Check credentials."
+  exit 1
+fi
+echo "==> Token obtained."
+
 post() {
   local path="$1"
   local data="$2"
   local result
-  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI5ODExOTIsInVzZXJfaWQiOjIsInVzZXJuYW1lIjoiZ3VlcnJvIn0.2l8FoZSqlvCQFH5ImtpxKwLlUJ5hCJo4f9IB580Rce8" -d "$data" 2>&1) || {
+  result=$(curl -sf -X POST "$API_URL$path" -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" -d "$data" 2>&1) || {
     echo "  FAILED: POST $path"
     echo "  Data: $data"
     echo "  Response: $result"
@@ -55,7 +76,7 @@ post /suppliers '{"name":"InfoStore SpA","address":"Via Giardini 300, Modena","p
 # ── Clients ──
 echo "==> Clients..."
 post /clients '{"name":"Berpa Costruzioni","short_code":"BRP","domain":"berpa.local","notes":"Construction company"}'
-post /clients '{"name":"Officine Meccaniche Pontina","short_code":"OMP","domain":"omp.local","notes":"Mechanical workshop"}'
+post /clients '{"name":"Officine Pontina","short_code":"OMP","domain":"omp.local","notes":"Mechanical workshop"}'
 post /clients '{"name":"Studio Legale Rossi","short_code":"SLR","notes":"Law firm"}'
 post /clients '{"name":"Farmacia Centrale","short_code":"FRC","notes":"Pharmacy chain"}'
 
@@ -115,17 +136,17 @@ echo "==> VLANs..."
 # Berpa HQ
 post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":1,"name":"Management","subnet":"10.10.0.0/24","description":"Network devices management"}'
 post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":10,"name":"Servers","subnet":"10.10.1.0/24","description":"Server VLAN"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":20,"name":"Users","subnet":"10.10.2.0/24","description":"Workstations"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":30,"name":"VoIP","subnet":"10.10.3.0/24","description":"IP phones"}'
-post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":40,"name":"Guest WiFi","subnet":"10.10.4.0/24","description":"Guest wireless network"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":20,"name":"Users","subnet":"10.10.2.0/24","dhcp_start":"10.10.2.100","dhcp_end":"10.10.2.200","description":"Workstations"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":30,"name":"VoIP","subnet":"10.10.3.0/24","dhcp_start":"10.10.3.50","dhcp_end":"10.10.3.150","description":"IP phones"}'
+post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":40,"name":"Guest WiFi","subnet":"10.10.4.0/24","dhcp_start":"10.10.4.10","dhcp_end":"10.10.4.250","description":"Guest wireless network"}'
 post /vlans '{"site_id":1,"address_block_id":1,"vlan_id":99,"name":"Printers","subnet":"10.10.9.0/24","description":"Printers and MFPs"}'
 # OMP factory
 post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":1,"name":"Management","subnet":"10.20.0.0/24"}'
 post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":10,"name":"Servers","subnet":"10.20.1.0/24"}'
-post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":20,"name":"Office","subnet":"10.20.2.0/24","description":"Office workstations"}'
+post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":20,"name":"Office","subnet":"10.20.2.0/24","dhcp_start":"10.20.2.100","dhcp_end":"10.20.2.200","description":"Office workstations"}'
 post /vlans '{"site_id":3,"address_block_id":2,"vlan_id":30,"name":"Production","subnet":"10.20.3.0/24","description":"Factory floor devices"}'
 # Studio Rossi
-post /vlans '{"site_id":4,"address_block_id":3,"vlan_id":1,"name":"LAN","subnet":"192.168.1.0/24","description":"Single flat network"}'
+post /vlans '{"site_id":4,"address_block_id":3,"vlan_id":1,"name":"LAN","subnet":"192.168.1.0/24","dhcp_start":"192.168.1.100","dhcp_end":"192.168.1.200","description":"Single flat network"}'
 # Farmacie
 post /vlans '{"site_id":5,"address_block_id":4,"vlan_id":1,"name":"LAN","subnet":"192.168.10.0/24"}'
 post /vlans '{"site_id":6,"address_block_id":5,"vlan_id":1,"name":"LAN","subnet":"192.168.11.0/24"}'
