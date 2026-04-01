@@ -963,7 +963,7 @@ func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int
 func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportSwitch, map[int64][]exportSwitchPort, error) {
 	ph, args := inPlaceholders(siteIDs)
 	srows, err := db.QueryContext(ctx,
-		`SELECT s.id, s.site_id, s.hostname, COALESCE(s.ip_address::text, ''),
+		`SELECT s.site_id, s.id, s.hostname, COALESCE(s.ip_address::text, ''),
 		        COALESCE(CONCAT(m.name, ' ', dm.model_name), ''),
 		        COALESCE(l.name, ''), s.total_ports, COALESCE(s.notes, '')
 		 FROM switches s
