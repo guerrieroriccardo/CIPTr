@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS switches (
     hostname        TEXT NOT NULL,
     model_id        BIGINT REFERENCES device_models(id) ON DELETE SET NULL,
     ip_address      INET,
+    vlan_id         BIGINT REFERENCES vlans(id) ON DELETE SET NULL,
     location_id     BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     total_ports     INTEGER NOT NULL DEFAULT 24,
     notes           TEXT,

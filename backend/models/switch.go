@@ -7,6 +7,7 @@ type Switch struct {
 	Hostname   string  `json:"hostname"`
 	ModelID    *int64  `json:"model_id"`
 	IPAddress  *string `json:"ip_address"`
+	VlanID     *int64  `json:"vlan_id"`
 	LocationID *int64  `json:"location_id"`
 	TotalPorts int     `json:"total_ports"`
 	Notes      *string `json:"notes"`
@@ -18,6 +19,7 @@ type SwitchInput struct {
 	Hostname   string  `json:"hostname"    binding:"required"`
 	ModelID    *int64  `json:"model_id"`
 	IPAddress  *string `json:"ip_address"`
+	VlanID     *int64  `json:"vlan_id"`
 	LocationID *int64  `json:"location_id"`
 	TotalPorts *int    `json:"total_ports"`
 	Notes      *string `json:"notes"`

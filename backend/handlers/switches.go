@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -24,13 +26,51 @@ func NewSwitchHandler(db *sql.DB) *SwitchHandler {
 }
 
 // switchSelectSQL is the base SELECT used by every read operation.
-const switchSelectSQL = `SELECT id, site_id, hostname, model_id, ip_address, location_id, total_ports, notes FROM switches`
+const switchSelectSQL = `SELECT id, site_id, hostname, model_id, ip_address, vlan_id, location_id, total_ports, notes FROM switches`
 
 // scanSwitch reads one row into a Switch struct.
 func scanSwitch(row interface{ Scan(...any) error }) (models.Switch, error) {
 	var s models.Switch
-	err := row.Scan(&s.ID, &s.SiteID, &s.Hostname, &s.ModelID, &s.IPAddress, &s.LocationID, &s.TotalPorts, &s.Notes)
+	err := row.Scan(&s.ID, &s.SiteID, &s.Hostname, &s.ModelID, &s.IPAddress, &s.VlanID, &s.LocationID, &s.TotalPorts, &s.Notes)
 	return s, err
+}
+
+// validateSwitchIP checks that the switch IP falls within the VLAN subnet (if both are set).
+func validateSwitchIP(ctx context.Context, db *sql.DB, vlanID *int64, ipAddress *string) error {
+	if vlanID == nil || ipAddress == nil || *ipAddress == "" {
+		return nil
+	}
+
+	var subnet *string
+	err := db.QueryRowContext(ctx,
+		`SELECT subnet FROM vlans WHERE id = $1`, *vlanID,
+	).Scan(&subnet)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("VLAN %d not found", *vlanID)
+	}
+	if err != nil {
+		return err
+	}
+
+	if subnet == nil || *subnet == "" {
+		return nil
+	}
+
+	_, subnetNet, err := net.ParseCIDR(*subnet)
+	if err != nil {
+		return fmt.Errorf("VLAN has invalid subnet: %s", *subnet)
+	}
+
+	ip := net.ParseIP(*ipAddress)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", *ipAddress)
+	}
+
+	if !subnetNet.Contains(ip) {
+		return fmt.Errorf("IP %s is not within VLAN subnet %s", *ipAddress, *subnet)
+	}
+
+	return nil
 }
 
 // List handles GET /switches
@@ -192,6 +232,11 @@ func (h *SwitchHandler) Create(c *gin.Context) {
 		totalPorts = *input.TotalPorts
 	}
 
+	if err := validateSwitchIP(c.Request.Context(), h.db, input.VlanID, input.IPAddress); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
 	tx, err := h.db.BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -200,10 +245,10 @@ func (h *SwitchHandler) Create(c *gin.Context) {
 	defer tx.Rollback()
 
 	s, err := scanSwitch(tx.QueryRowContext(c.Request.Context(),
-		`INSERT INTO switches (site_id, hostname, model_id, ip_address, location_id, total_ports, notes)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, site_id, hostname, model_id, ip_address, location_id, total_ports, notes`,
-		input.SiteID, input.Hostname, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes,
+		`INSERT INTO switches (site_id, hostname, model_id, ip_address, vlan_id, location_id, total_ports, notes)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, site_id, hostname, model_id, ip_address, vlan_id, location_id, total_ports, notes`,
+		input.SiteID, input.Hostname, input.ModelID, input.IPAddress, input.VlanID, input.LocationID, totalPorts, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -255,11 +300,16 @@ func (h *SwitchHandler) Update(c *gin.Context) {
 		totalPorts = *input.TotalPorts
 	}
 
+	if err := validateSwitchIP(c.Request.Context(), h.db, input.VlanID, input.IPAddress); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+
 	s, err := scanSwitch(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE switches SET site_id = $1, hostname = $2, model_id = $3, ip_address = $4, location_id = $5, total_ports = $6, notes = $7
-		 WHERE id = $8
-		 RETURNING id, site_id, hostname, model_id, ip_address, location_id, total_ports, notes`,
-		input.SiteID, input.Hostname, input.ModelID, input.IPAddress, input.LocationID, totalPorts, input.Notes, id,
+		`UPDATE switches SET site_id = $1, hostname = $2, model_id = $3, ip_address = $4, vlan_id = $5, location_id = $6, total_ports = $7, notes = $8
+		 WHERE id = $9
+		 RETURNING id, site_id, hostname, model_id, ip_address, vlan_id, location_id, total_ports, notes`,
+		input.SiteID, input.Hostname, input.ModelID, input.IPAddress, input.VlanID, input.LocationID, totalPorts, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("switch not found"))

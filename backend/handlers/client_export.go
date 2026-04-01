@@ -63,6 +63,7 @@ type exportSwitch struct {
 	ID         int64
 	Hostname   string
 	IPAddress  string
+	VlanName   string
 	Model      string
 	Location   string
 	TotalPorts int
@@ -442,6 +443,9 @@ func (h *ClientHandler) Export(c *gin.Context) {
 			if sw.IPAddress != "" {
 				pdf.CellFormat(pdfContentW, pdfRowH, "IP: "+sw.IPAddress, "", 1, "L", false, 0, "")
 			}
+			if sw.VlanName != "" {
+				pdf.CellFormat(pdfContentW, pdfRowH, "VLAN: "+sw.VlanName, "", 1, "L", false, 0, "")
+			}
 			if sw.Model != "" {
 				pdf.CellFormat(pdfContentW, pdfRowH, "Model: "+sw.Model, "", 1, "L", false, 0, "")
 			}
@@ -799,9 +803,10 @@ func fetchExportVLANIPCount(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 	}
 	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx, `
-		SELECT v.id, COUNT(dip.id)
+		SELECT v.id, COUNT(DISTINCT dip.id) + COUNT(DISTINCT sw.id)
 		FROM vlans v
 		LEFT JOIN device_ips dip ON dip.vlan_id = v.id
+		LEFT JOIN switches sw ON sw.vlan_id = v.id AND sw.ip_address IS NOT NULL
 		WHERE v.site_id IN `+ph+`
 		GROUP BY v.id
 	`, args...)
@@ -964,12 +969,14 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 	ph, args := inPlaceholders(siteIDs)
 	srows, err := db.QueryContext(ctx,
 		`SELECT s.site_id, s.id, s.hostname, COALESCE(s.ip_address::text, ''),
+		        COALESCE(v.name, ''),
 		        COALESCE(CONCAT(m.name, ' ', dm.model_name), ''),
 		        COALESCE(l.name, ''), s.total_ports, COALESCE(s.notes, '')
 		 FROM switches s
 		 LEFT JOIN device_models dm ON dm.id = s.model_id
 		 LEFT JOIN manufacturers m ON m.id = dm.manufacturer_id
 		 LEFT JOIN locations l ON l.id = s.location_id
+		 LEFT JOIN vlans v ON v.id = s.vlan_id
 		 WHERE s.site_id IN `+ph+` ORDER BY s.hostname`, args...)
 	if err != nil {
 		return nil, nil, err
@@ -981,7 +988,7 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 	for srows.Next() {
 		var siteID int64
 		var sw exportSwitch
-		if err := srows.Scan(&siteID, &sw.ID, &sw.Hostname, &sw.IPAddress, &sw.Model, &sw.Location, &sw.TotalPorts, &sw.Notes); err != nil {
+		if err := srows.Scan(&siteID, &sw.ID, &sw.Hostname, &sw.IPAddress, &sw.VlanName, &sw.Model, &sw.Location, &sw.TotalPorts, &sw.Notes); err != nil {
 			return nil, nil, err
 		}
 		switchBySite[siteID] = append(switchBySite[siteID], sw)

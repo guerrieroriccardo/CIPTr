@@ -136,21 +136,38 @@ func (h *IPUsageHandler) vlanLevel(c *gin.Context, ctx context.Context, vlanID i
 	}
 	defer rows.Close()
 
+	// Collect device IPs and switch IPs together, sorted by IP address.
+	ipRows, err := h.db.QueryContext(ctx, `
+		SELECT ip, label FROM (
+			SELECT dip.ip_address::inet AS ip,
+			       dip.ip_address || ' - ' || d.hostname || ' (' || di.name || ')' ||
+			       CASE WHEN COALESCE(dip.is_primary, false) THEN ' *' ELSE '' END AS label
+			FROM device_ips dip
+			JOIN device_interfaces di ON di.id = dip.interface_id
+			JOIN devices d ON d.id = di.device_id
+			WHERE dip.vlan_id = $1
+			UNION ALL
+			SELECT sw.ip_address::inet AS ip,
+			       host(sw.ip_address) || ' - ' || sw.hostname || ' (switch)' AS label
+			FROM switches sw
+			WHERE sw.vlan_id = $1 AND sw.ip_address IS NOT NULL
+		) combined
+		ORDER BY ip
+	`, vlanID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer ipRows.Close()
+
 	var children []models.IPUsageNode
-	for rows.Next() {
-		var id int64
-		var ip, iface, hostname string
-		var primary bool
-		if err := rows.Scan(&id, &ip, &primary, &iface, &hostname); err != nil {
+	for ipRows.Next() {
+		var ip, label string
+		if err := ipRows.Scan(&ip, &label); err != nil {
 			fail(c, http.StatusInternalServerError, err)
 			return
 		}
-		label := ip + " - " + hostname + " (" + iface + ")"
-		if primary {
-			label += " *"
-		}
 		children = append(children, models.IPUsageNode{
-			ID:    id,
 			Label: label,
 			Type:  "ip",
 		})
@@ -448,9 +465,10 @@ func (h *IPUsageHandler) fetchVLANUsage(ctx context.Context, whereClause string,
 	q := `
 		SELECT v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet,
 		       v.dhcp_start, v.dhcp_end,
-		       COUNT(dip.id) AS used_ips
+		       COUNT(DISTINCT dip.id) + COUNT(DISTINCT sw.id) AS used_ips
 		FROM vlans v
 		LEFT JOIN device_ips dip ON dip.vlan_id = v.id
+		LEFT JOIN switches sw ON sw.vlan_id = v.id AND sw.ip_address IS NOT NULL
 		` + whereClause + `
 		GROUP BY v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet,
 		         v.dhcp_start, v.dhcp_end

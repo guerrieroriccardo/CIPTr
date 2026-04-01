@@ -19,6 +19,7 @@ func init() {
 			{Title: "Site", Width: 16},
 			{Title: "Hostname", Width: 22},
 			{Title: "IP Address", Width: 16},
+			{Title: "VLAN", Width: 14},
 			{Title: "Ports", Width: 6},
 			{Title: "Location", Width: 18},
 		},
@@ -29,6 +30,7 @@ func init() {
 				SiteName(s.SiteID),
 				s.Hostname,
 				derefStr(s.IPAddress),
+				VLANName(s.VlanID),
 				fmt.Sprintf("%d", s.TotalPorts),
 				LocationName(s.LocationID),
 			}
@@ -41,6 +43,7 @@ func init() {
 			{Key: "site_id", Label: "Site", Required: true, PickerKey: "sites"},
 			{Key: "hostname", Label: "Hostname", Required: true},
 			{Key: "model_id", Label: "Model", PickerKey: "device_models"},
+			{Key: "vlan_id", Label: "VLAN", PickerKey: "vlans"},
 			{Key: "ip_address", Label: "IP Address"},
 			{Key: "location_id", Label: "Location", PickerKey: "locations"},
 			{Key: "total_ports", Label: "Total Ports"},
@@ -61,8 +64,26 @@ func init() {
 					}
 				}
 				return filtered
+			case "vlan_id":
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.VLANSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
 			}
 			return items
+		},
+
+		FieldHint: func(key string, values map[string]string) string {
+			if key == "ip_address" && values["vlan_id"] != "" && Resolve != nil {
+				id := mustInt64(values["vlan_id"])
+				if subnet, ok := Resolve.VLANSubnets[id]; ok {
+					return "Subnet: " + subnet
+				}
+			}
+			return ""
 		},
 
 		AsyncDerive: func(client *apiclient.Client, key string, values map[string]string) map[string]string {
@@ -96,6 +117,7 @@ func init() {
 				Hostname:   data["hostname"],
 				ModelID:    int64Ptr(data["model_id"]),
 				IPAddress:  strPtr(data["ip_address"]),
+				VlanID:     int64Ptr(data["vlan_id"]),
 				LocationID: int64Ptr(data["location_id"]),
 				TotalPorts: intPtr(data["total_ports"]),
 				Notes:      strPtr(data["notes"]),
@@ -110,6 +132,7 @@ func init() {
 				Hostname:   data["hostname"],
 				ModelID:    int64Ptr(data["model_id"]),
 				IPAddress:  strPtr(data["ip_address"]),
+				VlanID:     int64Ptr(data["vlan_id"]),
 				LocationID: int64Ptr(data["location_id"]),
 				TotalPorts: intPtr(data["total_ports"]),
 				Notes:      strPtr(data["notes"]),
