@@ -23,9 +23,19 @@ type LoginScreen struct {
 	err       error
 	loading   bool
 	width     int
+	anon      bool // anonymous mode: don't persist token/server URL
 }
 
 func NewLoginScreen(client *apiclient.Client) *LoginScreen {
+	return newLoginScreen(client, false)
+}
+
+// NewAnonLoginScreen creates a login screen that does not persist the token or server URL.
+func NewAnonLoginScreen(client *apiclient.Client) *LoginScreen {
+	return newLoginScreen(client, true)
+}
+
+func newLoginScreen(client *apiclient.Client, anon bool) *LoginScreen {
 	s := textinput.New()
 	s.Placeholder = "https://your-server.example.com"
 	s.Focus()
@@ -51,6 +61,7 @@ func NewLoginScreen(client *apiclient.Client) *LoginScreen {
 		serverURL: s,
 		username:  u,
 		password:  p,
+		anon:      anon,
 	}
 }
 
@@ -135,6 +146,7 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			l.client.BaseURL = srv + "/api/v1"
 			client := l.client
 			serverURL := srv
+			anon := l.anon
 			if p == "" {
 				return l, func() tea.Msg {
 					token, err := client.GuestLogin(u)
@@ -142,8 +154,10 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return loginErrorMsg{err: err}
 					}
 					client.Token = token
-					_ = auth.SaveToken(token)
-					_ = auth.SaveServerURL(serverURL)
+					if !anon {
+						_ = auth.SaveToken(token)
+						_ = auth.SaveServerURL(serverURL)
+					}
 					return loginSuccessMsg{}
 				}
 			}
@@ -153,8 +167,10 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return loginErrorMsg{err: err}
 				}
 				client.Token = token
-				_ = auth.SaveToken(token)
-				_ = auth.SaveServerURL(serverURL)
+				if !anon {
+					_ = auth.SaveToken(token)
+					_ = auth.SaveServerURL(serverURL)
+				}
 				return loginSuccessMsg{}
 			}
 		}

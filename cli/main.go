@@ -39,11 +39,24 @@ func main() {
 		}
 	}
 
+	// --anon flag: skip saved token and server URL, go straight to login screen.
+	// Useful for testing against a local dev backend without touching the production token.
+	anon := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--anon" {
+			anon = true
+			break
+		}
+	}
+
 	apiURL := os.Getenv("CIPTR_API_URL")
 	if apiURL == "" {
-		if saved := auth.LoadServerURL(); saved != "" {
-			apiURL = saved + "/api/v1"
-		} else {
+		if !anon {
+			if saved := auth.LoadServerURL(); saved != "" {
+				apiURL = saved + "/api/v1"
+			}
+		}
+		if apiURL == "" {
 			apiURL = defaultAPIURL
 		}
 	}
@@ -52,13 +65,25 @@ func main() {
 
 	// Load saved token. If valid, go straight to menu; otherwise show login.
 	var initial tui.Screen
-	if token := auth.LoadToken(); token != "" {
-		client.Token = token
-		initial = tui.NewMenu()
-	} else {
-		initial = tui.NewLoginScreen(client)
+	if !anon {
+		if token := auth.LoadToken(); token != "" {
+			client.Token = token
+			initial = tui.NewMenu()
+		}
 	}
-	app := tui.NewApp(initial, client)
+	if initial == nil {
+		if anon {
+			initial = tui.NewAnonLoginScreen(client)
+		} else {
+			initial = tui.NewLoginScreen(client)
+		}
+	}
+	var app tui.App
+	if anon {
+		app = tui.NewAnonApp(initial, client)
+	} else {
+		app = tui.NewApp(initial, client)
+	}
 
 	p := tea.NewProgram(app, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

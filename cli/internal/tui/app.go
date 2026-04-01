@@ -34,11 +34,19 @@ type App struct {
 	client *apiclient.Client
 	width  int
 	height int
+	anon   bool // anonymous mode: don't persist token/server URL
 }
 
 // NewApp creates the root application model with the given initial screen.
 func NewApp(initial Screen, client *apiclient.Client) App {
 	app := App{client: client}
+	app.nav.Push(initial)
+	return app
+}
+
+// NewAnonApp creates the root application model in anonymous mode.
+func NewAnonApp(initial Screen, client *apiclient.Client) App {
+	app := App{client: client, anon: true}
 	app.nav.Push(initial)
 	return app
 }
@@ -220,9 +228,16 @@ func (a App) handleMenuSelection(key string) (tea.Model, tea.Cmd) {
 // forceLogin clears the expired token and replaces the nav stack with the login screen.
 func (a App) forceLogin() (tea.Model, tea.Cmd) {
 	a.client.Token = ""
-	_ = auth.ClearToken()
+	if !a.anon {
+		_ = auth.ClearToken()
+	}
 	a.nav = NavStack{}
-	login := NewLoginScreen(a.client)
+	var login *LoginScreen
+	if a.anon {
+		login = NewAnonLoginScreen(a.client)
+	} else {
+		login = NewLoginScreen(a.client)
+	}
 	a.nav.Push(login)
 	return a, login.Init()
 }
