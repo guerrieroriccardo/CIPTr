@@ -60,34 +60,30 @@ func init() {
 		APIPath: "/backup-policies",
 
 		Columns: []table.Column{
-			{Title: "ID", Width: 6},
 			{Title: "Client", Width: 20},
-			{Title: "Name", Width: 20},
-			{Title: "Destination", Width: 22},
-			{Title: "Source", Width: 18},
-			{Title: "Schedule", Width: 14},
-			{Title: "Retention", Width: 22},
-			{Title: "Enabled", Width: 7},
+			{Title: "Name", Width: 22},
+			{Title: "Destination", Width: 28},
+			{Title: "Source", Width: 20},
+			{Title: "Schedule", Width: 16},
+			{Title: "Retention", Width: 26},
 		},
 		ToRow: func(raw any) table.Row {
 			p := raw.(*models.BackupPolicy)
-			enabled := "yes"
-			if !p.Enabled {
-				enabled = "no"
-			}
 			schedule := strings.Join(p.ScheduleTimes, ", ")
 			if schedule == "" {
 				schedule = "-"
 			}
+			name := p.Name
+			if !p.Enabled {
+				name += " (off)"
+			}
 			return table.Row{
-				fmt.Sprintf("%d", p.ID),
 				p.ClientName,
-				p.Name,
+				name,
 				p.Destination,
 				derefStr(p.Source),
 				schedule,
 				retentionSummary(p),
-				enabled,
 			}
 		},
 		GetID: func(raw any) string {

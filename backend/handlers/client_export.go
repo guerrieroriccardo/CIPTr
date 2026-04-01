@@ -616,17 +616,24 @@ func (h *ClientHandler) Export(c *gin.Context) {
 	if len(backupPolicies) > 0 {
 		pdf.AddPage()
 		pdfSectionTitle(pdf, "Backup Policies")
-		bpRows := make([][]string, len(backupPolicies))
+
+		// Row 1: Name, Destination, Source, Enabled
+		topRows := make([][]string, len(backupPolicies))
+		for i, bp := range backupPolicies {
+			topRows[i] = []string{bp.Name, bp.Destination, bp.Source, boolStr(bp.Enabled)}
+		}
+		pdfTable(pdf, []string{"Name", "Destination", "Source", "Enabled"},
+			[]float64{45, 60, 60, 25}, topRows)
+
+		// Row 2: Schedule, Retention, Notes
+		botRows := make([][]string, len(backupPolicies))
 		for i, bp := range backupPolicies {
 			retention := fmt.Sprintf("L:%d H:%d D:%d W:%d M:%d Y:%d",
 				bp.RetainLast, bp.RetainHourly, bp.RetainDaily, bp.RetainWeekly, bp.RetainMonthly, bp.RetainYearly)
-			bpRows[i] = []string{
-				bp.Name, bp.Destination, bp.Source,
-				boolStr(bp.Enabled), bp.ScheduleTimes, retention, bp.Notes,
-			}
+			botRows[i] = []string{bp.ScheduleTimes, retention, bp.Notes}
 		}
-		pdfTable(pdf, []string{"Name", "Destination", "Source", "On", "Schedule", "Retention", "Notes"},
-			[]float64{30, 30, 25, 14, 25, 40, 26}, bpRows)
+		pdfTable(pdf, []string{"Schedule", "Retention", "Notes"},
+			[]float64{45, 80, 65}, botRows)
 	}
 
 	var buf bytes.Buffer
