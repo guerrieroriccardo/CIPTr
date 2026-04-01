@@ -439,23 +439,46 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		sws := switchesBySite[site.ID]
 		for _, sw := range sws {
 			pdfSubsectionTitle(pdf, fmt.Sprintf("Switch: %s", sw.Hostname))
-			pdf.SetFont("Helvetica", "", pdfFontSize)
+
+			// Build info rows as key-value pairs, two per line.
+			type kv struct{ k, v string }
+			var pairs []kv
 			if sw.IPAddress != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "IP: "+sw.IPAddress, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"IP", sw.IPAddress})
 			}
 			if sw.VlanName != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "VLAN: "+sw.VlanName, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"VLAN", sw.VlanName})
 			}
 			if sw.Model != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Model: "+sw.Model, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"Model", sw.Model})
 			}
 			if sw.Location != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Location: "+sw.Location, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"Location", sw.Location})
 			}
-			pdf.CellFormat(pdfContentW, pdfRowH, fmt.Sprintf("Total Ports: %d", sw.TotalPorts), "", 1, "L", false, 0, "")
+			pairs = append(pairs, kv{"Ports", fmt.Sprintf("%d", sw.TotalPorts)})
 			if sw.Notes != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Notes: "+sw.Notes, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"Notes", sw.Notes})
 			}
+
+			pdf.SetFont("Helvetica", "", pdfFontSize)
+			labelW := 22.0
+			valW := pdfContentW/2 - labelW
+			for i := 0; i < len(pairs); i += 2 {
+				pdf.SetFont("Helvetica", "B", pdfFontSize)
+				pdf.CellFormat(labelW, pdfRowH, " "+pairs[i].k+":", "1", 0, "L", false, 0, "")
+				pdf.SetFont("Helvetica", "", pdfFontSize)
+				if i+1 < len(pairs) {
+					pdf.CellFormat(valW, pdfRowH, " "+pairs[i].v, "1", 0, "L", false, 0, "")
+					pdf.SetFont("Helvetica", "B", pdfFontSize)
+					pdf.CellFormat(labelW, pdfRowH, " "+pairs[i+1].k+":", "1", 0, "L", false, 0, "")
+					pdf.SetFont("Helvetica", "", pdfFontSize)
+					pdf.CellFormat(valW, pdfRowH, " "+pairs[i+1].v, "1", 0, "L", false, 0, "")
+				} else {
+					pdf.CellFormat(valW+labelW+valW, pdfRowH, " "+pairs[i].v, "1", 0, "L", false, 0, "")
+				}
+				pdf.Ln(-1)
+			}
+			pdf.Ln(2)
 
 			ports := switchPortsBySwitch[sw.ID]
 			if len(ports) > 0 {
@@ -477,14 +500,36 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		panels := patchPanelsBySite[site.ID]
 		for _, pp := range panels {
 			pdfSubsectionTitle(pdf, fmt.Sprintf("Patch Panel: %s", pp.Name))
-			pdf.SetFont("Helvetica", "", pdfFontSize)
-			pdf.CellFormat(pdfContentW, pdfRowH, fmt.Sprintf("Total Ports: %d", pp.TotalPorts), "", 1, "L", false, 0, "")
+
+			type kv struct{ k, v string }
+			var pairs []kv
+			pairs = append(pairs, kv{"Ports", fmt.Sprintf("%d", pp.TotalPorts)})
 			if pp.Location != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Location: "+pp.Location, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"Location", pp.Location})
 			}
 			if pp.Notes != "" {
-				pdf.CellFormat(pdfContentW, pdfRowH, "Notes: "+pp.Notes, "", 1, "L", false, 0, "")
+				pairs = append(pairs, kv{"Notes", pp.Notes})
 			}
+
+			pdf.SetFont("Helvetica", "", pdfFontSize)
+			labelW := 22.0
+			valW := pdfContentW/2 - labelW
+			for i := 0; i < len(pairs); i += 2 {
+				pdf.SetFont("Helvetica", "B", pdfFontSize)
+				pdf.CellFormat(labelW, pdfRowH, " "+pairs[i].k+":", "1", 0, "L", false, 0, "")
+				pdf.SetFont("Helvetica", "", pdfFontSize)
+				if i+1 < len(pairs) {
+					pdf.CellFormat(valW, pdfRowH, " "+pairs[i].v, "1", 0, "L", false, 0, "")
+					pdf.SetFont("Helvetica", "B", pdfFontSize)
+					pdf.CellFormat(labelW, pdfRowH, " "+pairs[i+1].k+":", "1", 0, "L", false, 0, "")
+					pdf.SetFont("Helvetica", "", pdfFontSize)
+					pdf.CellFormat(valW, pdfRowH, " "+pairs[i+1].v, "1", 0, "L", false, 0, "")
+				} else {
+					pdf.CellFormat(valW+labelW+valW, pdfRowH, " "+pairs[i].v, "1", 0, "L", false, 0, "")
+				}
+				pdf.Ln(-1)
+			}
+			pdf.Ln(2)
 
 			ports := ppPortsByPanel[pp.ID]
 			if len(ports) > 0 {
@@ -975,7 +1020,7 @@ func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int
 func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportSwitch, map[int64][]exportSwitchPort, error) {
 	ph, args := inPlaceholders(siteIDs)
 	srows, err := db.QueryContext(ctx,
-		`SELECT s.site_id, s.id, s.hostname, COALESCE(s.ip_address::text, ''),
+		`SELECT s.site_id, s.id, s.hostname, COALESCE(host(s.ip_address), ''),
 		        COALESCE(v.name, ''),
 		        COALESCE(CONCAT(m.name, ' ', dm.model_name), ''),
 		        COALESCE(l.name, ''), s.total_ports, COALESCE(s.notes, '')
