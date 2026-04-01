@@ -9,6 +9,7 @@ type DeviceModel struct {
 	ModelName      string    `json:"model_name"`
 	CategoryID     int64     `json:"category_id"`
 	OsDefaultID    *int64    `json:"os_default_id"`
+	DefaultPorts   *int      `json:"default_ports"`
 	Specs          *string   `json:"specs"`
 	Notes          *string   `json:"notes"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -20,6 +21,7 @@ type DeviceModelInput struct {
 	ModelName      string  `json:"model_name"      binding:"required"`
 	CategoryID     int64   `json:"category_id"     binding:"required"`
 	OsDefaultID    *int64  `json:"os_default_id"`
+	DefaultPorts   *int    `json:"default_ports"`
 	Specs          *string `json:"specs"`
 	Notes          *string `json:"notes"`
 }

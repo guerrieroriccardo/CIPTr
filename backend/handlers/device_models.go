@@ -23,12 +23,12 @@ func NewDeviceModelHandler(db *sql.DB) *DeviceModelHandler {
 }
 
 // deviceModelSelectSQL is the base SELECT used by every read operation.
-const deviceModelSelectSQL = `SELECT id, manufacturer_id, model_name, category_id, os_default_id, specs, notes, created_at FROM device_models`
+const deviceModelSelectSQL = `SELECT id, manufacturer_id, model_name, category_id, os_default_id, default_ports, specs, notes, created_at FROM device_models`
 
 // scanDeviceModel reads one row into a DeviceModel struct.
 func scanDeviceModel(row interface{ Scan(...any) error }) (models.DeviceModel, error) {
 	var dm models.DeviceModel
-	err := row.Scan(&dm.ID, &dm.ManufacturerID, &dm.ModelName, &dm.CategoryID, &dm.OsDefaultID, &dm.Specs, &dm.Notes, &dm.CreatedAt)
+	err := row.Scan(&dm.ID, &dm.ManufacturerID, &dm.ModelName, &dm.CategoryID, &dm.OsDefaultID, &dm.DefaultPorts, &dm.Specs, &dm.Notes, &dm.CreatedAt)
 	return dm, err
 }
 
@@ -113,11 +113,11 @@ func (h *DeviceModelHandler) Create(c *gin.Context) {
 	}
 
 	dm, err := scanDeviceModel(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO device_models (manufacturer_id, model_name, category_id, os_default_id, specs, notes)
-		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, manufacturer_id, model_name, category_id, os_default_id, specs, notes, created_at`,
+		`INSERT INTO device_models (manufacturer_id, model_name, category_id, os_default_id, default_ports, specs, notes)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, manufacturer_id, model_name, category_id, os_default_id, default_ports, specs, notes, created_at`,
 		input.ManufacturerID, input.ModelName, input.CategoryID,
-		input.OsDefaultID, input.Specs, input.Notes,
+		input.OsDefaultID, input.DefaultPorts, input.Specs, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -145,10 +145,10 @@ func (h *DeviceModelHandler) Update(c *gin.Context) {
 
 	dm, err := scanDeviceModel(h.db.QueryRowContext(c.Request.Context(),
 		`UPDATE device_models SET manufacturer_id = $1, model_name = $2, category_id = $3,
-		 os_default_id = $4, specs = $5, notes = $6 WHERE id = $7
-		 RETURNING id, manufacturer_id, model_name, category_id, os_default_id, specs, notes, created_at`,
+		 os_default_id = $4, default_ports = $5, specs = $6, notes = $7 WHERE id = $8
+		 RETURNING id, manufacturer_id, model_name, category_id, os_default_id, default_ports, specs, notes, created_at`,
 		input.ManufacturerID, input.ModelName, input.CategoryID,
-		input.OsDefaultID, input.Specs, input.Notes, id,
+		input.OsDefaultID, input.DefaultPorts, input.Specs, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("device model not found"))

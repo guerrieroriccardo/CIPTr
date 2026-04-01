@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS device_models (
     model_name      TEXT NOT NULL,
     category_id     BIGINT NOT NULL REFERENCES categories(id),
     os_default_id   BIGINT REFERENCES operating_systems(id) ON DELETE SET NULL,
+    default_ports   INTEGER,
     specs           TEXT,
     notes           TEXT,
     created_at      TIMESTAMPTZ DEFAULT NOW(),

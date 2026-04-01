@@ -19,15 +19,21 @@ func init() {
 			{Title: "Manufacturer", Width: 16},
 			{Title: "Model Name", Width: 25},
 			{Title: "Category", Width: 14},
+			{Title: "SW Ports", Width: 8},
 			{Title: "OS Default", Width: 15},
 		},
 		ToRow: func(raw any) table.Row {
 			dm := raw.(*models.DeviceModel)
+			ports := ""
+			if dm.DefaultPorts != nil {
+				ports = fmt.Sprintf("%d", *dm.DefaultPorts)
+			}
 			return table.Row{
 				fmt.Sprintf("%d", dm.ID),
 				ManufacturerName(dm.ManufacturerID),
 				dm.ModelName,
 				CategoryName(dm.CategoryID),
+				ports,
 				OsName(dm.OsDefaultID),
 			}
 		},
@@ -40,6 +46,7 @@ func init() {
 			{Key: "model_name", Label: "Model Name", Required: true},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
 			{Key: "os_default_id", Label: "OS Default", PickerKey: "operating_systems"},
+			{Key: "default_ports", Label: "Default Switch Ports"},
 			{Key: "specs", Label: "Specs"},
 			{Key: "notes", Label: "Notes"},
 		},
@@ -61,6 +68,7 @@ func init() {
 				ModelName:      data["model_name"],
 				CategoryID:     mustInt64(data["category_id"]),
 				OsDefaultID:    int64Ptr(data["os_default_id"]),
+				DefaultPorts:   intPtr(data["default_ports"]),
 				Specs:          strPtr(data["specs"]),
 				Notes:          strPtr(data["notes"]),
 			}
@@ -74,6 +82,7 @@ func init() {
 				ModelName:      data["model_name"],
 				CategoryID:     mustInt64(data["category_id"]),
 				OsDefaultID:    int64Ptr(data["os_default_id"]),
+				DefaultPorts:   intPtr(data["default_ports"]),
 				Specs:          strPtr(data["specs"]),
 				Notes:          strPtr(data["notes"]),
 			}

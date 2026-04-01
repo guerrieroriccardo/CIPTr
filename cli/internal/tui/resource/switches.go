@@ -87,17 +87,25 @@ func init() {
 		},
 
 		AsyncDerive: func(client *apiclient.Client, key string, values map[string]string) map[string]string {
-			if key != "site_id" || values["site_id"] == "" {
-				return nil
+			if key == "site_id" && values["site_id"] != "" {
+				var result struct {
+					Hostname string `json:"hostname"`
+				}
+				err := client.Get(fmt.Sprintf("/switches/next-name?site_id=%s", values["site_id"]), &result)
+				if err != nil || result.Hostname == "" {
+					return nil
+				}
+				return map[string]string{"hostname": result.Hostname}
 			}
-			var result struct {
-				Hostname string `json:"hostname"`
+			if key == "model_id" && values["model_id"] != "" {
+				var dm models.DeviceModel
+				err := client.Get("/device-models/"+values["model_id"], &dm)
+				if err != nil || dm.DefaultPorts == nil {
+					return nil
+				}
+				return map[string]string{"total_ports": fmt.Sprintf("%d", *dm.DefaultPorts)}
 			}
-			err := client.Get(fmt.Sprintf("/switches/next-name?site_id=%s", values["site_id"]), &result)
-			if err != nil || result.Hostname == "" {
-				return nil
-			}
-			return map[string]string{"hostname": result.Hostname}
+			return nil
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {
