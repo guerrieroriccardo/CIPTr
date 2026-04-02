@@ -23,13 +23,74 @@ func NewPatchPanelPortHandler(db *sql.DB) *PatchPanelPortHandler {
 }
 
 // patchPanelPortSelectSQL is the base SELECT used by every read operation.
-const patchPanelPortSelectSQL = `SELECT id, device_id, port_number, port_label, linked_port_id, notes FROM patch_panel_ports`
+const patchPanelPortSelectSQL = `SELECT id, device_id, port_number, port_label, linked_port_id, switch_port_id, notes FROM patch_panel_ports`
 
 // scanPatchPanelPort reads one row into a PatchPanelPort struct.
 func scanPatchPanelPort(row interface{ Scan(...any) error }) (models.PatchPanelPort, error) {
 	var ppp models.PatchPanelPort
-	err := row.Scan(&ppp.ID, &ppp.DeviceID, &ppp.PortNumber, &ppp.PortLabel, &ppp.LinkedPortID, &ppp.Notes)
+	err := row.Scan(&ppp.ID, &ppp.DeviceID, &ppp.PortNumber, &ppp.PortLabel, &ppp.LinkedPortID, &ppp.SwitchPortID, &ppp.Notes)
 	return ppp, err
+}
+
+// loadPPConnections enriches patch panel ports with connection info.
+func (h *PatchPanelPortHandler) loadPPConnections(c *gin.Context, ports []models.PatchPanelPort) error {
+	if len(ports) == 0 {
+		return nil
+	}
+
+	ids := make([]int64, len(ports))
+	idx := map[int64]int{}
+	for i, p := range ports {
+		ids[i] = p.ID
+		idx[p.ID] = i
+	}
+
+	// Enrich from device_connections: which device interface is connected to this PP port
+	ph, args := inPlaceholders(ids)
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT dc.patch_panel_port_id, d.hostname, di.name
+		 FROM device_connections dc
+		 JOIN device_interfaces di ON di.id = dc.interface_id
+		 JOIN devices d ON d.id = di.device_id
+		 WHERE dc.patch_panel_port_id IN `+ph, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ppID int64
+		var hostname, ifName string
+		if err := rows.Scan(&ppID, &hostname, &ifName); err != nil {
+			return err
+		}
+		if i, ok := idx[ppID]; ok {
+			ports[i].ConnectedDevice = &hostname
+			ports[i].ConnectedInterface = &ifName
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// Enrich from switch_port_id: which switch port is this PP port linked to
+	for i, p := range ports {
+		if p.SwitchPortID != nil {
+			var hostname string
+			var portNum int
+			err := h.db.QueryRowContext(c.Request.Context(),
+				`SELECT d.hostname, sp.port_number
+				 FROM switch_ports sp
+				 JOIN devices d ON d.id = sp.device_id
+				 WHERE sp.id = $1`, *p.SwitchPortID,
+			).Scan(&hostname, &portNum)
+			if err == nil {
+				ports[i].ConnectedSwitch = &hostname
+				ports[i].ConnectedSwitchPort = &portNum
+			}
+		}
+	}
+
+	return nil
 }
 
 // List handles GET /patch-panel-ports
@@ -61,6 +122,11 @@ func (h *PatchPanelPortHandler) List(c *gin.Context) {
 		ports = append(ports, ppp)
 	}
 
+	if err := h.loadPPConnections(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
 	ok(c, http.StatusOK, ports)
 }
 
@@ -90,6 +156,11 @@ func (h *PatchPanelPortHandler) ListByDevice(c *gin.Context) {
 		ports = append(ports, ppp)
 	}
 
+	if err := h.loadPPConnections(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
 	ok(c, http.StatusOK, ports)
 }
 
@@ -113,7 +184,13 @@ func (h *PatchPanelPortHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	ok(c, http.StatusOK, ppp)
+	ports := []models.PatchPanelPort{ppp}
+	if err := h.loadPPConnections(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	ok(c, http.StatusOK, ports[0])
 }
 
 // Create handles POST /patch-panel-ports
@@ -124,11 +201,28 @@ func (h *PatchPanelPortHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Validate: switch_port_id and linked_port_id are mutually exclusive
+	if input.SwitchPortID != nil && input.LinkedPortID != nil {
+		fail(c, http.StatusBadRequest, errors.New("cannot set both switch_port_id and linked_port_id"))
+		return
+	}
+
+	// 1:1 validation for switch_port_id
+	if input.SwitchPortID != nil {
+		if taken, err := isSwitchPortTaken(c.Request.Context(), h.db, *input.SwitchPortID, 0); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		} else if taken {
+			fail(c, http.StatusConflict, errors.New("switch port is already connected"))
+			return
+		}
+	}
+
 	ppp, err := scanPatchPanelPort(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO patch_panel_ports (device_id, port_number, port_label, linked_port_id, notes)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, device_id, port_number, port_label, linked_port_id, notes`,
-		input.DeviceID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes,
+		`INSERT INTO patch_panel_ports (device_id, port_number, port_label, linked_port_id, switch_port_id, notes)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, device_id, port_number, port_label, linked_port_id, switch_port_id, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.SwitchPortID, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -160,6 +254,23 @@ func (h *PatchPanelPortHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Validate: switch_port_id and linked_port_id are mutually exclusive
+	if input.SwitchPortID != nil && input.LinkedPortID != nil {
+		fail(c, http.StatusBadRequest, errors.New("cannot set both switch_port_id and linked_port_id"))
+		return
+	}
+
+	// 1:1 validation for switch_port_id (exclude this PP port)
+	if input.SwitchPortID != nil {
+		if taken, err := isSwitchPortTakenExcludingPP(c.Request.Context(), h.db, *input.SwitchPortID, id); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		} else if taken {
+			fail(c, http.StatusConflict, errors.New("switch port is already connected"))
+			return
+		}
+	}
+
 	// Get old linked_port_id before update so we can unlink the old partner.
 	var oldLinkedPortID *int64
 	_ = h.db.QueryRowContext(c.Request.Context(),
@@ -167,10 +278,10 @@ func (h *PatchPanelPortHandler) Update(c *gin.Context) {
 	).Scan(&oldLinkedPortID)
 
 	ppp, err := scanPatchPanelPort(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE patch_panel_ports SET device_id = $1, port_number = $2, port_label = $3, linked_port_id = $4, notes = $5
-		 WHERE id = $6
-		 RETURNING id, device_id, port_number, port_label, linked_port_id, notes`,
-		input.DeviceID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes, id,
+		`UPDATE patch_panel_ports SET device_id = $1, port_number = $2, port_label = $3, linked_port_id = $4, switch_port_id = $5, notes = $6
+		 WHERE id = $7
+		 RETURNING id, device_id, port_number, port_label, linked_port_id, switch_port_id, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.SwitchPortID, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("patch panel port not found"))

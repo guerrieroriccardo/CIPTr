@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -146,7 +147,40 @@ func (h *DeviceConnectionHandler) Create(c *gin.Context) {
 		return
 	}
 
-	dc, err := scanDeviceConnection(h.db.QueryRowContext(c.Request.Context(),
+	ctx := c.Request.Context()
+
+	// 1:1 validation: interface must not already have a connection
+	if taken, err := isInterfaceTaken(ctx, h.db, input.InterfaceID, 0); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	} else if taken {
+		fail(c, http.StatusConflict, errors.New("interface already has a connection"))
+		return
+	}
+
+	// 1:1 validation: switch port must not already be used
+	if input.SwitchPortID != nil {
+		if taken, err := isSwitchPortTaken(ctx, h.db, *input.SwitchPortID, 0); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		} else if taken {
+			fail(c, http.StatusConflict, errors.New("switch port is already connected"))
+			return
+		}
+	}
+
+	// 1:1 validation: patch panel port must not already be used
+	if input.PatchPanelPortID != nil {
+		if taken, err := isPatchPanelPortTaken(ctx, h.db, *input.PatchPanelPortID, 0); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		} else if taken {
+			fail(c, http.StatusConflict, errors.New("patch panel port is already connected"))
+			return
+		}
+	}
+
+	dc, err := scanDeviceConnection(h.db.QueryRowContext(ctx,
 		`INSERT INTO device_connections (interface_id, switch_port_id, patch_panel_port_id, connected_at, notes)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, interface_id, switch_port_id, patch_panel_port_id, connected_at, notes`,
@@ -157,7 +191,7 @@ func (h *DeviceConnectionHandler) Create(c *gin.Context) {
 		return
 	}
 
-	logAudit(c.Request.Context(), h.db, c, "create", "device_connections", dc.ID, fmt.Sprintf("Created connection #%d", dc.ID))
+	logAudit(ctx, h.db, c, "create", "device_connections", dc.ID, fmt.Sprintf("Created connection #%d", dc.ID))
 	ok(c, http.StatusCreated, dc)
 }
 
@@ -176,7 +210,38 @@ func (h *DeviceConnectionHandler) Update(c *gin.Context) {
 		return
 	}
 
-	dc, err := scanDeviceConnection(h.db.QueryRowContext(c.Request.Context(),
+	ctx := c.Request.Context()
+
+	// 1:1 validation: interface must not already have a different connection
+	if taken, err := isInterfaceTaken(ctx, h.db, input.InterfaceID, id); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	} else if taken {
+		fail(c, http.StatusConflict, errors.New("interface already has a connection"))
+		return
+	}
+
+	if input.SwitchPortID != nil {
+		if taken, err := isSwitchPortTaken(ctx, h.db, *input.SwitchPortID, id); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		} else if taken {
+			fail(c, http.StatusConflict, errors.New("switch port is already connected"))
+			return
+		}
+	}
+
+	if input.PatchPanelPortID != nil {
+		if taken, err := isPatchPanelPortTaken(ctx, h.db, *input.PatchPanelPortID, id); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		} else if taken {
+			fail(c, http.StatusConflict, errors.New("patch panel port is already connected"))
+			return
+		}
+	}
+
+	dc, err := scanDeviceConnection(h.db.QueryRowContext(ctx,
 		`UPDATE device_connections SET interface_id = $1, switch_port_id = $2, patch_panel_port_id = $3, connected_at = $4, notes = $5
 		 WHERE id = $6
 		 RETURNING id, interface_id, switch_port_id, patch_panel_port_id, connected_at, notes`,
@@ -191,7 +256,7 @@ func (h *DeviceConnectionHandler) Update(c *gin.Context) {
 		return
 	}
 
-	logAudit(c.Request.Context(), h.db, c, "update", "device_connections", id, fmt.Sprintf("Updated connection #%d", id))
+	logAudit(ctx, h.db, c, "update", "device_connections", id, fmt.Sprintf("Updated connection #%d", id))
 	ok(c, http.StatusOK, dc)
 }
 
@@ -218,4 +283,78 @@ func (h *DeviceConnectionHandler) Delete(c *gin.Context) {
 
 	logAudit(c.Request.Context(), h.db, c, "delete", "device_connections", id, fmt.Sprintf("Deleted connection #%d", id))
 	ok(c, http.StatusOK, gin.H{"deleted": true})
+}
+
+// ---------------------------------------------------------------------------
+// 1:1 validation helpers (used by device_connections and patch_panel_ports)
+// ---------------------------------------------------------------------------
+
+// isSwitchPortTaken checks if a switch port is already used in device_connections
+// or patch_panel_ports.switch_port_id. excludeDCID excludes a device_connection row
+// (pass 0 when creating). excludePPID is handled by the caller in patch_panel_ports.
+func isSwitchPortTaken(ctx context.Context, db *sql.DB, switchPortID int64, excludeDCID int64) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM device_connections WHERE switch_port_id = $1 AND ($2 = 0 OR id != $2)`,
+		switchPortID, excludeDCID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	// Also check patch_panel_ports
+	err = db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM patch_panel_ports WHERE switch_port_id = $1`,
+		switchPortID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// isSwitchPortTakenExcludingPP is like isSwitchPortTaken but also excludes a
+// patch_panel_port row (for PP update operations).
+func isSwitchPortTakenExcludingPP(ctx context.Context, db *sql.DB, switchPortID int64, excludePPID int64) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM device_connections WHERE switch_port_id = $1`,
+		switchPortID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	err = db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM patch_panel_ports WHERE switch_port_id = $1 AND id != $2`,
+		switchPortID, excludePPID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// isInterfaceTaken checks if an interface already has a device_connection.
+func isInterfaceTaken(ctx context.Context, db *sql.DB, interfaceID int64, excludeDCID int64) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM device_connections WHERE interface_id = $1 AND ($2 = 0 OR id != $2)`,
+		interfaceID, excludeDCID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// isPatchPanelPortTaken checks if a patch panel port is already used in device_connections.
+func isPatchPanelPortTaken(ctx context.Context, db *sql.DB, ppPortID int64, excludeDCID int64) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM device_connections WHERE patch_panel_port_id = $1 AND ($2 = 0 OR id != $2)`,
+		ppPortID, excludeDCID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

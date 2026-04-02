@@ -82,6 +82,73 @@ func (h *SwitchPortHandler) syncTaggedVlans(c *gin.Context, portID int64, vlanID
 	return nil
 }
 
+// loadSPConnections enriches switch ports with connection info from device_connections
+// and patch_panel_ports.
+func (h *SwitchPortHandler) loadSPConnections(c *gin.Context, ports []models.SwitchPort) error {
+	if len(ports) == 0 {
+		return nil
+	}
+
+	ids := make([]int64, len(ports))
+	idx := map[int64]int{}
+	for i, p := range ports {
+		ids[i] = p.ID
+		idx[p.ID] = i
+	}
+
+	ph, args := inPlaceholders(ids)
+
+	// From device_connections: which device interface is connected to this switch port
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT dc.switch_port_id, d.hostname, di.name
+		 FROM device_connections dc
+		 JOIN device_interfaces di ON di.id = dc.interface_id
+		 JOIN devices d ON d.id = di.device_id
+		 WHERE dc.switch_port_id IN `+ph, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var spID int64
+		var hostname, ifName string
+		if err := rows.Scan(&spID, &hostname, &ifName); err != nil {
+			return err
+		}
+		if i, ok := idx[spID]; ok {
+			ports[i].ConnectedDevice = &hostname
+			ports[i].ConnectedInterface = &ifName
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// From patch_panel_ports: which PP port is linked to this switch port
+	rows2, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT ppp.switch_port_id, d.hostname, ppp.port_number
+		 FROM patch_panel_ports ppp
+		 JOIN devices d ON d.id = ppp.device_id
+		 WHERE ppp.switch_port_id IN `+ph, args...)
+	if err != nil {
+		return err
+	}
+	defer rows2.Close()
+	for rows2.Next() {
+		var spID int64
+		var ppName string
+		var ppPortNum int
+		if err := rows2.Scan(&spID, &ppName, &ppPortNum); err != nil {
+			return err
+		}
+		if i, ok := idx[spID]; ok {
+			ports[i].ConnectedPatchPanel = &ppName
+			ports[i].ConnectedPatchPanelPort = &ppPortNum
+		}
+	}
+	return rows2.Err()
+}
+
 // List handles GET /switch-ports
 // Supports optional query param: ?device_id=
 func (h *SwitchPortHandler) List(c *gin.Context) {
@@ -112,6 +179,10 @@ func (h *SwitchPortHandler) List(c *gin.Context) {
 	}
 
 	if err := h.loadTaggedVlans(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	if err := h.loadSPConnections(c, ports); err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
@@ -149,6 +220,10 @@ func (h *SwitchPortHandler) ListByDevice(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
+	if err := h.loadSPConnections(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
 
 	ok(c, http.StatusOK, ports)
 }
@@ -175,6 +250,10 @@ func (h *SwitchPortHandler) GetByID(c *gin.Context) {
 
 	ports := []models.SwitchPort{sp}
 	if err := h.loadTaggedVlans(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	if err := h.loadSPConnections(c, ports); err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
 	}
