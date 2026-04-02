@@ -146,11 +146,6 @@ func (h *IPUsageHandler) vlanLevel(c *gin.Context, ctx context.Context, vlanID i
 			JOIN device_interfaces di ON di.id = dip.interface_id
 			JOIN devices d ON d.id = di.device_id
 			WHERE dip.vlan_id = $1
-			UNION ALL
-			SELECT sw.ip_address::inet AS ip,
-			       host(sw.ip_address) || ' - ' || sw.hostname || ' (switch)' AS label
-			FROM switches sw
-			WHERE sw.vlan_id = $1 AND sw.ip_address IS NOT NULL
 		) combined
 		ORDER BY ip
 	`, vlanID)
@@ -465,10 +460,9 @@ func (h *IPUsageHandler) fetchVLANUsage(ctx context.Context, whereClause string,
 	q := `
 		SELECT v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet,
 		       v.dhcp_start, v.dhcp_end,
-		       COUNT(DISTINCT dip.id) + COUNT(DISTINCT sw.id) AS used_ips
+		       COUNT(DISTINCT dip.id) AS used_ips
 		FROM vlans v
 		LEFT JOIN device_ips dip ON dip.vlan_id = v.id
-		LEFT JOIN switches sw ON sw.vlan_id = v.id AND sw.ip_address IS NOT NULL
 		` + whereClause + `
 		GROUP BY v.id, v.site_id, v.address_block_id, v.vlan_id, v.name, v.subnet,
 		         v.dhcp_start, v.dhcp_end

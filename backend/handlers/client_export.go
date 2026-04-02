@@ -855,10 +855,9 @@ func fetchExportVLANIPCount(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 	}
 	ph, args := inPlaceholders(siteIDs)
 	rows, err := db.QueryContext(ctx, `
-		SELECT v.id, COUNT(DISTINCT dip.id) + COUNT(DISTINCT sw.id)
+		SELECT v.id, COUNT(DISTINCT dip.id)
 		FROM vlans v
 		LEFT JOIN device_ips dip ON dip.vlan_id = v.id
-		LEFT JOIN switches sw ON sw.vlan_id = v.id AND sw.ip_address IS NOT NULL
 		WHERE v.site_id IN `+ph+`
 		GROUP BY v.id
 	`, args...)
@@ -1020,16 +1019,16 @@ func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int
 func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportSwitch, map[int64][]exportSwitchPort, error) {
 	ph, args := inPlaceholders(siteIDs)
 	srows, err := db.QueryContext(ctx,
-		`SELECT s.site_id, s.id, s.hostname, COALESCE(host(s.ip_address), ''),
-		        COALESCE(v.name, ''),
+		`SELECT d.site_id, d.id, d.hostname, '',
+		        '',
 		        COALESCE(CONCAT(m.name, ' ', dm.model_name), ''),
-		        COALESCE(l.name, ''), s.total_ports, COALESCE(s.notes, '')
-		 FROM switches s
-		 LEFT JOIN device_models dm ON dm.id = s.model_id
+		        COALESCE(l.name, ''), COALESCE(d.total_ports, 0), COALESCE(d.notes, '')
+		 FROM devices d
+		 JOIN categories cat ON cat.id = d.category_id AND cat.port_type = 'switch'
+		 LEFT JOIN device_models dm ON dm.id = d.model_id
 		 LEFT JOIN manufacturers m ON m.id = dm.manufacturer_id
-		 LEFT JOIN locations l ON l.id = s.location_id
-		 LEFT JOIN vlans v ON v.id = s.vlan_id
-		 WHERE s.site_id IN `+ph+` ORDER BY s.hostname`, args...)
+		 LEFT JOIN locations l ON l.id = d.location_id
+		 WHERE d.site_id IN `+ph+` ORDER BY d.hostname`, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1050,25 +1049,66 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 		return nil, nil, err
 	}
 
+	// Fetch IP + VLAN for each switch device (from device_ips via device_interfaces).
+	if len(switchIDs) > 0 {
+		iph, iargs := inPlaceholders(switchIDs)
+		iprows, err := db.QueryContext(ctx,
+			`SELECT di.device_id, host(dip.ip_address), COALESCE(v.name, '')
+			 FROM device_ips dip
+			 JOIN device_interfaces di ON di.id = dip.interface_id
+			 LEFT JOIN vlans v ON v.id = dip.vlan_id
+			 WHERE di.device_id IN `+iph+`
+			 ORDER BY di.device_id, dip.is_primary DESC NULLS LAST
+			`, iargs...)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer iprows.Close()
+		// Use first IP per device.
+		seen := map[int64]bool{}
+		ipMap := map[int64][2]string{} // device_id → [ip, vlan_name]
+		for iprows.Next() {
+			var devID int64
+			var ip, vlanName string
+			if err := iprows.Scan(&devID, &ip, &vlanName); err != nil {
+				return nil, nil, err
+			}
+			if !seen[devID] {
+				ipMap[devID] = [2]string{ip, vlanName}
+				seen[devID] = true
+			}
+		}
+		// Patch IP and VLAN into exportSwitch structs.
+		for siteID, sws := range switchBySite {
+			for i := range sws {
+				if ipInfo, ok := ipMap[sws[i].ID]; ok {
+					sws[i].IPAddress = ipInfo[0]
+					sws[i].VlanName = ipInfo[1]
+				}
+			}
+			switchBySite[siteID] = sws
+		}
+	}
+
 	// Switch ports
 	portsBySwitch := map[int64][]exportSwitchPort{}
 	if len(switchIDs) > 0 {
 		ph, args := inPlaceholders(switchIDs)
 		prows, err := db.QueryContext(ctx,
-			`SELECT switch_id, port_number, COALESCE(port_label, ''), COALESCE(speed, ''),
+			`SELECT device_id, port_number, COALESCE(port_label, ''), COALESCE(speed, ''),
 			        COALESCE(is_uplink, false), COALESCE(notes, '')
-			 FROM switch_ports WHERE switch_id IN `+ph+` ORDER BY port_number`, args...)
+			 FROM switch_ports WHERE device_id IN `+ph+` ORDER BY port_number`, args...)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer prows.Close()
 		for prows.Next() {
-			var switchID int64
+			var deviceID int64
 			var p exportSwitchPort
-			if err := prows.Scan(&switchID, &p.PortNumber, &p.PortLabel, &p.Speed, &p.IsUplink, &p.Notes); err != nil {
+			if err := prows.Scan(&deviceID, &p.PortNumber, &p.PortLabel, &p.Speed, &p.IsUplink, &p.Notes); err != nil {
 				return nil, nil, err
 			}
-			portsBySwitch[switchID] = append(portsBySwitch[switchID], p)
+			portsBySwitch[deviceID] = append(portsBySwitch[deviceID], p)
 		}
 		if err := prows.Err(); err != nil {
 			return nil, nil, err
@@ -1081,10 +1121,11 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportPatchPanel, map[int64][]exportPatchPanelPort, error) {
 	ph, args := inPlaceholders(siteIDs)
 	pprows, err := db.QueryContext(ctx,
-		`SELECT pp.id, pp.site_id, pp.name, pp.total_ports, COALESCE(l.name, ''), COALESCE(pp.notes, '')
-		 FROM patch_panels pp
-		 LEFT JOIN locations l ON l.id = pp.location_id
-		 WHERE pp.site_id IN `+ph+` ORDER BY pp.name`, args...)
+		`SELECT d.site_id, d.id, d.hostname, COALESCE(d.total_ports, 0), COALESCE(l.name, ''), COALESCE(d.notes, '')
+		 FROM devices d
+		 JOIN categories cat ON cat.id = d.category_id AND cat.port_type = 'patch_panel'
+		 LEFT JOIN locations l ON l.id = d.location_id
+		 WHERE d.site_id IN `+ph+` ORDER BY d.hostname`, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1109,13 +1150,13 @@ func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 	if len(panelIDs) > 0 {
 		ph, args := inPlaceholders(panelIDs)
 		prows, err := db.QueryContext(ctx,
-			`SELECT ppp.patch_panel_id, ppp.port_number, COALESCE(ppp.port_label, ''),
-			        COALESCE(lpp.name || ' #' || lppp.port_number::text, ''),
+			`SELECT ppp.device_id, ppp.port_number, COALESCE(ppp.port_label, ''),
+			        COALESCE(ld.hostname || ' #' || lppp.port_number::text, ''),
 			        COALESCE(ppp.notes, '')
 			 FROM patch_panel_ports ppp
 			 LEFT JOIN patch_panel_ports lppp ON lppp.id = ppp.linked_port_id
-			 LEFT JOIN patch_panels lpp ON lpp.id = lppp.patch_panel_id
-			 WHERE ppp.patch_panel_id IN `+ph+` ORDER BY ppp.port_number`, args...)
+			 LEFT JOIN devices ld ON ld.id = lppp.device_id
+			 WHERE ppp.device_id IN `+ph+` ORDER BY ppp.port_number`, args...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1239,13 +1280,13 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 		crows, err := db.QueryContext(ctx,
 			`SELECT di.device_id, di.name,
 			        COALESCE(sw.hostname || ' #' || sp.port_number::text, ''),
-			        COALESCE(pp.name || ' #' || ppp.port_number::text, '')
+			        COALESCE(ppd.hostname || ' #' || ppp.port_number::text, '')
 			 FROM device_connections dc
 			 JOIN device_interfaces di ON di.id = dc.interface_id
 			 LEFT JOIN switch_ports sp ON sp.id = dc.switch_port_id
-			 LEFT JOIN switches sw ON sw.id = sp.switch_id
+			 LEFT JOIN devices sw ON sw.id = sp.device_id
 			 LEFT JOIN patch_panel_ports ppp ON ppp.id = dc.patch_panel_port_id
-			 LEFT JOIN patch_panels pp ON pp.id = ppp.patch_panel_id
+			 LEFT JOIN devices ppd ON ppd.id = ppp.device_id
 			 WHERE di.device_id IN `+ph+` ORDER BY di.name`, args...)
 		if err != nil {
 			return nil, nil, nil, nil, err
