@@ -39,9 +39,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	deviceInterfaceHandler  := handlers.NewDeviceInterfaceHandler(database)
 	deviceIPHandler         := handlers.NewDeviceIPHandler(database)
 	deviceConnectionHandler := handlers.NewDeviceConnectionHandler(database)
-	switchHandler           := handlers.NewSwitchHandler(database)
 	switchPortHandler       := handlers.NewSwitchPortHandler(database)
-	patchPanelHandler       := handlers.NewPatchPanelHandler(database)
 	patchPanelPortHandler   := handlers.NewPatchPanelPortHandler(database)
 	deviceGroupHandler      := handlers.NewDeviceGroupHandler(database)
 	deviceGroupMemberHandler := handlers.NewDeviceGroupMemberHandler(database)
@@ -94,8 +92,6 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		sites.GET("/:id/vlans", vlanHandler.ListBySite)
 		sites.GET("/:id/locations", locationHandler.ListBySite)
 		sites.GET("/:id/devices", deviceHandler.ListBySite)
-		sites.GET("/:id/switches", switchHandler.ListBySite)
-		sites.GET("/:id/patch-panels", patchPanelHandler.ListBySite)
 		sites.GET("/:id/device-groups", deviceGroupHandler.ListBySite)
 		sites.GET("/:id/firewall-rules", firewallRuleHandler.ListBySite)
 	}
@@ -136,16 +132,6 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		suppliersGroup.DELETE("/:id", write, supplierHandler.Delete)
 	}
 
-	patchPanels := api.Group("/patch-panels")
-	{
-		patchPanels.GET("", patchPanelHandler.List)
-		patchPanels.POST("", write, patchPanelHandler.Create)
-		patchPanels.GET("/:id", patchPanelHandler.GetByID)
-		patchPanels.PUT("/:id", write, patchPanelHandler.Update)
-		patchPanels.DELETE("/:id", write, patchPanelHandler.Delete)
-		patchPanels.GET("/:id/ports", patchPanelPortHandler.ListByPatchPanel)
-	}
-
 	patchPanelPorts := api.Group("/patch-panel-ports")
 	{
 		patchPanelPorts.GET("", patchPanelPortHandler.List)
@@ -153,17 +139,6 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		patchPanelPorts.GET("/:id", patchPanelPortHandler.GetByID)
 		patchPanelPorts.PUT("/:id", write, patchPanelPortHandler.Update)
 		patchPanelPorts.DELETE("/:id", write, patchPanelPortHandler.Delete)
-	}
-
-	switches := api.Group("/switches")
-	{
-		switches.GET("", switchHandler.List)
-		switches.GET("/next-name", switchHandler.NextName)
-		switches.POST("", write, switchHandler.Create)
-		switches.GET("/:id", switchHandler.GetByID)
-		switches.PUT("/:id", write, switchHandler.Update)
-		switches.DELETE("/:id", write, switchHandler.Delete)
-		switches.GET("/:id/ports", switchPortHandler.ListBySwitch)
 	}
 
 	switchPorts := api.Group("/switch-ports")
@@ -207,6 +182,8 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		devices.GET("/:id/ips", deviceIPHandler.ListByDevice)
 		devices.GET("/:id/connections", deviceConnectionHandler.ListByDevice)
 		devices.GET("/:id/label", deviceHandler.Label)
+		devices.GET("/:id/switch-ports", switchPortHandler.ListByDevice)
+		devices.GET("/:id/patch-panel-ports", patchPanelPortHandler.ListByDevice)
 	}
 
 	deviceInterfaces := api.Group("/device-interfaces")
