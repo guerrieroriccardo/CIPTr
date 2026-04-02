@@ -288,6 +288,21 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return exportSuccessMsg{path: path}
 				}
 			}
+		default:
+			// Custom actions defined per resource.
+			for _, action := range rt.def.CustomActions {
+				if msg.String() == action.Key {
+					if item := rt.selectedItem(); item != nil {
+						handler := action.Handler
+						client := rt.client
+						return rt, func() tea.Msg {
+							def, id, defaults := handler(item)
+							def.Defaults = defaults
+							return PushScreenMsg{Screen: NewResourceForm(def, client, id, nil)}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -351,6 +366,9 @@ func (rt ResourceTable) View() string {
 	}
 	if rt.def.ExportLabel != nil {
 		helpText = "l label • " + helpText
+	}
+	for _, action := range rt.def.CustomActions {
+		helpText = action.Key + " " + action.Label + " • " + helpText
 	}
 	help := HelpStyle.Render(helpText)
 

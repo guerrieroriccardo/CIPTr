@@ -19,13 +19,13 @@ func init() {
 			{Title: "ID", Width: 5},
 			{Title: "Switch", Width: 16},
 			{Title: "#", Width: 4},
-			{Title: "Label", Width: 12},
+			{Title: "Label", Width: 10},
 			{Title: "Speed", Width: 8},
 			{Title: "Up", Width: 4},
 			{Title: "Dis", Width: 4},
 			{Title: "Untagged", Width: 14},
-			{Title: "Tagged", Width: 20},
-			{Title: "MAC Restrict", Width: 18},
+			{Title: "Tagged", Width: 16},
+			{Title: "Connected To", Width: 22},
 		},
 		ToRow: func(raw any) table.Row {
 			sp := raw.(*models.SwitchPort)
@@ -33,6 +33,13 @@ func init() {
 			var taggedNames []string
 			for _, vid := range sp.TaggedVlanIDs {
 				taggedNames = append(taggedNames, VLANName(&vid))
+			}
+			// Build connected-to display string.
+			connected := ""
+			if sp.ConnectedDevice != nil && sp.ConnectedInterface != nil {
+				connected = *sp.ConnectedDevice + "/" + *sp.ConnectedInterface
+			} else if sp.ConnectedPatchPanel != nil && sp.ConnectedPatchPanelPort != nil {
+				connected = fmt.Sprintf("%s #%d", *sp.ConnectedPatchPanel, *sp.ConnectedPatchPanelPort)
 			}
 			return table.Row{
 				fmt.Sprintf("%d", sp.ID),
@@ -44,7 +51,7 @@ func init() {
 				derefBool(sp.IsDisabled),
 				VLANName(sp.UntaggedVlanID),
 				strings.Join(taggedNames, ", "),
-				derefStr(sp.MacRestriction),
+				connected,
 			}
 		},
 		GetID: func(raw any) string {
@@ -123,6 +130,19 @@ func init() {
 				return filtered
 			}
 			return items
+		},
+
+		CustomActions: []CustomAction{
+			{
+				Key:   "c",
+				Label: "connect",
+				Handler: func(raw any) (def *Def, id string, defaults map[string]string) {
+					sp := raw.(*models.SwitchPort)
+					return Registry["device_connections"], "", map[string]string{
+						"switch_port_id": fmt.Sprintf("%d", sp.ID),
+					}
+				},
+			},
 		},
 
 		List: func(client *apiclient.Client) ([]any, error) {

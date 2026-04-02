@@ -44,35 +44,47 @@ func init() {
 		},
 
 		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
-			if Resolve == nil || values["interface_id"] == "" {
+			if Resolve == nil {
 				return items
 			}
-			ifaceID := mustInt64(values["interface_id"])
+
+			// Determine site from whichever field is already filled.
+			var siteID int64
+			if v := values["interface_id"]; v != "" {
+				ifaceID := mustInt64(v)
+				if s, ok := Resolve.InterfaceSite[ifaceID]; ok {
+					siteID = s
+				}
+			} else if v := values["switch_port_id"]; v != "" && siteID == 0 {
+				spID := mustInt64(v)
+				if devID, ok := Resolve.SwitchPortDevice[spID]; ok {
+					siteID = Resolve.DeviceSite[devID]
+				}
+			} else if v := values["patch_panel_port_id"]; v != "" && siteID == 0 {
+				ppID := mustInt64(v)
+				if devID, ok := Resolve.PatchPanelPortDevice[ppID]; ok {
+					siteID = Resolve.DeviceSite[devID]
+				}
+			}
+
+			if siteID == 0 {
+				return items
+			}
 
 			switch key {
 			case "interface_id":
-				// Show only interfaces of the same device.
-				deviceID, ok := Resolve.InterfaceDevice[ifaceID]
-				if !ok {
-					return items
-				}
 				filtered := make(map[int64]string)
 				for id, name := range items {
-					if Resolve.InterfaceDevice[id] == deviceID {
+					if s, ok := Resolve.InterfaceSite[id]; ok && s == siteID {
 						filtered[id] = name
 					}
 				}
 				return filtered
 
 			case "switch_port_id":
-				// Show only switch ports from devices at the same site.
-				siteID, ok := Resolve.InterfaceSite[ifaceID]
-				if !ok {
-					return items
-				}
 				filtered := make(map[int64]string)
 				for id, name := range items {
-					if devID, ok2 := Resolve.SwitchPortDevice[id]; ok2 {
+					if devID, ok := Resolve.SwitchPortDevice[id]; ok {
 						if Resolve.DeviceSite[devID] == siteID {
 							filtered[id] = name
 						}
@@ -81,14 +93,9 @@ func init() {
 				return filtered
 
 			case "patch_panel_port_id":
-				// Show only patch panel ports from devices at the same site.
-				siteID, ok := Resolve.InterfaceSite[ifaceID]
-				if !ok {
-					return items
-				}
 				filtered := make(map[int64]string)
 				for id, name := range items {
-					if devID, ok2 := Resolve.PatchPanelPortDevice[id]; ok2 {
+					if devID, ok := Resolve.PatchPanelPortDevice[id]; ok {
 						if Resolve.DeviceSite[devID] == siteID {
 							filtered[id] = name
 						}

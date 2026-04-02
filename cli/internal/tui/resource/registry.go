@@ -65,11 +65,23 @@ type Def struct {
 	// ExportLabel downloads a label PDF for the selected item. Returns saved file path.
 	ExportLabel func(client *apiclient.Client, id string) (string, error)
 
+	// CustomActions maps a keybind (e.g. "c") to an action on the selected item.
+	// Each action has a Label for the help bar and a Handler that receives the
+	// selected item and returns the Def + pre-filled defaults for a form to push.
+	CustomActions []CustomAction
+
 	// API operations — filled in at registration time
 	List   func(client *apiclient.Client) ([]any, error)
 	Create func(client *apiclient.Client, data map[string]string) (any, error)
 	Update func(client *apiclient.Client, id string, data map[string]string) (any, error)
 	Delete func(client *apiclient.Client, id string) error
+}
+
+// CustomAction defines a keybind-triggered action on a table item.
+type CustomAction struct {
+	Key     string // keybind (e.g. "c")
+	Label   string // help text (e.g. "connect")
+	Handler func(raw any) (def *Def, id string, defaults map[string]string) // returns form config
 }
 
 // Registry maps menu keys to resource definitions.
