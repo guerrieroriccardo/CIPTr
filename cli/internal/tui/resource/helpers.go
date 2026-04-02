@@ -3,6 +3,7 @@ package resource
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // strPtr returns a pointer to s, or nil if s is empty.
@@ -80,6 +81,38 @@ func derefInt(p *int) string {
 		return ""
 	}
 	return fmt.Sprintf("%d", *p)
+}
+
+// parseInt64Slice parses a comma-separated string of int64 values.
+func parseInt64Slice(s string) []int64 {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	var result []int64
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		v, err := strconv.ParseInt(p, 10, 64)
+		if err == nil {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// formatInt64Slice formats a slice of int64 as comma-separated string.
+func formatInt64Slice(ids []int64) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = fmt.Sprintf("%d", id)
+	}
+	return strings.Join(parts, ",")
 }
 
 // derefBool formats a *bool, or "" if nil.

@@ -71,11 +71,15 @@ type exportSwitch struct {
 }
 
 type exportSwitchPort struct {
-	PortNumber int
-	PortLabel  string
-	Speed      string
-	IsUplink   bool
-	Notes      string
+	ID            int64
+	PortNumber    int
+	PortLabel     string
+	Speed         string
+	IsUplink      bool
+	IsDisabled    bool
+	UntaggedVlan  string
+	TaggedVlans   string
+	Notes         string
 }
 
 type exportPatchPanel struct {
@@ -482,13 +486,14 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 			ports := switchPortsBySwitch[sw.ID]
 			if len(ports) > 0 {
-				pdfTable(pdf, []string{"Port #", "Label", "Speed", "Uplink", "Notes"},
-					[]float64{25, 40, 35, 25, 65}, func() [][]string {
+				pdfTable(pdf, []string{"#", "Label", "Speed", "Up", "Dis", "Untagged", "Tagged"},
+					[]float64{15, 25, 25, 15, 15, 35, 60}, func() [][]string {
 						rows := make([][]string, len(ports))
 						for i, p := range ports {
 							rows[i] = []string{
 								fmt.Sprintf("%d", p.PortNumber), p.PortLabel, p.Speed,
-								boolStr(p.IsUplink), p.Notes,
+								boolStr(p.IsUplink), boolStr(p.IsDisabled),
+								p.UntaggedVlan, p.TaggedVlans,
 							}
 						}
 						return rows
@@ -1095,23 +1100,63 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 	if len(switchIDs) > 0 {
 		ph, args := inPlaceholders(switchIDs)
 		prows, err := db.QueryContext(ctx,
-			`SELECT device_id, port_number, COALESCE(port_label, ''), COALESCE(speed, ''),
-			        COALESCE(is_uplink, false), COALESCE(notes, '')
-			 FROM switch_ports WHERE device_id IN `+ph+` ORDER BY port_number`, args...)
+			`SELECT sp.id, sp.device_id, sp.port_number, COALESCE(sp.port_label, ''), COALESCE(sp.speed, ''),
+			        COALESCE(sp.is_uplink, false), COALESCE(sp.is_disabled, false),
+			        COALESCE(uv.name, ''), COALESCE(sp.notes, '')
+			 FROM switch_ports sp
+			 LEFT JOIN vlans uv ON uv.id = sp.untagged_vlan_id
+			 WHERE sp.device_id IN `+ph+` ORDER BY sp.port_number`, args...)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer prows.Close()
+		var portIDs []int64
+		portIdx := map[int64]struct{ devIdx, portIdx int }{}
 		for prows.Next() {
 			var deviceID int64
 			var p exportSwitchPort
-			if err := prows.Scan(&deviceID, &p.PortNumber, &p.PortLabel, &p.Speed, &p.IsUplink, &p.Notes); err != nil {
+			if err := prows.Scan(&p.ID, &deviceID, &p.PortNumber, &p.PortLabel, &p.Speed, &p.IsUplink, &p.IsDisabled, &p.UntaggedVlan, &p.Notes); err != nil {
 				return nil, nil, err
 			}
 			portsBySwitch[deviceID] = append(portsBySwitch[deviceID], p)
+			portIDs = append(portIDs, p.ID)
+			portIdx[p.ID] = struct{ devIdx, portIdx int }{0, len(portsBySwitch[deviceID]) - 1}
 		}
 		if err := prows.Err(); err != nil {
 			return nil, nil, err
+		}
+
+		// Load tagged VLANs for all ports.
+		if len(portIDs) > 0 {
+			tph, targs := inPlaceholders(portIDs)
+			trows, err := db.QueryContext(ctx,
+				`SELECT sptv.switch_port_id, v.name
+				 FROM switch_port_tagged_vlans sptv
+				 JOIN vlans v ON v.id = sptv.vlan_id
+				 WHERE sptv.switch_port_id IN `+tph+`
+				 ORDER BY sptv.switch_port_id, v.vlan_id`, targs...)
+			if err != nil {
+				return nil, nil, err
+			}
+			defer trows.Close()
+			taggedByPort := map[int64][]string{}
+			for trows.Next() {
+				var portID int64
+				var vlanName string
+				if err := trows.Scan(&portID, &vlanName); err != nil {
+					return nil, nil, err
+				}
+				taggedByPort[portID] = append(taggedByPort[portID], vlanName)
+			}
+			// Attach to ports.
+			for devID, ports := range portsBySwitch {
+				for i := range ports {
+					if names, ok := taggedByPort[ports[i].ID]; ok {
+						ports[i].TaggedVlans = strings.Join(names, ", ")
+					}
+				}
+				portsBySwitch[devID] = ports
+			}
 		}
 	}
 

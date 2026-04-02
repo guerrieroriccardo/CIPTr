@@ -108,8 +108,18 @@ func NewResourceForm(def *resource.Def, client *apiclient.Client, id string, ite
 			if json.Unmarshal(v, &s) == nil {
 				inputs[i].SetValue(s)
 			} else {
-				// Numeric or boolean — use raw JSON text (e.g. "42", "true").
-				inputs[i].SetValue(strings.Trim(string(v), `"`))
+				// Check for JSON array (e.g. [1,2,3]) — format as comma-separated.
+				var nums []json.Number
+				if json.Unmarshal(v, &nums) == nil {
+					parts := make([]string, len(nums))
+					for j, n := range nums {
+						parts[j] = n.String()
+					}
+					inputs[i].SetValue(strings.Join(parts, ","))
+				} else {
+					// Numeric or boolean — use raw JSON text (e.g. "42", "true").
+					inputs[i].SetValue(strings.Trim(string(v), `"`))
+				}
 			}
 		}
 	}

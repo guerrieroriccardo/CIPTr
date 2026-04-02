@@ -2,6 +2,7 @@ package resource
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/guerrieroriccardo/CIPTr/backend/models"
@@ -15,16 +16,24 @@ func init() {
 		APIPath: "/switch-ports",
 
 		Columns: []table.Column{
-			{Title: "ID", Width: 6},
-			{Title: "Switch", Width: 18},
-			{Title: "Port #", Width: 7},
-			{Title: "Label", Width: 15},
-			{Title: "Speed", Width: 10},
-			{Title: "Uplink", Width: 7},
+			{Title: "ID", Width: 5},
+			{Title: "Switch", Width: 16},
+			{Title: "#", Width: 4},
+			{Title: "Label", Width: 12},
+			{Title: "Speed", Width: 8},
+			{Title: "Up", Width: 4},
+			{Title: "Dis", Width: 4},
+			{Title: "Untagged", Width: 14},
+			{Title: "Tagged", Width: 20},
 			{Title: "MAC Restrict", Width: 18},
 		},
 		ToRow: func(raw any) table.Row {
 			sp := raw.(*models.SwitchPort)
+			// Resolve tagged VLAN names.
+			var taggedNames []string
+			for _, vid := range sp.TaggedVlanIDs {
+				taggedNames = append(taggedNames, VLANName(&vid))
+			}
 			return table.Row{
 				fmt.Sprintf("%d", sp.ID),
 				DeviceName(sp.DeviceID),
@@ -32,6 +41,9 @@ func init() {
 				derefStr(sp.PortLabel),
 				derefStr(sp.Speed),
 				derefBool(sp.IsUplink),
+				derefBool(sp.IsDisabled),
+				VLANName(sp.UntaggedVlanID),
+				strings.Join(taggedNames, ", "),
 				derefStr(sp.MacRestriction),
 			}
 		},
@@ -45,6 +57,9 @@ func init() {
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "speed", Label: "Speed"},
 			{Key: "is_uplink", Label: "Uplink", PickerOptions: []string{"true", "false"}},
+			{Key: "is_disabled", Label: "Disabled", PickerOptions: []string{"true", "false"}},
+			{Key: "untagged_vlan_id", Label: "Untagged VLAN", PickerKey: "vlans"},
+			{Key: "tagged_vlan_ids", Label: "Tagged VLANs (comma-sep IDs)"},
 			{Key: "mac_restriction", Label: "MAC Restriction", PickerFunc: func(values map[string]string) []PickerEntry {
 				if Resolve == nil {
 					return nil
@@ -79,6 +94,28 @@ func init() {
 			{Key: "notes", Label: "Notes"},
 		},
 
+		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
+			if Resolve == nil || values["device_id"] == "" {
+				return items
+			}
+			deviceID := mustInt64(values["device_id"])
+			siteID := Resolve.DeviceSite[deviceID]
+			if siteID == 0 {
+				return items
+			}
+			switch key {
+			case "untagged_vlan_id":
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.VLANSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+			}
+			return items
+		},
+
 		List: func(client *apiclient.Client) ([]any, error) {
 			var items []models.SwitchPort
 			if err := client.Get("/switch-ports", &items); err != nil {
@@ -97,7 +134,10 @@ func init() {
 				PortLabel:      strPtr(data["port_label"]),
 				Speed:          strPtr(data["speed"]),
 				IsUplink:       boolPtr(data["is_uplink"]),
+				IsDisabled:     boolPtr(data["is_disabled"]),
 				MacRestriction: strPtr(data["mac_restriction"]),
+				UntaggedVlanID: int64Ptr(data["untagged_vlan_id"]),
+				TaggedVlanIDs:  parseInt64Slice(data["tagged_vlan_ids"]),
 				Notes:          strPtr(data["notes"]),
 			}
 			var created models.SwitchPort
@@ -111,7 +151,10 @@ func init() {
 				PortLabel:      strPtr(data["port_label"]),
 				Speed:          strPtr(data["speed"]),
 				IsUplink:       boolPtr(data["is_uplink"]),
+				IsDisabled:     boolPtr(data["is_disabled"]),
 				MacRestriction: strPtr(data["mac_restriction"]),
+				UntaggedVlanID: int64Ptr(data["untagged_vlan_id"]),
+				TaggedVlanIDs:  parseInt64Slice(data["tagged_vlan_ids"]),
 				Notes:          strPtr(data["notes"]),
 			}
 			var updated models.SwitchPort

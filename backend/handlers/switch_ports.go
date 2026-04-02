@@ -23,13 +23,63 @@ func NewSwitchPortHandler(db *sql.DB) *SwitchPortHandler {
 }
 
 // switchPortSelectSQL is the base SELECT used by every read operation.
-const switchPortSelectSQL = `SELECT id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes FROM switch_ports`
+const switchPortSelectSQL = `SELECT id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, untagged_vlan_id, is_disabled, notes FROM switch_ports`
 
-// scanSwitchPort reads one row into a SwitchPort struct.
+// scanSwitchPort reads one row into a SwitchPort struct (without tagged VLANs).
 func scanSwitchPort(row interface{ Scan(...any) error }) (models.SwitchPort, error) {
 	var sp models.SwitchPort
-	err := row.Scan(&sp.ID, &sp.DeviceID, &sp.PortNumber, &sp.PortLabel, &sp.Speed, &sp.IsUplink, &sp.MacRestriction, &sp.Notes)
+	err := row.Scan(&sp.ID, &sp.DeviceID, &sp.PortNumber, &sp.PortLabel, &sp.Speed, &sp.IsUplink, &sp.MacRestriction, &sp.UntaggedVlanID, &sp.IsDisabled, &sp.Notes)
 	return sp, err
+}
+
+// loadTaggedVlans fetches tagged VLAN IDs for a set of switch port IDs and attaches them.
+func (h *SwitchPortHandler) loadTaggedVlans(c *gin.Context, ports []models.SwitchPort) error {
+	if len(ports) == 0 {
+		return nil
+	}
+	ids := make([]int64, len(ports))
+	idx := map[int64]int{} // port ID → index in slice
+	for i, p := range ports {
+		ids[i] = p.ID
+		idx[p.ID] = i
+		ports[i].TaggedVlanIDs = []int64{} // ensure non-nil
+	}
+
+	ph, args := inPlaceholders(ids)
+	rows, err := h.db.QueryContext(c.Request.Context(),
+		`SELECT switch_port_id, vlan_id FROM switch_port_tagged_vlans WHERE switch_port_id IN `+ph+` ORDER BY vlan_id`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var portID, vlanID int64
+		if err := rows.Scan(&portID, &vlanID); err != nil {
+			return err
+		}
+		if i, ok := idx[portID]; ok {
+			ports[i].TaggedVlanIDs = append(ports[i].TaggedVlanIDs, vlanID)
+		}
+	}
+	return rows.Err()
+}
+
+// syncTaggedVlans replaces the tagged VLAN set for a switch port.
+func (h *SwitchPortHandler) syncTaggedVlans(c *gin.Context, portID int64, vlanIDs []int64) error {
+	reqCtx := c.Request.Context()
+	_, err := h.db.ExecContext(reqCtx, `DELETE FROM switch_port_tagged_vlans WHERE switch_port_id = $1`, portID)
+	if err != nil {
+		return err
+	}
+	for _, vid := range vlanIDs {
+		_, err := h.db.ExecContext(reqCtx,
+			`INSERT INTO switch_port_tagged_vlans (switch_port_id, vlan_id) VALUES ($1, $2)`, portID, vid)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // List handles GET /switch-ports
@@ -61,6 +111,11 @@ func (h *SwitchPortHandler) List(c *gin.Context) {
 		ports = append(ports, sp)
 	}
 
+	if err := h.loadTaggedVlans(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
 	ok(c, http.StatusOK, ports)
 }
 
@@ -90,6 +145,11 @@ func (h *SwitchPortHandler) ListByDevice(c *gin.Context) {
 		ports = append(ports, sp)
 	}
 
+	if err := h.loadTaggedVlans(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
 	ok(c, http.StatusOK, ports)
 }
 
@@ -113,7 +173,13 @@ func (h *SwitchPortHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	ok(c, http.StatusOK, sp)
+	ports := []models.SwitchPort{sp}
+	if err := h.loadTaggedVlans(c, ports); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	ok(c, http.StatusOK, ports[0])
 }
 
 // Create handles POST /switch-ports
@@ -125,14 +191,24 @@ func (h *SwitchPortHandler) Create(c *gin.Context) {
 	}
 
 	sp, err := scanSwitchPort(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO switch_ports (device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes`,
-		input.DeviceID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.Notes,
+		`INSERT INTO switch_ports (device_id, port_number, port_label, speed, is_uplink, mac_restriction, untagged_vlan_id, is_disabled, notes)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, untagged_vlan_id, is_disabled, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.UntaggedVlanID, input.IsDisabled, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	if len(input.TaggedVlanIDs) > 0 {
+		if err := h.syncTaggedVlans(c, sp.ID, input.TaggedVlanIDs); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
+		sp.TaggedVlanIDs = input.TaggedVlanIDs
+	} else {
+		sp.TaggedVlanIDs = []int64{}
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "create", "switch_ports", sp.ID, fmt.Sprintf("Created switch port #%d", sp.PortNumber))
@@ -154,10 +230,10 @@ func (h *SwitchPortHandler) Update(c *gin.Context) {
 	}
 
 	sp, err := scanSwitchPort(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE switch_ports SET device_id = $1, port_number = $2, port_label = $3, speed = $4, is_uplink = $5, mac_restriction = $6, notes = $7
-		 WHERE id = $8
-		 RETURNING id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes`,
-		input.DeviceID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.Notes, id,
+		`UPDATE switch_ports SET device_id = $1, port_number = $2, port_label = $3, speed = $4, is_uplink = $5, mac_restriction = $6, untagged_vlan_id = $7, is_disabled = $8, notes = $9
+		 WHERE id = $10
+		 RETURNING id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, untagged_vlan_id, is_disabled, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.UntaggedVlanID, input.IsDisabled, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("switch port not found"))
@@ -166,6 +242,15 @@ func (h *SwitchPortHandler) Update(c *gin.Context) {
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
+	}
+
+	if err := h.syncTaggedVlans(c, sp.ID, input.TaggedVlanIDs); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	sp.TaggedVlanIDs = input.TaggedVlanIDs
+	if sp.TaggedVlanIDs == nil {
+		sp.TaggedVlanIDs = []int64{}
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "update", "switch_ports", id, fmt.Sprintf("Updated switch port #%d", sp.PortNumber))
