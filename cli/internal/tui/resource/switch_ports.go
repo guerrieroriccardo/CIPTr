@@ -104,10 +104,19 @@ func init() {
 				return items
 			}
 			switch key {
-			case "untagged_vlan_id", "tagged_vlan_ids":
+			case "untagged_vlan_id":
 				filtered := make(map[int64]string)
 				for id, name := range items {
 					if Resolve.VLANSite[id] == siteID {
+						filtered[id] = name
+					}
+				}
+				return filtered
+			case "tagged_vlan_ids":
+				untaggedID := mustInt64(values["untagged_vlan_id"])
+				filtered := make(map[int64]string)
+				for id, name := range items {
+					if Resolve.VLANSite[id] == siteID && id != untaggedID {
 						filtered[id] = name
 					}
 				}
