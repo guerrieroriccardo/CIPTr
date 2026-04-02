@@ -23,24 +23,24 @@ func NewSwitchPortHandler(db *sql.DB) *SwitchPortHandler {
 }
 
 // switchPortSelectSQL is the base SELECT used by every read operation.
-const switchPortSelectSQL = `SELECT id, switch_id, port_number, port_label, speed, is_uplink, mac_restriction, notes FROM switch_ports`
+const switchPortSelectSQL = `SELECT id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes FROM switch_ports`
 
 // scanSwitchPort reads one row into a SwitchPort struct.
 func scanSwitchPort(row interface{ Scan(...any) error }) (models.SwitchPort, error) {
 	var sp models.SwitchPort
-	err := row.Scan(&sp.ID, &sp.SwitchID, &sp.PortNumber, &sp.PortLabel, &sp.Speed, &sp.IsUplink, &sp.MacRestriction, &sp.Notes)
+	err := row.Scan(&sp.ID, &sp.DeviceID, &sp.PortNumber, &sp.PortLabel, &sp.Speed, &sp.IsUplink, &sp.MacRestriction, &sp.Notes)
 	return sp, err
 }
 
 // List handles GET /switch-ports
-// Supports optional query param: ?switch_id=
+// Supports optional query param: ?device_id=
 func (h *SwitchPortHandler) List(c *gin.Context) {
 	query := switchPortSelectSQL
 	args := []any{}
 
-	if switchID := c.Query("switch_id"); switchID != "" {
-		query += ` WHERE switch_id = $1`
-		args = append(args, switchID)
+	if deviceID := c.Query("device_id"); deviceID != "" {
+		query += ` WHERE device_id = $1`
+		args = append(args, deviceID)
 	}
 	query += ` ORDER BY port_number`
 
@@ -64,16 +64,16 @@ func (h *SwitchPortHandler) List(c *gin.Context) {
 	ok(c, http.StatusOK, ports)
 }
 
-// ListBySwitch handles GET /switches/:id/ports
-func (h *SwitchPortHandler) ListBySwitch(c *gin.Context) {
-	switchID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+// ListByDevice handles GET /devices/:id/switch-ports
+func (h *SwitchPortHandler) ListByDevice(c *gin.Context) {
+	deviceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		fail(c, http.StatusBadRequest, errors.New("invalid switch id"))
+		fail(c, http.StatusBadRequest, errors.New("invalid device id"))
 		return
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		switchPortSelectSQL+` WHERE switch_id = $1 ORDER BY port_number`, switchID)
+		switchPortSelectSQL+` WHERE device_id = $1 ORDER BY port_number`, deviceID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -125,10 +125,10 @@ func (h *SwitchPortHandler) Create(c *gin.Context) {
 	}
 
 	sp, err := scanSwitchPort(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO switch_ports (switch_id, port_number, port_label, speed, is_uplink, mac_restriction, notes)
+		`INSERT INTO switch_ports (device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, switch_id, port_number, port_label, speed, is_uplink, mac_restriction, notes`,
-		input.SwitchID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.Notes,
+		 RETURNING id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -154,10 +154,10 @@ func (h *SwitchPortHandler) Update(c *gin.Context) {
 	}
 
 	sp, err := scanSwitchPort(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE switch_ports SET switch_id = $1, port_number = $2, port_label = $3, speed = $4, is_uplink = $5, mac_restriction = $6, notes = $7
+		`UPDATE switch_ports SET device_id = $1, port_number = $2, port_label = $3, speed = $4, is_uplink = $5, mac_restriction = $6, notes = $7
 		 WHERE id = $8
-		 RETURNING id, switch_id, port_number, port_label, speed, is_uplink, mac_restriction, notes`,
-		input.SwitchID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.Notes, id,
+		 RETURNING id, device_id, port_number, port_label, speed, is_uplink, mac_restriction, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.Speed, input.IsUplink, input.MacRestriction, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("switch port not found"))

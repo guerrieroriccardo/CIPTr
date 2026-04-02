@@ -23,24 +23,24 @@ func NewPatchPanelPortHandler(db *sql.DB) *PatchPanelPortHandler {
 }
 
 // patchPanelPortSelectSQL is the base SELECT used by every read operation.
-const patchPanelPortSelectSQL = `SELECT id, patch_panel_id, port_number, port_label, linked_port_id, notes FROM patch_panel_ports`
+const patchPanelPortSelectSQL = `SELECT id, device_id, port_number, port_label, linked_port_id, notes FROM patch_panel_ports`
 
 // scanPatchPanelPort reads one row into a PatchPanelPort struct.
 func scanPatchPanelPort(row interface{ Scan(...any) error }) (models.PatchPanelPort, error) {
 	var ppp models.PatchPanelPort
-	err := row.Scan(&ppp.ID, &ppp.PatchPanelID, &ppp.PortNumber, &ppp.PortLabel, &ppp.LinkedPortID, &ppp.Notes)
+	err := row.Scan(&ppp.ID, &ppp.DeviceID, &ppp.PortNumber, &ppp.PortLabel, &ppp.LinkedPortID, &ppp.Notes)
 	return ppp, err
 }
 
 // List handles GET /patch-panel-ports
-// Supports optional query param: ?patch_panel_id=
+// Supports optional query param: ?device_id=
 func (h *PatchPanelPortHandler) List(c *gin.Context) {
 	query := patchPanelPortSelectSQL
 	args := []any{}
 
-	if ppID := c.Query("patch_panel_id"); ppID != "" {
-		query += ` WHERE patch_panel_id = $1`
-		args = append(args, ppID)
+	if deviceID := c.Query("device_id"); deviceID != "" {
+		query += ` WHERE device_id = $1`
+		args = append(args, deviceID)
 	}
 	query += ` ORDER BY port_number`
 
@@ -64,16 +64,16 @@ func (h *PatchPanelPortHandler) List(c *gin.Context) {
 	ok(c, http.StatusOK, ports)
 }
 
-// ListByPatchPanel handles GET /patch-panels/:id/ports
-func (h *PatchPanelPortHandler) ListByPatchPanel(c *gin.Context) {
-	ppID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+// ListByDevice handles GET /devices/:id/patch-panel-ports
+func (h *PatchPanelPortHandler) ListByDevice(c *gin.Context) {
+	deviceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		fail(c, http.StatusBadRequest, errors.New("invalid patch panel id"))
+		fail(c, http.StatusBadRequest, errors.New("invalid device id"))
 		return
 	}
 
 	rows, err := h.db.QueryContext(c.Request.Context(),
-		patchPanelPortSelectSQL+` WHERE patch_panel_id = $1 ORDER BY port_number`, ppID)
+		patchPanelPortSelectSQL+` WHERE device_id = $1 ORDER BY port_number`, deviceID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
 		return
@@ -125,10 +125,10 @@ func (h *PatchPanelPortHandler) Create(c *gin.Context) {
 	}
 
 	ppp, err := scanPatchPanelPort(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO patch_panel_ports (patch_panel_id, port_number, port_label, linked_port_id, notes)
+		`INSERT INTO patch_panel_ports (device_id, port_number, port_label, linked_port_id, notes)
 		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, patch_panel_id, port_number, port_label, linked_port_id, notes`,
-		input.PatchPanelID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes,
+		 RETURNING id, device_id, port_number, port_label, linked_port_id, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -167,10 +167,10 @@ func (h *PatchPanelPortHandler) Update(c *gin.Context) {
 	).Scan(&oldLinkedPortID)
 
 	ppp, err := scanPatchPanelPort(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE patch_panel_ports SET patch_panel_id = $1, port_number = $2, port_label = $3, linked_port_id = $4, notes = $5
+		`UPDATE patch_panel_ports SET device_id = $1, port_number = $2, port_label = $3, linked_port_id = $4, notes = $5
 		 WHERE id = $6
-		 RETURNING id, patch_panel_id, port_number, port_label, linked_port_id, notes`,
-		input.PatchPanelID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes, id,
+		 RETURNING id, device_id, port_number, port_label, linked_port_id, notes`,
+		input.DeviceID, input.PortNumber, input.PortLabel, input.LinkedPortID, input.Notes, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("patch panel port not found"))

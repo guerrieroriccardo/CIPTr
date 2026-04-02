@@ -23,11 +23,11 @@ func NewCategoryHandler(db *sql.DB) *CategoryHandler {
 	return &CategoryHandler{db: db}
 }
 
-const categorySelectSQL = `SELECT id, name, short_code, track_vm_id, created_at FROM categories`
+const categorySelectSQL = `SELECT id, name, short_code, track_vm_id, port_type, created_at FROM categories`
 
 func scanCategory(row interface{ Scan(...any) error }) (models.Category, error) {
 	var cat models.Category
-	err := row.Scan(&cat.ID, &cat.Name, &cat.ShortCode, &cat.TrackVmID, &cat.CreatedAt)
+	err := row.Scan(&cat.ID, &cat.Name, &cat.ShortCode, &cat.TrackVmID, &cat.PortType, &cat.CreatedAt)
 	return cat, err
 }
 
@@ -93,9 +93,9 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	}
 
 	cat, err := scanCategory(h.db.QueryRowContext(c.Request.Context(),
-		`INSERT INTO categories (name, short_code, track_vm_id) VALUES ($1, $2, $3)
-		 RETURNING id, name, short_code, track_vm_id, created_at`,
-		input.Name, input.ShortCode, trackVmID,
+		`INSERT INTO categories (name, short_code, track_vm_id, port_type) VALUES ($1, $2, $3, $4)
+		 RETURNING id, name, short_code, track_vm_id, port_type, created_at`,
+		input.Name, input.ShortCode, trackVmID, input.PortType,
 	))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err)
@@ -128,9 +128,9 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	}
 
 	cat, err := scanCategory(h.db.QueryRowContext(c.Request.Context(),
-		`UPDATE categories SET name = $1, short_code = $2, track_vm_id = $3 WHERE id = $4
-		 RETURNING id, name, short_code, track_vm_id, created_at`,
-		input.Name, input.ShortCode, trackVmID, id,
+		`UPDATE categories SET name = $1, short_code = $2, track_vm_id = $3, port_type = $4 WHERE id = $5
+		 RETURNING id, name, short_code, track_vm_id, port_type, created_at`,
+		input.Name, input.ShortCode, trackVmID, input.PortType, id,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(c, http.StatusNotFound, errors.New("category not found"))
