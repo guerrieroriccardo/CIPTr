@@ -9,7 +9,7 @@ import (
 
 // MinCLIVersion is the minimum CLI version accepted by this backend.
 // Bump this when making breaking API changes.
-const MinCLIVersion = "0.3.2"
+const MinCLIVersion = "0.16.0"
 
 // CLIVersionRequired rejects requests from CLI versions older than MinCLIVersion.
 // Requests without the X-CLI-Version header (e.g. browser, curl) are allowed through.

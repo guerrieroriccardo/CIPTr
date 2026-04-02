@@ -31,3 +31,7 @@ logo.png
 
 # Generated Labels
 label-*
+
+*.tape
+
+plans
