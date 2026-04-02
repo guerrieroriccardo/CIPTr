@@ -73,6 +73,7 @@ func init() {
 			{Key: "has_antivirus", Label: "Has Antivirus", PickerOptions: []string{"true", "false"}},
 			{Key: "supplier_id", Label: "Supplier", PickerKey: "suppliers"},
 			{Key: "installation_date", Label: "Installation Date (YYYY-MM-DD)"},
+			{Key: "total_ports", Label: "Total Ports"},
 			{Key: "is_reserved", Label: "Is Reserved", PickerOptions: []string{"true", "false"}},
 			{Key: "notes", Label: "Notes"},
 		},
@@ -215,6 +216,7 @@ func init() {
 				InstallationDate: strPtr(data["installation_date"]),
 				IsReserved:       boolPtr(data["is_reserved"]),
 				VmID:             int64Ptr(data["vm_id"]),
+				TotalPorts:       intPtr(data["total_ports"]),
 				Notes:            strPtr(data["notes"]),
 			}
 			var created models.Device
@@ -240,6 +242,7 @@ func init() {
 				InstallationDate: strPtr(data["installation_date"]),
 				IsReserved:       boolPtr(data["is_reserved"]),
 				VmID:             int64Ptr(data["vm_id"]),
+				TotalPorts:       intPtr(data["total_ports"]),
 				Notes:            strPtr(data["notes"]),
 			}
 			var updated models.Device

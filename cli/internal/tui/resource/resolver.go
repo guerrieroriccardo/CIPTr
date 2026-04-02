@@ -21,8 +21,6 @@ type Resolver struct {
 	Suppliers      map[int64]string
 	Devices        map[int64]string
 	Interfaces     map[int64]string
-	Switches       map[int64]string
-	PatchPanels    map[int64]string
 	VLANs          map[int64]string
 	AddressBlocks  map[int64]string
 	DeviceModels   map[int64]string
@@ -41,10 +39,8 @@ type Resolver struct {
 	AddressBlockSite   map[int64]int64  // address block ID → site ID
 	SiteClient         map[int64]int64  // site ID → client ID
 	ClientShortCode    map[int64]string // client ID → short code
-	SwitchSite         map[int64]int64  // switch ID → site ID
-	SwitchPortSwitch   map[int64]int64  // switch port ID → switch ID
-	PatchPanelSite     map[int64]int64  // patch panel ID → site ID
-	PatchPanelPortPanel map[int64]int64 // patch panel port ID → panel ID
+	SwitchPortDevice    map[int64]int64  // switch port ID → device ID
+	PatchPanelPortDevice map[int64]int64 // patch panel port ID → device ID
 	LocationSite        map[int64]int64  // location ID → site ID
 	DeviceIPs           map[int64]string // device IP ID → "10.0.0.1 (hostname - eth0)"
 	DeviceIPVLAN        map[int64]int64  // device IP ID → VLAN ID
@@ -54,6 +50,8 @@ type Resolver struct {
 	InterfaceMAC        map[int64]string // interface ID → MAC address
 	UsedMACs            map[string]bool  // MAC addresses already restricted on a switch port
 	CategoryTrackVmID   map[int64]bool   // category ID → true if VM ID tracking is enabled
+	CategoryPortType    map[int64]string // category ID → port type ("switch", "patch_panel", or "")
+	DeviceCategory      map[int64]int64  // device ID → category ID
 }
 
 // ResolverReadyMsg is sent when all lookup data has been fetched.
@@ -70,8 +68,6 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			Suppliers:      make(map[int64]string),
 			Devices:        make(map[int64]string),
 			Interfaces:     make(map[int64]string),
-			Switches:       make(map[int64]string),
-			PatchPanels:    make(map[int64]string),
 			VLANs:          make(map[int64]string),
 			AddressBlocks:  make(map[int64]string),
 			DeviceModels:   make(map[int64]string),
@@ -88,10 +84,8 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			AddressBlockSite:   make(map[int64]int64),
 			SiteClient:         make(map[int64]int64),
 			ClientShortCode:    make(map[int64]string),
-			SwitchSite:         make(map[int64]int64),
-			SwitchPortSwitch:   make(map[int64]int64),
-			PatchPanelSite:     make(map[int64]int64),
-			PatchPanelPortPanel: make(map[int64]int64),
+			SwitchPortDevice:    make(map[int64]int64),
+			PatchPanelPortDevice: make(map[int64]int64),
 			LocationSite:        make(map[int64]int64),
 			DeviceIPs:           make(map[int64]string),
 			DeviceIPVLAN:        make(map[int64]int64),
@@ -101,6 +95,8 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			InterfaceMAC:        make(map[int64]string),
 			UsedMACs:            make(map[string]bool),
 			CategoryTrackVmID:   make(map[int64]bool),
+			CategoryPortType:    make(map[int64]string),
+			DeviceCategory:      make(map[int64]int64),
 		}
 
 		// Fetch all small lookup tables. Errors are silently ignored —
@@ -127,6 +123,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				label := v.ShortCode + " - " + v.Name
 				r.Categories[v.ID] = label
 				r.CategoryTrackVmID[v.ID] = v.TrackVmID
+				if v.PortType != nil {
+					r.CategoryPortType[v.ID] = *v.PortType
+				}
 			}
 		}
 
@@ -149,6 +148,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			for _, v := range devices {
 				r.Devices[v.ID] = v.Hostname
 				r.DeviceSite[v.ID] = v.SiteID
+				r.DeviceCategory[v.ID] = v.CategoryID
 			}
 		}
 
@@ -186,22 +186,6 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				if v.MacAddress != nil && *v.MacAddress != "" {
 					r.InterfaceMAC[v.ID] = *v.MacAddress
 				}
-			}
-		}
-
-		var switches []models.Switch
-		if err := c.Get("/switches", &switches); err == nil {
-			for _, v := range switches {
-				r.Switches[v.ID] = v.Hostname
-				r.SwitchSite[v.ID] = v.SiteID
-			}
-		}
-
-		var panels []models.PatchPanel
-		if err := c.Get("/patch-panels", &panels); err == nil {
-			for _, v := range panels {
-				r.PatchPanels[v.ID] = v.Name
-				r.PatchPanelSite[v.ID] = v.SiteID
 			}
 		}
 
@@ -266,11 +250,11 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				if v.PortLabel != nil && *v.PortLabel != "" {
 					label = *v.PortLabel
 				}
-				if swName, ok := r.Switches[v.SwitchID]; ok {
-					label = swName + " - " + label
+				if devName, ok := r.Devices[v.DeviceID]; ok {
+					label = devName + " - " + label
 				}
 				r.SwitchPorts[v.ID] = label
-				r.SwitchPortSwitch[v.ID] = v.SwitchID
+				r.SwitchPortDevice[v.ID] = v.DeviceID
 				if v.MacRestriction != nil && *v.MacRestriction != "" {
 					r.UsedMACs[*v.MacRestriction] = true
 				}
@@ -284,11 +268,11 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				if v.PortLabel != nil && *v.PortLabel != "" {
 					label = *v.PortLabel
 				}
-				if panelName, ok := r.PatchPanels[v.PatchPanelID]; ok {
-					label = panelName + " - " + label
+				if devName, ok := r.Devices[v.DeviceID]; ok {
+					label = devName + " - " + label
 				}
 				r.PatchPanelPorts[v.ID] = label
-				r.PatchPanelPortPanel[v.ID] = v.PatchPanelID
+				r.PatchPanelPortDevice[v.ID] = v.DeviceID
 			}
 		}
 
@@ -338,8 +322,6 @@ func ManufacturerName(id int64) string { return lookupName(func() map[int64]stri
 func SupplierName(id *int64) string    { return lookupOptional(func() map[int64]string { return safeLookup().Suppliers }, id) }
 func DeviceName(id int64) string       { return lookupName(func() map[int64]string { return safeLookup().Devices }, id) }
 func InterfaceName(id int64) string    { return lookupName(func() map[int64]string { return safeLookup().Interfaces }, id) }
-func SwitchName(id int64) string       { return lookupName(func() map[int64]string { return safeLookup().Switches }, id) }
-func PatchPanelName(id int64) string      { return lookupName(func() map[int64]string { return safeLookup().PatchPanels }, id) }
 func VLANName(id *int64) string           { return lookupOptional(func() map[int64]string { return safeLookup().VLANs }, id) }
 func AddressBlockName(id *int64) string   { return lookupOptional(func() map[int64]string { return safeLookup().AddressBlocks }, id) }
 func DeviceModelName(id *int64) string    { return lookupOptional(func() map[int64]string { return safeLookup().DeviceModels }, id) }
@@ -365,10 +347,6 @@ func (r *Resolver) Lookup(key string) map[int64]string {
 		return r.Devices
 	case "interfaces":
 		return r.Interfaces
-	case "switches":
-		return r.Switches
-	case "patch_panels":
-		return r.PatchPanels
 	case "vlans":
 		return r.VLANs
 	case "address_blocks":

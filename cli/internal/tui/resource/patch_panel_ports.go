@@ -26,7 +26,7 @@ func init() {
 			pp := raw.(*models.PatchPanelPort)
 			return table.Row{
 				fmt.Sprintf("%d", pp.ID),
-				PatchPanelName(pp.PatchPanelID),
+				DeviceName(pp.DeviceID),
 				fmt.Sprintf("%d", pp.PortNumber),
 				derefStr(pp.PortLabel),
 				lookupOptional(func() map[int64]string { return safeLookup().PatchPanelPorts }, pp.LinkedPortID),
@@ -38,7 +38,7 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "patch_panel_id", Label: "Patch Panel", Required: true, PickerKey: "patch_panels"},
+			{Key: "device_id", Label: "Device", Required: true, PickerKey: "devices"},
 			{Key: "port_number", Label: "Port Number", Required: true},
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "linked_port_id", Label: "Linked Port", PickerKey: "patch_panel_ports"},
@@ -58,7 +58,7 @@ func init() {
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
 			input := models.PatchPanelPortInput{
-				PatchPanelID: mustInt64(data["patch_panel_id"]),
+				DeviceID: mustInt64(data["device_id"]),
 				PortNumber:   mustInt(data["port_number"]),
 				PortLabel:    strPtr(data["port_label"]),
 				LinkedPortID: int64Ptr(data["linked_port_id"]),
@@ -70,7 +70,7 @@ func init() {
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
 			input := models.PatchPanelPortInput{
-				PatchPanelID: mustInt64(data["patch_panel_id"]),
+				DeviceID: mustInt64(data["device_id"]),
 				PortNumber:   mustInt(data["port_number"]),
 				PortLabel:    strPtr(data["port_label"]),
 				LinkedPortID: int64Ptr(data["linked_port_id"]),

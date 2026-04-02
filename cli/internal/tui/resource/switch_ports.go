@@ -27,7 +27,7 @@ func init() {
 			sp := raw.(*models.SwitchPort)
 			return table.Row{
 				fmt.Sprintf("%d", sp.ID),
-				SwitchName(sp.SwitchID),
+				DeviceName(sp.DeviceID),
 				fmt.Sprintf("%d", sp.PortNumber),
 				derefStr(sp.PortLabel),
 				derefStr(sp.Speed),
@@ -40,7 +40,7 @@ func init() {
 		},
 
 		Fields: []Field{
-			{Key: "switch_id", Label: "Switch", Required: true, PickerKey: "switches"},
+			{Key: "device_id", Label: "Device", Required: true, PickerKey: "devices"},
 			{Key: "port_number", Label: "Port Number", Required: true},
 			{Key: "port_label", Label: "Port Label"},
 			{Key: "speed", Label: "Speed"},
@@ -49,10 +49,10 @@ func init() {
 				if Resolve == nil {
 					return nil
 				}
-				// Determine site from the selected switch.
+				// Determine site from the selected device.
 				var siteID int64
-				if switchID := mustInt64(values["switch_id"]); switchID != 0 {
-					siteID = Resolve.SwitchSite[switchID]
+				if deviceID := mustInt64(values["device_id"]); deviceID != 0 {
+					siteID = Resolve.DeviceSite[deviceID]
 				}
 				// Allow the current value through (editing keeps own MAC).
 				currentMAC := values["mac_restriction"]
@@ -92,7 +92,7 @@ func init() {
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
 			input := models.SwitchPortInput{
-				SwitchID:       mustInt64(data["switch_id"]),
+				DeviceID:       mustInt64(data["device_id"]),
 				PortNumber:     mustInt(data["port_number"]),
 				PortLabel:      strPtr(data["port_label"]),
 				Speed:          strPtr(data["speed"]),
@@ -106,7 +106,7 @@ func init() {
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
 			input := models.SwitchPortInput{
-				SwitchID:       mustInt64(data["switch_id"]),
+				DeviceID:       mustInt64(data["device_id"]),
 				PortNumber:     mustInt(data["port_number"]),
 				PortLabel:      strPtr(data["port_label"]),
 				Speed:          strPtr(data["speed"]),

@@ -65,15 +65,15 @@ func init() {
 				return filtered
 
 			case "switch_port_id":
-				// Show only switch ports from switches at the same site.
+				// Show only switch ports from devices at the same site.
 				siteID, ok := Resolve.InterfaceSite[ifaceID]
 				if !ok {
 					return items
 				}
 				filtered := make(map[int64]string)
 				for id, name := range items {
-					if swID, ok2 := Resolve.SwitchPortSwitch[id]; ok2 {
-						if Resolve.SwitchSite[swID] == siteID {
+					if devID, ok2 := Resolve.SwitchPortDevice[id]; ok2 {
+						if Resolve.DeviceSite[devID] == siteID {
 							filtered[id] = name
 						}
 					}
@@ -81,15 +81,15 @@ func init() {
 				return filtered
 
 			case "patch_panel_port_id":
-				// Show only patch panel ports from panels at the same site.
+				// Show only patch panel ports from devices at the same site.
 				siteID, ok := Resolve.InterfaceSite[ifaceID]
 				if !ok {
 					return items
 				}
 				filtered := make(map[int64]string)
 				for id, name := range items {
-					if panelID, ok2 := Resolve.PatchPanelPortPanel[id]; ok2 {
-						if Resolve.PatchPanelSite[panelID] == siteID {
+					if devID, ok2 := Resolve.PatchPanelPortDevice[id]; ok2 {
+						if Resolve.DeviceSite[devID] == siteID {
 							filtered[id] = name
 						}
 					}

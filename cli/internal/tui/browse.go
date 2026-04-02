@@ -158,40 +158,6 @@ func scopedDevices(siteID string) *resource.Def {
 	return &base
 }
 
-func scopedSwitches(siteID string) *resource.Def {
-	base := *resource.Registry["switches"]
-	base.Defaults = map[string]string{"site_id": siteID}
-	base.List = func(c *apiclient.Client) ([]any, error) {
-		var items []models.Switch
-		if err := c.Get("/switches?site_id="+siteID, &items); err != nil {
-			return nil, err
-		}
-		result := make([]any, len(items))
-		for i := range items {
-			result[i] = &items[i]
-		}
-		return result, nil
-	}
-	return &base
-}
-
-func scopedPatchPanels(siteID string) *resource.Def {
-	base := *resource.Registry["patch_panels"]
-	base.Defaults = map[string]string{"site_id": siteID}
-	base.List = func(c *apiclient.Client) ([]any, error) {
-		var items []models.PatchPanel
-		if err := c.Get("/patch-panels?site_id="+siteID, &items); err != nil {
-			return nil, err
-		}
-		result := make([]any, len(items))
-		for i := range items {
-			result[i] = &items[i]
-		}
-		return result, nil
-	}
-	return &base
-}
-
 func scopedDeviceGroups(siteID string) *resource.Def {
 	base := *resource.Registry["device_groups"]
 	base.Defaults = map[string]string{"site_id": siteID}
@@ -311,12 +277,12 @@ func scopedDeviceConnections(ifaceID string) *resource.Def {
 	return &base
 }
 
-func scopedSwitchPorts(switchID string) *resource.Def {
+func scopedSwitchPorts(deviceID string) *resource.Def {
 	base := *resource.Registry["switch_ports"]
-	base.Defaults = map[string]string{"switch_id": switchID}
+	base.Defaults = map[string]string{"device_id": deviceID}
 	base.List = func(c *apiclient.Client) ([]any, error) {
 		var items []models.SwitchPort
-		if err := c.Get("/switch-ports?switch_id="+switchID, &items); err != nil {
+		if err := c.Get("/switch-ports?device_id="+deviceID, &items); err != nil {
 			return nil, err
 		}
 		result := make([]any, len(items))
@@ -328,12 +294,12 @@ func scopedSwitchPorts(switchID string) *resource.Def {
 	return &base
 }
 
-func scopedPatchPanelPorts(panelID string) *resource.Def {
+func scopedPatchPanelPorts(deviceID string) *resource.Def {
 	base := *resource.Registry["patch_panel_ports"]
-	base.Defaults = map[string]string{"patch_panel_id": panelID}
+	base.Defaults = map[string]string{"device_id": deviceID}
 	base.List = func(c *apiclient.Client) ([]any, error) {
 		var items []models.PatchPanelPort
-		if err := c.Get("/patch-panel-ports?patch_panel_id="+panelID, &items); err != nil {
+		if err := c.Get("/patch-panel-ports?device_id="+deviceID, &items); err != nil {
 			return nil, err
 		}
 		result := make([]any, len(items))
@@ -506,17 +472,6 @@ func interfaceDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 	}
 }
 
-func switchDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
-	return func(raw any) tea.Cmd {
-		sw := raw.(*models.Switch)
-		switchID := fmt.Sprintf("%d", sw.ID)
-		screen := NewResourceTable(scopedSwitchPorts(switchID), apiClient)
-		return func() tea.Msg {
-			return PushScreenMsg{Screen: titledScreen{screen, sw.Hostname}}
-		}
-	}
-}
-
 func deviceGroupDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 	return func(raw any) tea.Cmd {
 		g := raw.(*models.DeviceGroup)
@@ -524,17 +479,6 @@ func deviceGroupDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
 		screen := NewResourceTable(scopedDeviceGroupMembers(groupID), apiClient)
 		return func() tea.Msg {
 			return PushScreenMsg{Screen: titledScreen{screen, g.Name + " Members"}}
-		}
-	}
-}
-
-func patchPanelDrillDown(apiClient *apiclient.Client) func(any) tea.Cmd {
-	return func(raw any) tea.Cmd {
-		pp := raw.(*models.PatchPanel)
-		panelID := fmt.Sprintf("%d", pp.ID)
-		screen := NewResourceTable(scopedPatchPanelPorts(panelID), apiClient)
-		return func() tea.Msg {
-			return PushScreenMsg{Screen: titledScreen{screen, pp.Name}}
 		}
 	}
 }
@@ -583,12 +527,6 @@ func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu 
 			{label: "Devices", build: func() Screen {
 				return NewResourceTableWithSelect(scopedDevices(siteID), apiClient, deviceDrillDown(apiClient))
 			}},
-			{label: "Switches", build: func() Screen {
-				return NewResourceTableWithSelect(scopedSwitches(siteID), apiClient, switchDrillDown(apiClient))
-			}},
-			{label: "Patch Panels", build: func() Screen {
-				return NewResourceTableWithSelect(scopedPatchPanels(siteID), apiClient, patchPanelDrillDown(apiClient))
-			}},
 			{label: "Device Groups", build: func() Screen {
 				return NewResourceTableWithSelect(scopedDeviceGroups(siteID), apiClient, deviceGroupDrillDown(apiClient))
 			}},
@@ -604,13 +542,27 @@ func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu 
 
 func newDeviceScopeMenu(device *models.Device, apiClient *apiclient.Client) ScopeMenu {
 	deviceID := fmt.Sprintf("%d", device.ID)
+	items := []ScopeMenuItem{
+		{label: "Interfaces", build: func() Screen {
+			return NewResourceTableWithSelect(scopedInterfaces(deviceID), apiClient, interfaceDrillDown(apiClient))
+		}},
+	}
+	// Add port management based on category port_type.
+	if resource.Resolve != nil {
+		portType := resource.Resolve.CategoryPortType[device.CategoryID]
+		if portType == "switch" {
+			items = append(items, ScopeMenuItem{label: "Switch Ports", build: func() Screen {
+				return NewResourceTable(scopedSwitchPorts(deviceID), apiClient)
+			}})
+		} else if portType == "patch_panel" {
+			items = append(items, ScopeMenuItem{label: "Patch Panel Ports", build: func() Screen {
+				return NewResourceTable(scopedPatchPanelPorts(deviceID), apiClient)
+			}})
+		}
+	}
 	return ScopeMenu{
 		title: device.Hostname,
-		items: []ScopeMenuItem{
-			{label: "Interfaces", build: func() Screen {
-				return NewResourceTableWithSelect(scopedInterfaces(deviceID), apiClient, interfaceDrillDown(apiClient))
-			}},
-		},
+		items: items,
 	}
 }
 
