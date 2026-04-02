@@ -1,9 +1,9 @@
 package models
 
-// SwitchPort represents a single port on a network switch.
+// SwitchPort represents a single port on a network switch (which is a device).
 type SwitchPort struct {
 	ID             int64   `json:"id"`
-	SwitchID       int64   `json:"switch_id"`
+	DeviceID       int64   `json:"device_id"`
 	PortNumber     int     `json:"port_number"`
 	PortLabel      *string `json:"port_label"`
 	Speed          *string `json:"speed"`
@@ -14,7 +14,7 @@ type SwitchPort struct {
 
 // SwitchPortInput is used for create and update requests.
 type SwitchPortInput struct {
-	SwitchID       int64   `json:"switch_id"   binding:"required"`
+	DeviceID       int64   `json:"device_id"   binding:"required"`
 	PortNumber     int     `json:"port_number" binding:"required"`
 	PortLabel      *string `json:"port_label"`
 	Speed          *string `json:"speed"`
