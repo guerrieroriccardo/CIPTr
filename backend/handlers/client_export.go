@@ -79,6 +79,7 @@ type exportSwitchPort struct {
 	IsDisabled    bool
 	UntaggedVlan  string
 	TaggedVlans   string
+	ConnectedTo   string
 	Notes         string
 }
 
@@ -91,10 +92,11 @@ type exportPatchPanel struct {
 }
 
 type exportPatchPanelPort struct {
-	PortNumber int
-	PortLabel  string
-	LinkedPort string
-	Notes      string
+	PortNumber      int
+	PortLabel       string
+	LinkedPort      string
+	ConnectedSwitch string
+	Notes           string
 }
 
 type exportDevice struct {
@@ -441,7 +443,10 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 		// Switches
 		sws := switchesBySite[site.ID]
-		for _, sw := range sws {
+		for si, sw := range sws {
+			if si > 0 {
+				pdfSeparatorLine(pdf)
+			}
 			pdfSubsectionTitle(pdf, fmt.Sprintf("Switch: %s", sw.Hostname))
 
 			// Build info rows as key-value pairs, two per line.
@@ -486,14 +491,14 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 			ports := switchPortsBySwitch[sw.ID]
 			if len(ports) > 0 {
-				pdfTable(pdf, []string{"#", "Label", "Speed", "Up", "Dis", "Untagged", "Tagged"},
-					[]float64{15, 25, 25, 15, 15, 35, 60}, func() [][]string {
+				pdfTable(pdf, []string{"#", "Label", "Speed", "Up", "Dis", "Untagged", "Tagged", "Connected To"},
+					[]float64{12, 20, 20, 12, 12, 30, 40, 44}, func() [][]string {
 						rows := make([][]string, len(ports))
 						for i, p := range ports {
 							rows[i] = []string{
 								fmt.Sprintf("%d", p.PortNumber), p.PortLabel, p.Speed,
 								boolStr(p.IsUplink), boolStr(p.IsDisabled),
-								p.UntaggedVlan, p.TaggedVlans,
+								p.UntaggedVlan, p.TaggedVlans, p.ConnectedTo,
 							}
 						}
 						return rows
@@ -503,7 +508,10 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 		// Patch Panels
 		panels := patchPanelsBySite[site.ID]
-		for _, pp := range panels {
+		for pi, pp := range panels {
+			if pi > 0 {
+				pdfSeparatorLine(pdf)
+			}
 			pdfSubsectionTitle(pdf, fmt.Sprintf("Patch Panel: %s", pp.Name))
 
 			type kv struct{ k, v string }
@@ -538,13 +546,13 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 			ports := ppPortsByPanel[pp.ID]
 			if len(ports) > 0 {
-				pdfTable(pdf, []string{"Port #", "Label", "Linked To", "Notes"},
-					[]float64{25, 50, 55, 60}, func() [][]string {
+				pdfTable(pdf, []string{"Port #", "Label", "Linked To", "Switch Port", "Notes"},
+					[]float64{20, 40, 45, 45, 40}, func() [][]string {
 						rows := make([][]string, len(ports))
 						for i, p := range ports {
 							rows[i] = []string{
 								fmt.Sprintf("%d", p.PortNumber), p.PortLabel,
-								p.LinkedPort, p.Notes,
+								p.LinkedPort, p.ConnectedSwitch, p.Notes,
 							}
 						}
 						return rows
@@ -582,6 +590,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 				}())
 
 			// Per-device detail: interfaces, IPs, connections
+			firstDetail := true
 			for _, d := range devs {
 				ifaces := ifacesByDevice[d.ID]
 				ips := ipsByDevice[d.ID]
@@ -589,6 +598,11 @@ func (h *ClientHandler) Export(c *gin.Context) {
 				if len(ifaces) == 0 && len(ips) == 0 && len(conns) == 0 {
 					continue
 				}
+
+				if !firstDetail {
+					pdfSeparatorLine(pdf)
+				}
+				firstDetail = false
 
 				pdfCheckPageBreak(pdf, 20)
 				pdf.SetFont("Helvetica", "B", pdfFontSize)
@@ -761,6 +775,16 @@ func pdfCheckPageBreak(pdf *fpdf.Fpdf, h float64) {
 	if pdf.GetY()+h > pdfPageH-pdfMargin-5 {
 		pdf.AddPage()
 	}
+}
+
+// pdfSeparatorLine draws a thin gray horizontal line to visually separate sections.
+func pdfSeparatorLine(pdf *fpdf.Fpdf) {
+	pdfCheckPageBreak(pdf, 6)
+	y := pdf.GetY() + 2
+	pdf.SetDrawColor(180, 180, 180)
+	pdf.Line(pdfMargin, y, pdfPageW-pdfMargin, y)
+	pdf.SetDrawColor(0, 0, 0)
+	pdf.SetY(y + 3)
 }
 
 // pdfIPUtilizationTable renders a table with VLAN usage and colored utilization bars.
@@ -1158,6 +1182,59 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 				portsBySwitch[devID] = ports
 			}
 		}
+
+		// Load connections: device interface -> switch port
+		if len(portIDs) > 0 {
+			cph, cargs := inPlaceholders(portIDs)
+			crows, err := db.QueryContext(ctx,
+				`SELECT dc.switch_port_id, d.hostname, di.name
+				 FROM device_connections dc
+				 JOIN device_interfaces di ON di.id = dc.interface_id
+				 JOIN devices d ON d.id = di.device_id
+				 WHERE dc.switch_port_id IN `+cph, cargs...)
+			if err != nil {
+				return nil, nil, err
+			}
+			defer crows.Close()
+			connByPort := map[int64]string{}
+			for crows.Next() {
+				var spID int64
+				var hostname, ifName string
+				if err := crows.Scan(&spID, &hostname, &ifName); err != nil {
+					return nil, nil, err
+				}
+				connByPort[spID] = hostname + "/" + ifName
+			}
+
+			// Load connections: patch panel port -> switch port
+			ppcrows, err := db.QueryContext(ctx,
+				`SELECT ppp.switch_port_id, d.hostname, ppp.port_number
+				 FROM patch_panel_ports ppp
+				 JOIN devices d ON d.id = ppp.device_id
+				 WHERE ppp.switch_port_id IN `+cph, cargs...)
+			if err != nil {
+				return nil, nil, err
+			}
+			defer ppcrows.Close()
+			for ppcrows.Next() {
+				var spID int64
+				var ppName string
+				var ppPort int
+				if err := ppcrows.Scan(&spID, &ppName, &ppPort); err != nil {
+					return nil, nil, err
+				}
+				connByPort[spID] = fmt.Sprintf("%s #%d", ppName, ppPort)
+			}
+
+			for devID, ports := range portsBySwitch {
+				for i := range ports {
+					if conn, ok := connByPort[ports[i].ID]; ok {
+						ports[i].ConnectedTo = conn
+					}
+				}
+				portsBySwitch[devID] = ports
+			}
+		}
 	}
 
 	return switchBySite, portsBySwitch, nil
@@ -1197,10 +1274,13 @@ func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 		prows, err := db.QueryContext(ctx,
 			`SELECT ppp.device_id, ppp.port_number, COALESCE(ppp.port_label, ''),
 			        COALESCE(ld.hostname || ' #' || lppp.port_number::text, ''),
+			        COALESCE(sd.hostname || ' #' || sp.port_number::text, ''),
 			        COALESCE(ppp.notes, '')
 			 FROM patch_panel_ports ppp
 			 LEFT JOIN patch_panel_ports lppp ON lppp.id = ppp.linked_port_id
 			 LEFT JOIN devices ld ON ld.id = lppp.device_id
+			 LEFT JOIN switch_ports sp ON sp.id = ppp.switch_port_id
+			 LEFT JOIN devices sd ON sd.id = sp.device_id
 			 WHERE ppp.device_id IN `+ph+` ORDER BY ppp.port_number`, args...)
 		if err != nil {
 			return nil, nil, err
@@ -1209,7 +1289,7 @@ func fetchExportPatchPanels(ctx context.Context, db *sql.DB, siteIDs []int64) (m
 		for prows.Next() {
 			var panelID int64
 			var p exportPatchPanelPort
-			if err := prows.Scan(&panelID, &p.PortNumber, &p.PortLabel, &p.LinkedPort, &p.Notes); err != nil {
+			if err := prows.Scan(&panelID, &p.PortNumber, &p.PortLabel, &p.LinkedPort, &p.ConnectedSwitch, &p.Notes); err != nil {
 				return nil, nil, err
 			}
 			portsByPanel[panelID] = append(portsByPanel[panelID], p)
