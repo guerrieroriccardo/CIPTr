@@ -73,7 +73,13 @@ func init() {
 			{Key: "has_antivirus", Label: "Has Antivirus", PickerOptions: []string{"true", "false"}},
 			{Key: "supplier_id", Label: "Supplier", PickerKey: "suppliers"},
 			{Key: "installation_date", Label: "Installation Date (YYYY-MM-DD)"},
-			{Key: "total_ports", Label: "Total Ports"},
+			{Key: "total_ports", Label: "Total Ports", Hidden: func(values map[string]string) bool {
+				if Resolve == nil {
+					return true
+				}
+				catID := mustInt64(values["category_id"])
+				return catID == 0 || Resolve.CategoryPortType[catID] == ""
+			}},
 			{Key: "is_reserved", Label: "Is Reserved", PickerOptions: []string{"true", "false"}},
 			{Key: "notes", Label: "Notes"},
 		},
@@ -139,7 +145,7 @@ func init() {
 		},
 
 		AsyncDerive: func(client *apiclient.Client, key string, values map[string]string) map[string]string {
-			if key != "site_id" && key != "category_id" {
+			if key != "site_id" && key != "category_id" && key != "model_id" {
 				return nil
 			}
 
@@ -177,6 +183,19 @@ func init() {
 					}
 				} else {
 					derived["vm_id"] = "" // clear when category doesn't track VM IDs
+				}
+			}
+
+			// Auto-total_ports: when model is selected and category has port_type,
+			// fill from the model's default_ports.
+			if key == "model_id" && Resolve != nil {
+				modelID := mustInt64(values["model_id"])
+				if modelID != 0 {
+					if dp, ok := Resolve.DeviceModelDefaultPorts[modelID]; ok && dp > 0 {
+						derived["total_ports"] = fmt.Sprintf("%d", dp)
+					}
+				} else {
+					derived["total_ports"] = "" // clear when model is deselected
 				}
 			}
 

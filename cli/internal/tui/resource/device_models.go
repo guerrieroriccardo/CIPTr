@@ -46,7 +46,13 @@ func init() {
 			{Key: "model_name", Label: "Model Name", Required: true},
 			{Key: "category_id", Label: "Category", Required: true, PickerKey: "categories"},
 			{Key: "os_default_id", Label: "OS Default", PickerKey: "operating_systems"},
-			{Key: "default_ports", Label: "Default Switch Ports"},
+			{Key: "default_ports", Label: "Default Ports", Hidden: func(values map[string]string) bool {
+				if Resolve == nil {
+					return true
+				}
+				catID := mustInt64(values["category_id"])
+				return catID == 0 || Resolve.CategoryPortType[catID] == ""
+			}},
 			{Key: "specs", Label: "Specs"},
 			{Key: "notes", Label: "Notes"},
 		},

@@ -45,7 +45,8 @@ type Resolver struct {
 	DeviceIPs           map[int64]string // device IP ID → "10.0.0.1 (hostname - eth0)"
 	DeviceIPVLAN        map[int64]int64  // device IP ID → VLAN ID
 	DeviceIPInterface   map[int64]int64  // device IP ID → interface ID
-	DeviceModelCategory map[int64]int64  // device model ID → category ID
+	DeviceModelCategory     map[int64]int64 // device model ID → category ID
+	DeviceModelDefaultPorts map[int64]int   // device model ID → default ports (0 if unset)
 	DeviceGroupSite     map[int64]int64  // device group ID → site ID
 	InterfaceMAC        map[int64]string // interface ID → MAC address
 	UsedMACs            map[string]bool  // MAC addresses already restricted on a switch port
@@ -90,7 +91,8 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceIPs:           make(map[int64]string),
 			DeviceIPVLAN:        make(map[int64]int64),
 			DeviceIPInterface:   make(map[int64]int64),
-			DeviceModelCategory: make(map[int64]int64),
+			DeviceModelCategory:     make(map[int64]int64),
+			DeviceModelDefaultPorts: make(map[int64]int),
 			DeviceGroupSite:     make(map[int64]int64),
 			InterfaceMAC:        make(map[int64]string),
 			UsedMACs:            make(map[string]bool),
@@ -224,6 +226,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				}
 				r.DeviceModels[v.ID] = label
 				r.DeviceModelCategory[v.ID] = v.CategoryID
+				if v.DefaultPorts != nil {
+					r.DeviceModelDefaultPorts[v.ID] = *v.DefaultPorts
+				}
 			}
 		}
 
