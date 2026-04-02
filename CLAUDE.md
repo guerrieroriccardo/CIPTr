@@ -69,7 +69,6 @@ CIPTr/
 │   │   ├── response.go         # ok() e fail() helpers
 │   │   ├── clients.go
 │   │   ├── devices.go
-│   │   ├── switches.go
 │   │   └── ...
 │   ├── models/                 # Struct Go che rispecchiano le tabelle (condivise con CLI)
 │   └── Dockerfile              # Multi-stage build
@@ -125,13 +124,9 @@ clients
         └── address_blocks  (/20 block assigned to the site)
               └── vlans (subnets carved from the block, e.g. /24 per VLAN)
         └── locations (rooms, floors, closets within the site)
-        └── switches (physical switches at the site)
-              └── switch_ports (ports on each switch)
-        └── patch_panels (patch panels at the site)
-              └── patch_panel_ports (ports on each patch panel)
 
 manufacturers (lookup: HP, Cisco, Dell, ...)
-categories (lookup: Server, PC, Switch, Printer, ...)
+categories (lookup: Server, PC, Switch, Printer, ... + port_type for infrastructure)
 suppliers (company info: name, address, phone, email)
 
 device_models (hardware catalog, FK → manufacturers, FK → categories)
@@ -139,6 +134,8 @@ device_models (hardware catalog, FK → manufacturers, FK → categories)
         └── device_interfaces (NICs: eth0, iDRAC, WAN, LAN1, ...)
               └── device_ips (IP per NIC, linked to a VLAN)
               └── device_connections (physical link: NIC → switch_port ↔ patch_panel_port)
+        └── switch_ports (ports on switch devices, via category port_type='switch')
+        └── patch_panel_ports (ports on patch panel devices, via category port_type='patch_panel')
 ```
 
 ### SQL — schema.sql
@@ -150,22 +147,20 @@ Tabelle principali e colonne chiave:
 | Tabella | Colonne chiave | Note |
 |---------|---------------|------|
 | `manufacturers` | `id`, `name` (UNIQUE) | Lookup: HP, Cisco, Dell... |
-| `categories` | `id`, `name` (UNIQUE) | Lookup: Server, PC, Switch... |
+| `categories` | `id`, `name` (UNIQUE), `port_type` | Lookup: Server, PC, Switch... `port_type`: NULL, 'switch', 'patch_panel' |
 | `suppliers` | `id`, `name`, `address`, `phone`, `email` | Azienda fornitrice |
 | `clients` | `id`, `name`, `short_code` | Cliente MSP |
 | `sites` | `id`, `client_id` (FK), `name`, `address` | Sede fisica |
 | `locations` | `id`, `site_id` (FK), `name`, `floor` | Stanza/piano |
 | `address_blocks` | `id`, `site_id` (FK), `network` (CIDR) | Blocco IP assegnato |
 | `vlans` | `id`, `site_id` (FK), `vlan_id`, `subnet` (CIDR) | Sottorete |
-| `device_models` | `id`, `manufacturer_id` (FK), `model_name`, `category_id` (FK) | Catalogo HW |
-| `devices` | `id`, `site_id` (FK), `hostname`, `category_id` (FK), `supplier_id` (FK) | Dispositivo deployato |
+| `device_models` | `id`, `manufacturer_id` (FK), `model_name`, `category_id` (FK), `default_ports` | Catalogo HW. `default_ports` auto-compila `total_ports` al deploy |
+| `devices` | `id`, `site_id` (FK), `hostname`, `category_id` (FK), `supplier_id` (FK), `total_ports` | Dispositivo deployato. Switch e patch panel sono devices con `total_ports` |
 | `device_interfaces` | `id`, `device_id` (FK), `name`, `mac_address` (MACADDR) | NIC |
 | `device_ips` | `id`, `interface_id` (FK), `ip_address` (INET) | IP per NIC |
 | `device_connections` | `id`, `interface_id` (FK), `switch_port_id`, `patch_panel_port_id` | Collegamento fisico |
-| `switches` | `id`, `site_id` (FK), `name`, `ip_address` (INET) | Switch di rete |
-| `switch_ports` | `id`, `switch_id` (FK), `port_number` | Porta dello switch |
-| `patch_panels` | `id`, `site_id` (FK), `name` | Patch panel |
-| `patch_panel_ports` | `id`, `patch_panel_id` (FK), `port_number` | Porta del patch panel |
+| `switch_ports` | `id`, `device_id` (FK), `port_number`, `speed`, `is_uplink`, `mac_restriction` | Porta switch (device con port_type='switch') |
+| `patch_panel_ports` | `id`, `device_id` (FK), `port_number`, `linked_port_id` | Porta patch panel (device con port_type='patch_panel') |
 
 ---
 
@@ -205,16 +200,21 @@ Base URL: `http://localhost:8080/api/v1`
 | POST | `/devices/:id/ips` | Aggiungi IP |
 | DELETE | `/device-ips/:id` | Rimuovi IP |
 
-### Switches
+### Switch Ports & Patch Panel Ports
 | Metodo | Path | Descrizione |
 |--------|------|-------------|
-| GET | `/switches` | Lista switch (filtro ?site_id=) |
-| POST | `/switches` | Crea switch |
-| GET | `/switches/:id` | Dettaglio switch |
-| PUT | `/switches/:id` | Aggiorna switch |
-| DELETE | `/switches/:id` | Elimina switch |
-| GET | `/switches/:id/ports` | Porte dello switch con dispositivo collegato |
-| PUT | `/switch-ports/:id` | Aggiorna porta (collega/scollega dispositivo) |
+| GET | `/devices/:id/switch-ports` | Porte switch del dispositivo |
+| GET | `/devices/:id/patch-panel-ports` | Porte patch panel del dispositivo |
+| GET | `/switch-ports` | Lista porte switch (filtro ?device_id=) |
+| POST | `/switch-ports` | Crea porta switch |
+| GET | `/switch-ports/:id` | Dettaglio porta switch |
+| PUT | `/switch-ports/:id` | Aggiorna porta switch |
+| DELETE | `/switch-ports/:id` | Elimina porta switch |
+| GET | `/patch-panel-ports` | Lista porte patch panel (filtro ?device_id=) |
+| POST | `/patch-panel-ports` | Crea porta patch panel |
+| GET | `/patch-panel-ports/:id` | Dettaglio porta patch panel |
+| PUT | `/patch-panel-ports/:id` | Aggiorna porta patch panel |
+| DELETE | `/patch-panel-ports/:id` | Elimina porta patch panel |
 
 ### Manufacturers (Lookup)
 | Metodo | Path | Descrizione |
@@ -272,8 +272,7 @@ Base URL: `http://localhost:8080/api/v1`
 /devices                → Lista globale dispositivi (con filtri)
 /devices/:id            → Dettaglio dispositivo
 /devices/new            → Aggiungi dispositivo
-/switches               → Lista switch
-/switches/:id           → Dettaglio switch (visualizzazione porte)
+/devices/:id/ports      → Porte del dispositivo (switch/patch panel)
 /inventory              → Catalogo modelli hardware
 /vlans                  → Gestione VLAN
 ```
@@ -301,7 +300,7 @@ Tutte le 17 risorse CRUD implementate:
 clients, sites, locations, address_blocks, vlans,
 manufacturers, categories, suppliers,
 device_models, devices, device_interfaces, device_ips, device_connections,
-switches, switch_ports, patch_panels, patch_panel_ports
+switch_ports, patch_panel_ports
 
 ### Fase 2b — CLI Releases & Self-Update ✅
 1. ✅ Version embedding via `-ldflags` (`cli/internal/version/`)
@@ -447,7 +446,7 @@ Esempi di categorie iniziali: `PC`, `Laptop`, `Server`, `Printer`, `Switch`, `Ro
 ## 9. Note Importanti
 
 - **NIC multiple**: un dispositivo può avere più schede di rete (server, router, ecc.). La tabella `device_interfaces` modella ogni NIC come entità separata (es. eth0, iDRAC, WAN). Ogni NIC può avere più IP (`device_ips`) e una connessione fisica (`device_connections`). Il flag `is_primary` su `device_ips` indica l'IP principale del dispositivo.
-- **Switch come dispositivo**: uno switch fisico è un record in `switches` (per gestire le porte) ma NON va duplicato in `devices`. Se si vuole tracciarne IP e seriale, si aggiungono campi direttamente a `switches`.
-- **Patch panel**: il collegamento fisico è `device → patch_panel_port → switch_port`. La tabella `device_connections` tiene entrambi i riferimenti opzionali.
+- **Switch e Patch Panel come dispositivi**: switch e patch panel sono normali record in `devices`, distinti dalla colonna `port_type` della loro categoria ('switch' o 'patch_panel'). Quando si crea un device con `total_ports` e la categoria ha un `port_type`, vengono auto-generate le righe nella tabella porte corrispondente (`switch_ports` o `patch_panel_ports`). Il modello hardware (`device_models.default_ports`) auto-compila `total_ports` nel form CLI.
+- **Connessioni fisiche**: il collegamento fisico e' `device_interface → device_connection → switch_port / patch_panel_port`. La tabella `device_connections` tiene entrambi i riferimenti opzionali.
 - **Import da Excel**: prevedere in futuro un endpoint `POST /api/v1/import/csv`. Non prioritario ora, ma lo schema deve poter accogliere tutti i campi del vecchio Excel.
 - **Hostname univoco per sede**: sarebbe utile aggiungere un UNIQUE constraint su `(site_id, hostname)` in `devices` per evitare duplicati.
