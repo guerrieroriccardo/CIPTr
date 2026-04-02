@@ -47,6 +47,9 @@ type ResourceForm struct {
 
 	// Tracks fields manually edited by the user (not auto-derived).
 	manuallyEdited map[int]bool
+
+	// Multi-select picker state
+	multiSelected map[string]bool // set of selected IDs during multi-pick
 }
 
 // NewResourceForm creates a form screen. If id is non-empty and item is
@@ -255,8 +258,8 @@ func (f *ResourceForm) openPicker() {
 		return
 	}
 
-	// Add a "None" option at the top for optional fields to allow clearing the value.
-	if !field.Required {
+	// Add a "None" option at the top for optional single-select fields to allow clearing the value.
+	if !field.Required && !field.MultiSelect {
 		items = append([]pickerItem{{id: "", label: "(None)"}}, items...)
 	}
 
@@ -265,6 +268,20 @@ func (f *ResourceForm) openPicker() {
 	f.pickerFilter = ""
 	f.pickerCursor = 0
 	f.pickerScroll = 0
+
+	// Initialize multi-select state from current value.
+	if field.MultiSelect {
+		f.multiSelected = map[string]bool{}
+		for _, id := range strings.Split(f.inputs[f.focus].Value(), ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				f.multiSelected[id] = true
+			}
+		}
+	} else {
+		f.multiSelected = nil
+	}
+
 	f.filterPicker()
 }
 
@@ -370,7 +387,7 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, f.updateFocus()
 		case "enter":
 			// If current field has a picker, open it.
-			if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 || f.def.Fields[f.focus].PickerFunc != nil {
+			if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 || f.def.Fields[f.focus].PickerFunc != nil || f.def.Fields[f.focus].MultiSelect {
 				f.openPicker()
 				return f, nil
 			}
@@ -447,7 +464,40 @@ func (f ResourceForm) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return f, func() tea.Msg {
 			return PushScreenMsg{Screen: NewResourceForm(&scopedDef, f.client, "", nil)}
 		}
+	case " ":
+		// Multi-select: toggle selection with space.
+		if f.multiSelected != nil && len(f.pickerMatch) > 0 {
+			item := f.pickerMatch[f.pickerCursor]
+			if f.multiSelected[item.id] {
+				delete(f.multiSelected, item.id)
+			} else {
+				f.multiSelected[item.id] = true
+			}
+			return f, nil
+		}
+		return f, nil
 	case "enter":
+		if f.multiSelected != nil {
+			// Multi-select: confirm selection.
+			var ids []string
+			// Preserve order from pickerItems (not pickerMatch).
+			for _, item := range f.pickerItems {
+				if f.multiSelected[item.id] {
+					ids = append(ids, item.id)
+				}
+			}
+			changedKey := f.def.Fields[f.focus].Key
+			f.inputs[f.focus].SetValue(strings.Join(ids, ","))
+			f.picking = false
+			f.multiSelected = nil
+			f.focus = (f.focus + 1) % len(f.inputs)
+			f.ensureVisible()
+			cmds := []tea.Cmd{f.updateFocus()}
+			if asyncCmd := f.fireAsyncDerive(changedKey); asyncCmd != nil {
+				cmds = append(cmds, asyncCmd)
+			}
+			return f, tea.Batch(cmds...)
+		}
 		if len(f.pickerMatch) > 0 {
 			selected := f.pickerMatch[f.pickerCursor]
 			changedKey := f.def.Fields[f.focus].Key
@@ -538,7 +588,7 @@ func (f ResourceForm) View() string {
 		if field.Required {
 			label += " *"
 		}
-		if field.PickerKey != "" || len(field.PickerOptions) > 0 || field.PickerFunc != nil {
+		if field.PickerKey != "" || len(field.PickerOptions) > 0 || field.PickerFunc != nil || field.MultiSelect {
 			label += " " + pickerHintStyle.Render("[enter to pick]")
 		}
 		if f.def.FieldHint != nil {
@@ -550,10 +600,30 @@ func (f ResourceForm) View() string {
 		resolvedName := ""
 		if field.PickerKey != "" && f.inputs[i].Value() != "" && resource.Resolve != nil {
 			if m := resource.Resolve.Lookup(field.PickerKey); m != nil {
-				for id, name := range m {
-					if fmt.Sprintf("%d", id) == f.inputs[i].Value() {
-						resolvedName = name
-						break
+				if field.MultiSelect {
+					// Multi-select: resolve all comma-separated IDs.
+					var names []string
+					for _, part := range strings.Split(f.inputs[i].Value(), ",") {
+						part = strings.TrimSpace(part)
+						if part == "" {
+							continue
+						}
+						for id, name := range m {
+							if fmt.Sprintf("%d", id) == part {
+								names = append(names, name)
+								break
+							}
+						}
+					}
+					if len(names) > 0 {
+						resolvedName = strings.Join(names, ", ")
+					}
+				} else {
+					for id, name := range m {
+						if fmt.Sprintf("%d", id) == f.inputs[i].Value() {
+							resolvedName = name
+							break
+						}
 					}
 				}
 			}
@@ -584,7 +654,7 @@ func (f ResourceForm) View() string {
 
 	// Build help text — show picker hint for FK fields.
 	helpParts := []string{"tab next"}
-	if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 || f.def.Fields[f.focus].PickerFunc != nil {
+	if f.def.Fields[f.focus].PickerKey != "" || len(f.def.Fields[f.focus].PickerOptions) > 0 || f.def.Fields[f.focus].PickerFunc != nil || f.def.Fields[f.focus].MultiSelect {
 		helpParts = append(helpParts, "enter pick")
 	}
 	helpParts = append(helpParts, "ctrl+s save", "esc cancel")
@@ -615,24 +685,38 @@ func (f ResourceForm) viewPicker() string {
 		}
 		for i := f.pickerScroll; i < end; i++ {
 			item := f.pickerMatch[i]
-			line := "  " + item.label
-			if i == f.pickerCursor {
-				line = pickerSelectedStyle.Render("> " + item.label)
+			prefix := "  "
+			if f.multiSelected != nil {
+				if f.multiSelected[item.id] {
+					prefix = "[x] "
+				} else {
+					prefix = "[ ] "
+				}
 			}
-			b.WriteString(line + "\n")
+			if i == f.pickerCursor {
+				line := pickerSelectedStyle.Render("> " + prefix + item.label)
+				b.WriteString(line + "\n")
+			} else {
+				b.WriteString("  " + prefix + item.label + "\n")
+			}
 		}
 		if len(f.pickerMatch) > vis {
 			b.WriteString(HelpStyle.Render(fmt.Sprintf("  [%d/%d]", f.pickerCursor+1, len(f.pickerMatch))) + "\n")
 		}
 	}
 
-	helpParts := []string{"↑↓ navigate", "enter select"}
-	if field.PickerKey != "" {
-		if subDef, ok := resource.Registry[field.PickerKey]; ok && subDef.Create != nil {
-			helpParts = append(helpParts, "ctrl+n create new")
+	var helpParts []string
+	if f.multiSelected != nil {
+		helpParts = []string{"↑↓ navigate", "space toggle", "enter confirm", "esc cancel"}
+	} else {
+		helpParts = []string{"↑↓ navigate", "enter select"}
+		if field.PickerKey != "" {
+			if subDef, ok := resource.Registry[field.PickerKey]; ok && subDef.Create != nil {
+				helpParts = append(helpParts, "ctrl+n create new")
+			}
 		}
+		helpParts = append(helpParts, "esc cancel")
 	}
-	helpParts = append(helpParts, "esc cancel")
 	b.WriteString("\n" + HelpStyle.Render(strings.Join(helpParts, " • ")))
 	return b.String()
 }

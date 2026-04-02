@@ -19,6 +19,7 @@ type Field struct {
 	PickerKey     string   // If set, enables FK picker using this resolver key (e.g. "clients", "sites")
 	PickerOptions []string // If set, enables picker with static options (e.g. ["active", "planned"])
 	PickerFunc    func(values map[string]string) []PickerEntry // Dynamic picker items (value differs from label)
+	MultiSelect   bool                                        // If true, picker allows multiple selections (stored as comma-separated IDs)
 	Hidden        func(values map[string]string) bool         // If returns true, field is hidden from the form
 }
 

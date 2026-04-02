@@ -59,7 +59,7 @@ func init() {
 			{Key: "is_uplink", Label: "Uplink", PickerOptions: []string{"true", "false"}},
 			{Key: "is_disabled", Label: "Disabled", PickerOptions: []string{"true", "false"}},
 			{Key: "untagged_vlan_id", Label: "Untagged VLAN", PickerKey: "vlans"},
-			{Key: "tagged_vlan_ids", Label: "Tagged VLANs (comma-sep IDs)"},
+			{Key: "tagged_vlan_ids", Label: "Tagged VLANs", PickerKey: "vlans", MultiSelect: true},
 			{Key: "mac_restriction", Label: "MAC Restriction", PickerFunc: func(values map[string]string) []PickerEntry {
 				if Resolve == nil {
 					return nil
@@ -104,7 +104,7 @@ func init() {
 				return items
 			}
 			switch key {
-			case "untagged_vlan_id":
+			case "untagged_vlan_id", "tagged_vlan_ids":
 				filtered := make(map[int64]string)
 				for id, name := range items {
 					if Resolve.VLANSite[id] == siteID {
