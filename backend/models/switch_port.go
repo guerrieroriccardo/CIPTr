@@ -13,6 +13,12 @@ type SwitchPort struct {
 	TaggedVlanIDs   []int64 `json:"tagged_vlan_ids"`
 	IsDisabled      *bool   `json:"is_disabled"`
 	Notes           *string `json:"notes"`
+
+	// Read-only enrichment (populated on GET)
+	ConnectedDevice        *string `json:"connected_device,omitempty"`
+	ConnectedInterface     *string `json:"connected_interface,omitempty"`
+	ConnectedPatchPanel    *string `json:"connected_patch_panel,omitempty"`
+	ConnectedPatchPanelPort *int   `json:"connected_patch_panel_port,omitempty"`
 }
 
 // SwitchPortInput is used for create and update requests.
