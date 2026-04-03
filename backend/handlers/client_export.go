@@ -106,6 +106,7 @@ type exportDevice struct {
 	SerialNumber     string
 	AssetTag         string
 	Category         string
+	CategoryCode     string
 	Status           string
 	IsUp             bool
 	OS               string
@@ -491,18 +492,18 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 			ports := switchPortsBySwitch[sw.ID]
 			if len(ports) > 0 {
-				pdfTable(pdf, []string{"#", "Label", "Speed", "Up", "Dis", "Untagged", "Tagged", "Connected To"},
-					[]float64{12, 20, 20, 12, 12, 30, 40, 44}, func() [][]string {
-						rows := make([][]string, len(ports))
-						for i, p := range ports {
-							rows[i] = []string{
-								fmt.Sprintf("%d", p.PortNumber), p.PortLabel, p.Speed,
-								boolStr(p.IsUplink), boolStr(p.IsDisabled),
-								p.UntaggedVlan, p.TaggedVlans, p.ConnectedTo,
-							}
-						}
-						return rows
-					}())
+				var spRows [][]string
+				var spDimmed []bool
+				for _, p := range ports {
+					spRows = append(spRows, []string{
+						fmt.Sprintf("%d", p.PortNumber), p.PortLabel, p.Speed,
+						boolStr(p.IsUplink), boolStr(p.IsDisabled),
+						p.UntaggedVlan, p.TaggedVlans, p.ConnectedTo,
+					})
+					spDimmed = append(spDimmed, p.IsDisabled)
+				}
+				pdfTableStyled(pdf, []string{"#", "Label", "Speed", "Up", "Dis", "Untagged", "Tagged", "Connected To"},
+					[]float64{12, 20, 20, 12, 12, 30, 40, 44}, spRows, spDimmed)
 			}
 		}
 
@@ -564,8 +565,30 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		devs := devicesBySite[site.ID]
 		if len(devs) > 0 {
 			pdfSubsectionTitle(pdf, "Devices")
-			pdfTable(pdf, []string{"Hostname", "Category", "Status", "IP", "S/N", "Model", "Location"},
-				[]float64{32, 22, 22, 28, 28, 30, 28}, func() [][]string {
+
+			// Category legend: collect unique categories used in this site.
+			catLegend := map[string]string{} // short_code -> full name
+			var catCodes []string
+			for _, d := range devs {
+				if d.CategoryCode != "" && catLegend[d.CategoryCode] == "" {
+					catLegend[d.CategoryCode] = d.Category
+					catCodes = append(catCodes, d.CategoryCode)
+				}
+			}
+			if len(catCodes) > 0 {
+				pdf.SetFont("Helvetica", "I", 7)
+				pdf.SetTextColor(100, 100, 100)
+				var legendParts []string
+				for _, code := range catCodes {
+					legendParts = append(legendParts, code+" = "+catLegend[code])
+				}
+				pdf.CellFormat(pdfContentW, 4, "Categories: "+strings.Join(legendParts, ", "), "", 1, "L", false, 0, "")
+				pdf.Ln(1)
+				pdf.SetTextColor(0, 0, 0)
+			}
+
+			pdfTable(pdf, []string{"Hostname", "Cat", "Status", "IP", "S/N", "Model", "Location"},
+				[]float64{34, 16, 22, 28, 28, 32, 30}, func() [][]string {
 					rows := make([][]string, len(devs))
 					for i, d := range devs {
 						primaryIP := ""
@@ -581,8 +604,12 @@ func (h *ClientHandler) Export(c *gin.Context) {
 								primaryIP = ips[0].IPAddress
 							}
 						}
+						cat := d.CategoryCode
+						if cat == "" {
+							cat = d.Category
+						}
 						rows[i] = []string{
-							d.Hostname, d.Category, d.Status,
+							d.Hostname, cat, d.Status,
 							primaryIP, d.SerialNumber, d.Model, d.Location,
 						}
 					}
@@ -765,6 +792,50 @@ func pdfTable(pdf *fpdf.Fpdf, headers []string, widths []float64, rows [][]strin
 			if i < len(widths) {
 				pdf.CellFormat(widths[i], pdfRowH, " "+cell, "1", 0, "L", true, 0, "")
 			}
+		}
+		pdf.Ln(-1)
+	}
+	pdf.Ln(3)
+}
+
+// pdfTableStyled renders a table like pdfTable but dims rows where dimmed[i] is true.
+func pdfTableStyled(pdf *fpdf.Fpdf, headers []string, widths []float64, rows [][]string, dimmed []bool) {
+	if len(rows) == 0 {
+		return
+	}
+
+	pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
+
+	// Header
+	pdf.SetFillColor(60, 60, 60)
+	pdf.SetTextColor(255, 255, 255)
+	pdf.SetFont("Helvetica", "B", pdfFontSize)
+	for i, h := range headers {
+		pdf.CellFormat(widths[i], pdfHeaderH, " "+h, "1", 0, "L", true, 0, "")
+	}
+	pdf.Ln(-1)
+	pdf.SetTextColor(0, 0, 0)
+
+	// Rows
+	pdf.SetFont("Helvetica", "", pdfFontSize)
+	for r, row := range rows {
+		pdfCheckPageBreak(pdf, pdfRowH)
+		isDimmed := r < len(dimmed) && dimmed[r]
+		if isDimmed {
+			pdf.SetFillColor(180, 180, 180)
+			pdf.SetTextColor(100, 100, 100)
+		} else if r%2 == 0 {
+			pdf.SetFillColor(245, 245, 245)
+		} else {
+			pdf.SetFillColor(255, 255, 255)
+		}
+		for i, cell := range row {
+			if i < len(widths) {
+				pdf.CellFormat(widths[i], pdfRowH, " "+cell, "1", 0, "L", true, 0, "")
+			}
+		}
+		if isDimmed {
+			pdf.SetTextColor(0, 0, 0)
 		}
 		pdf.Ln(-1)
 	}
@@ -1313,7 +1384,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 	drows, err := db.QueryContext(ctx,
 		`SELECT d.site_id, d.id, d.hostname, COALESCE(d.dns_name, ''),
 		        COALESCE(d.serial_number, ''), COALESCE(d.asset_tag, ''),
-		        COALESCE(c.name, ''), d.status, COALESCE(d.is_up, false),
+		        COALESCE(c.name, ''), COALESCE(c.short_code, ''), d.status, COALESCE(d.is_up, false),
 		        COALESCE(os.name, ''), COALESCE(d.has_rmm, false), COALESCE(d.has_antivirus, false),
 		        COALESCE(sup.name, ''),
 		        COALESCE(CONCAT(m.name, ' ', dm.model_name), ''),
@@ -1340,7 +1411,7 @@ func fetchExportDevices(ctx context.Context, db *sql.DB, siteIDs []int64) (
 		var siteID int64
 		var d exportDevice
 		if err := drows.Scan(&siteID, &d.ID, &d.Hostname, &d.DnsName,
-			&d.SerialNumber, &d.AssetTag, &d.Category, &d.Status, &d.IsUp,
+			&d.SerialNumber, &d.AssetTag, &d.Category, &d.CategoryCode, &d.Status, &d.IsUp,
 			&d.OS, &d.HasRmm, &d.HasAntivirus, &d.Supplier, &d.Model, &d.Location,
 			&d.InstallationDate, &d.VmID, &d.Notes); err != nil {
 			return nil, nil, nil, nil, err
