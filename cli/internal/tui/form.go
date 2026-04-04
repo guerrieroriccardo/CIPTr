@@ -17,6 +17,7 @@ import (
 type formSavedMsg struct{}
 type formErrorMsg struct{ err error }
 type asyncDeriveMsg struct{ values map[string]string }
+type bulkDoneMsg struct{ errors []error }
 
 // pickerItem represents one selectable entry in the FK picker.
 type pickerItem struct {
@@ -50,6 +51,16 @@ type ResourceForm struct {
 
 	// Multi-select picker state
 	multiSelected map[string]bool // set of selected IDs during multi-pick
+
+	// Bulk edit mode
+	bulkItems   []any             // when non-nil, form is in bulk-edit mode
+	bulkContext map[string]string // common values from selected items (for picker scoping)
+	bulkDone    int               // items updated so far
+	bulkErrs    []error           // errors collected during bulk update
+
+	// Bulk confirmation
+	bulkConfirming bool            // waiting for user to type "apply"
+	confirmInput   textinput.Model // text input for confirmation
 }
 
 // NewResourceForm creates a form screen. If id is non-empty and item is
@@ -130,7 +141,56 @@ func NewResourceForm(def *resource.Def, client *apiclient.Client, id string, ite
 	return form
 }
 
+// NewBulkEditForm creates a form in bulk-edit mode. All fields start empty;
+// only non-empty fields are applied to every selected item on submit.
+// Common values from selected items are stored as context for picker filtering.
+func NewBulkEditForm(def *resource.Def, client *apiclient.Client, items []any) ResourceForm {
+	inputs := make([]textinput.Model, len(def.Fields))
+	for i, f := range def.Fields {
+		ti := textinput.New()
+		ti.Placeholder = f.Label
+		ti.CharLimit = 256
+		ti.Width = 40
+		inputs[i] = ti
+	}
+	inputs[0].Focus()
+
+	// Extract common values from selected items for picker scoping.
+	// If all items share a value for a field, use it as context.
+	bulkCtx := map[string]string{}
+	if len(items) > 0 {
+		allData := make([]map[string]string, len(items))
+		for i, item := range items {
+			allData[i] = extractItemData(def, item)
+		}
+		for _, field := range def.Fields {
+			val := allData[0][field.Key]
+			common := true
+			for _, d := range allData[1:] {
+				if d[field.Key] != val {
+					common = false
+					break
+				}
+			}
+			if common && val != "" {
+				bulkCtx[field.Key] = val
+			}
+		}
+	}
+
+	return ResourceForm{
+		def:         def,
+		client:      client,
+		inputs:      inputs,
+		bulkItems:   items,
+		bulkContext:  bulkCtx,
+	}
+}
+
 func (f ResourceForm) Title() string {
+	if f.bulkItems != nil {
+		return fmt.Sprintf("Bulk Edit %d %s", len(f.bulkItems), f.def.Plural)
+	}
 	if f.id == "" {
 		return "New " + f.def.Name
 	}
@@ -154,10 +214,7 @@ func (f ResourceForm) Init() tea.Cmd {
 
 // activeFieldIndices returns the indices of fields currently visible (not hidden).
 func (f ResourceForm) activeFieldIndices() []int {
-	values := make(map[string]string, len(f.def.Fields))
-	for i, fld := range f.def.Fields {
-		values[fld.Key] = f.inputs[i].Value()
-	}
+	values := f.currentValues()
 	var indices []int
 	for i, field := range f.def.Fields {
 		if field.Hidden == nil || !field.Hidden(values) {
@@ -211,6 +268,20 @@ func (f *ResourceForm) ensureVisible() {
 	}
 }
 
+// currentValues returns the current form values, using bulkContext as fallback
+// for empty fields in bulk-edit mode (so pickers are properly scoped).
+func (f *ResourceForm) currentValues() map[string]string {
+	values := make(map[string]string, len(f.def.Fields))
+	for j, fld := range f.def.Fields {
+		v := f.inputs[j].Value()
+		if v == "" && f.bulkContext != nil {
+			v = f.bulkContext[fld.Key]
+		}
+		values[fld.Key] = v
+	}
+	return values
+}
+
 // openPicker populates picker items from the resolver or static options and enters picker mode.
 func (f *ResourceForm) openPicker() {
 	field := f.def.Fields[f.focus]
@@ -229,10 +300,7 @@ func (f *ResourceForm) openPicker() {
 		}
 		// Apply contextual filter if defined.
 		if f.def.PickerFilter != nil {
-			currentValues := make(map[string]string, len(f.def.Fields))
-			for j, fld := range f.def.Fields {
-				currentValues[fld.Key] = f.inputs[j].Value()
-			}
+			currentValues := f.currentValues()
 			m = f.def.PickerFilter(field.Key, currentValues, m)
 		}
 		items = make([]pickerItem, 0, len(m))
@@ -246,10 +314,7 @@ func (f *ResourceForm) openPicker() {
 			return items[i].label < items[j].label
 		})
 	} else if field.PickerFunc != nil {
-		currentValues := make(map[string]string, len(f.def.Fields))
-		for j, fld := range f.def.Fields {
-			currentValues[fld.Key] = f.inputs[j].Value()
-		}
+		currentValues := f.currentValues()
 		entries := field.PickerFunc(currentValues)
 		for _, e := range entries {
 			items = append(items, pickerItem{id: e.Value, label: e.Label})
@@ -345,6 +410,14 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case formSavedMsg:
 		return f, func() tea.Msg { return MutationPopMsg{} }
 
+	case bulkDoneMsg:
+		if len(msg.errors) > 0 {
+			f.err = fmt.Errorf("%d/%d updates failed: %v", len(msg.errors), len(f.bulkItems), msg.errors[0])
+			f.saving = false
+			return f, nil
+		}
+		return f, func() tea.Msg { return MutationPopMsg{} }
+
 	case formErrorMsg:
 		f.err = msg.err
 		f.saving = false
@@ -361,6 +434,27 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return f, nil
 
 	case tea.KeyMsg:
+		// Bulk confirmation mode — intercept all keys.
+		if f.bulkConfirming {
+			switch msg.String() {
+			case "esc":
+				f.bulkConfirming = false
+				return f, nil
+			case "enter":
+				if f.confirmInput.Value() == "apply" {
+					f.bulkConfirming = false
+					f.saving = true
+					return f, f.submitBulk()
+				}
+				f.err = fmt.Errorf("type 'apply' to confirm or esc to cancel")
+				return f, nil
+			default:
+				var cmd tea.Cmd
+				f.confirmInput, cmd = f.confirmInput.Update(msg)
+				return f, cmd
+			}
+		}
+
 		// Picker mode — intercept all keys.
 		if f.picking {
 			return f.updatePicker(msg)
@@ -555,11 +649,16 @@ func (f ResourceForm) View() string {
 
 	var b strings.Builder
 
-	action := "Create"
-	if f.id != "" {
-		action = "Edit"
+	if f.bulkItems != nil {
+		b.WriteString(TitleStyle.Render(fmt.Sprintf("Bulk Edit %d %s", len(f.bulkItems), f.def.Plural)) + "\n")
+		b.WriteString(HelpStyle.Render("Empty fields will not be changed") + "\n")
+	} else {
+		action := "Create"
+		if f.id != "" {
+			action = "Edit"
+		}
+		b.WriteString(TitleStyle.Render(action+" "+f.def.Name) + "\n")
 	}
-	b.WriteString(TitleStyle.Render(action+" "+f.def.Name) + "\n")
 
 	active := f.activeFieldIndices()
 	vis := f.visibleFields()
@@ -576,10 +675,7 @@ func (f ResourceForm) View() string {
 	// Collect current values for FieldHint callback.
 	var currentValues map[string]string
 	if f.def.FieldHint != nil {
-		currentValues = make(map[string]string, len(f.def.Fields))
-		for j, fld := range f.def.Fields {
-			currentValues[fld.Key] = f.inputs[j].Value()
-		}
+		currentValues = f.currentValues()
 	}
 
 	for _, i := range active[f.scroll:end] {
@@ -648,8 +744,17 @@ func (f ResourceForm) View() string {
 		b.WriteString(ErrorStyle.Render(fmt.Sprintf("Error: %v", f.err)) + "\n\n")
 	}
 
+	if f.bulkConfirming {
+		b.WriteString(fmt.Sprintf("\nApply changes to %d items? Type 'apply' to confirm:\n", len(f.bulkItems)))
+		b.WriteString("  " + f.confirmInput.View() + "\n")
+	}
+
 	if f.saving {
-		b.WriteString("Saving...\n")
+		if f.bulkItems != nil {
+			b.WriteString(fmt.Sprintf("Updating %d items...\n", len(f.bulkItems)))
+		} else {
+			b.WriteString("Saving...\n")
+		}
 	}
 
 	// Build help text — show picker hint for FK fields.
@@ -753,7 +858,35 @@ func (f ResourceForm) updateFocus() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (f *ResourceForm) enterBulkConfirm() tea.Cmd {
+	// Validate that at least one field is non-empty before asking confirmation.
+	hasChange := false
+	for i := range f.def.Fields {
+		if strings.TrimSpace(f.inputs[i].Value()) != "" {
+			hasChange = true
+			break
+		}
+	}
+	if !hasChange {
+		return func() tea.Msg {
+			return formErrorMsg{err: fmt.Errorf("no fields to update")}
+		}
+	}
+	f.bulkConfirming = true
+	f.err = nil
+	f.confirmInput = textinput.New()
+	f.confirmInput.Placeholder = "type 'apply' to confirm"
+	f.confirmInput.CharLimit = 10
+	f.confirmInput.Width = 30
+	f.confirmInput.Focus()
+	return textinput.Blink
+}
+
 func (f ResourceForm) submit() tea.Cmd {
+	if f.bulkItems != nil {
+		return f.enterBulkConfirm()
+	}
+
 	active := f.activeFieldIndices()
 	activeSet := make(map[int]bool, len(active))
 	for _, i := range active {
@@ -795,4 +928,74 @@ func (f ResourceForm) submit() tea.Cmd {
 		}
 		return formSavedMsg{}
 	}
+}
+
+// submitBulk applies non-empty fields to all selected items.
+func (f ResourceForm) submitBulk() tea.Cmd {
+	// Collect only non-empty fields as the changes to apply.
+	changes := make(map[string]string)
+	for i, field := range f.def.Fields {
+		v := strings.TrimSpace(f.inputs[i].Value())
+		if v != "" {
+			changes[field.Key] = f.inputs[i].Value()
+		}
+	}
+	if len(changes) == 0 {
+		return func() tea.Msg {
+			return formErrorMsg{err: fmt.Errorf("no fields to update")}
+		}
+	}
+
+	def := f.def
+	client := f.client
+	items := f.bulkItems
+
+	return func() tea.Msg {
+		var errs []error
+		for _, item := range items {
+			// Extract current values from the item.
+			data := extractItemData(def, item)
+			// Overlay the user's changes.
+			for k, v := range changes {
+				data[k] = v
+			}
+			id := def.GetID(item)
+			if _, err := def.Update(client, id, data); err != nil {
+				errs = append(errs, fmt.Errorf("%s: %w", id, err))
+			}
+		}
+		return bulkDoneMsg{errors: errs}
+	}
+}
+
+// extractItemData marshals an item to JSON and extracts field values as strings,
+// using the same logic as form pre-population.
+func extractItemData(def *resource.Def, item any) map[string]string {
+	data := make(map[string]string)
+	raw, _ := json.Marshal(item)
+	var m map[string]json.RawMessage
+	_ = json.Unmarshal(raw, &m)
+	for _, field := range def.Fields {
+		v, ok := m[field.Key]
+		if !ok || string(v) == "null" {
+			data[field.Key] = ""
+			continue
+		}
+		var s string
+		if json.Unmarshal(v, &s) == nil {
+			data[field.Key] = s
+		} else {
+			var nums []json.Number
+			if json.Unmarshal(v, &nums) == nil {
+				parts := make([]string, len(nums))
+				for j, n := range nums {
+					parts[j] = n.String()
+				}
+				data[field.Key] = strings.Join(parts, ",")
+			} else {
+				data[field.Key] = strings.Trim(string(v), `"`)
+			}
+		}
+	}
+	return data
 }

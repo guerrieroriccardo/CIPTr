@@ -64,6 +64,9 @@ type ResourceTable struct {
 	sortCol    int  // -1 = none
 	sortAsc    bool
 	sortCursor int
+
+	// Multi-select for bulk edit
+	selected map[int]bool // indices into items
 }
 
 // NewResourceTable creates a table screen for the given resource definition.
@@ -132,6 +135,7 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rt.items = msg.items
 		rt.loaded = true
 		rt.err = nil
+		rt.selected = nil
 		rt.allRows = make([]table.Row, len(msg.items))
 		for i, item := range msg.items {
 			rt.allRows[i] = rt.def.ToRow(item)
@@ -214,7 +218,39 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				rt.applyFilter()
 				return rt, nil
 			}
+			if len(rt.selected) > 0 {
+				rt.selected = nil
+				rt.applyFilter()
+				return rt, nil
+			}
 			return rt, func() tea.Msg { return PopScreenMsg{} }
+		case " ":
+			if idx := rt.selectedItemIndex(); idx >= 0 {
+				if rt.selected == nil {
+					rt.selected = map[int]bool{}
+				}
+				if rt.selected[idx] {
+					delete(rt.selected, idx)
+					if len(rt.selected) == 0 {
+						rt.selected = nil
+					}
+				} else {
+					rt.selected[idx] = true
+				}
+				rt.applyFilter()
+			}
+			return rt, nil
+		case "b":
+			if rt.def.Update == nil || len(rt.selected) == 0 {
+				break
+			}
+			var items []any
+			for idx := range rt.selected {
+				items = append(items, rt.items[idx])
+			}
+			return rt, func() tea.Msg {
+				return PushScreenMsg{Screen: NewBulkEditForm(rt.def, rt.client, items)}
+			}
 		case "/":
 			rt.filtering = true
 			rt.filterInput.Focus()
@@ -328,7 +364,11 @@ func (rt ResourceTable) View() string {
 		}
 		sortIndicator = fmt.Sprintf(" [%s %s]", rt.def.Columns[rt.sortCol].Title, dir)
 	}
-	title := TitleStyle.Render(fmt.Sprintf("%s (%d)%s", rt.def.Plural, len(rt.filtered), sortIndicator))
+	selIndicator := ""
+	if len(rt.selected) > 0 {
+		selIndicator = fmt.Sprintf(" [%d selected]", len(rt.selected))
+	}
+	title := TitleStyle.Render(fmt.Sprintf("%s (%d)%s%s", rt.def.Plural, len(rt.filtered), sortIndicator, selIndicator))
 
 	// Sort picker overlay.
 	if rt.sorting {
@@ -363,6 +403,9 @@ func (rt ResourceTable) View() string {
 	helpText := "/ filter • s sort • n new • enter edit • d delete • r refresh • esc back"
 	if rt.onSelect != nil {
 		helpText = "/ filter • s sort • n new • enter open • e edit • d delete • r refresh • esc back"
+	}
+	if rt.def.Update != nil {
+		helpText = "space select • b bulk edit • " + helpText
 	}
 	if rt.def.ExportLabel != nil {
 		helpText = "l label • " + helpText
@@ -447,7 +490,7 @@ func (rt *ResourceTable) applyFilter() {
 		for i := range rt.allRows {
 			rt.filtered[i] = i
 		}
-		rt.table.SetRows(rt.allRows)
+		rt.table.SetRows(rt.markSelected(rt.allRows, rt.filtered))
 		return
 	}
 	query := strings.ToLower(rt.filterText)
@@ -462,20 +505,46 @@ func (rt *ResourceTable) applyFilter() {
 			}
 		}
 	}
-	rt.table.SetRows(rows)
+	rt.table.SetRows(rt.markSelected(rows, rt.filtered))
+}
+
+// markSelected prepends a marker to the first column of selected rows.
+func (rt *ResourceTable) markSelected(rows []table.Row, filtered []int) []table.Row {
+	if len(rt.selected) == 0 {
+		return rows
+	}
+	out := make([]table.Row, len(rows))
+	for i, row := range rows {
+		newRow := make(table.Row, len(row))
+		copy(newRow, row)
+		if rt.selected[filtered[i]] {
+			newRow[0] = "*" + newRow[0]
+		}
+		out[i] = newRow
+	}
+	return out
 }
 
 // selectedItem returns the original item for the currently highlighted table row,
 // accounting for filtering. Returns nil if nothing is selected.
 func (rt ResourceTable) selectedItem() any {
-	if len(rt.filtered) == 0 {
+	idx := rt.selectedItemIndex()
+	if idx < 0 {
 		return nil
+	}
+	return rt.items[idx]
+}
+
+// selectedItemIndex returns the index into rt.items for the currently highlighted row.
+func (rt ResourceTable) selectedItemIndex() int {
+	if len(rt.filtered) == 0 {
+		return -1
 	}
 	cursor := rt.table.Cursor()
 	if cursor >= len(rt.filtered) {
-		return nil
+		return -1
 	}
-	return rt.items[rt.filtered[cursor]]
+	return rt.filtered[cursor]
 }
 
 // scaleColumns proportionally resizes column widths to fill the terminal width.
