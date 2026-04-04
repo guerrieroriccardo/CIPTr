@@ -42,6 +42,8 @@ func init() {
 			{Key: "vlan_id", Label: "VLAN", PickerKey: "vlans"},
 			{Key: "ip_address", Label: "IP Address", Required: true},
 			{Key: "is_primary", Label: "Primary", PickerOptions: []string{"true", "false"}},
+			{Key: "set_as_gateway", Label: "Set as Gateway", PickerOptions: []string{"true", "false"},
+				Hidden: func(values map[string]string) bool { return values["vlan_id"] == "" }},
 			{Key: "notes", Label: "Notes"},
 		},
 
@@ -86,11 +88,12 @@ func init() {
 		},
 		Create: func(client *apiclient.Client, data map[string]string) (any, error) {
 			input := models.DeviceIPInput{
-				InterfaceID: mustInt64(data["interface_id"]),
-				IPAddress:   data["ip_address"],
-				VlanID:      int64Ptr(data["vlan_id"]),
-				IsPrimary:   boolPtr(data["is_primary"]),
-				Notes:       strPtr(data["notes"]),
+				InterfaceID:  mustInt64(data["interface_id"]),
+				IPAddress:    data["ip_address"],
+				VlanID:       int64Ptr(data["vlan_id"]),
+				IsPrimary:    boolPtr(data["is_primary"]),
+				SetAsGateway: boolPtr(data["set_as_gateway"]),
+				Notes:        strPtr(data["notes"]),
 			}
 			var created models.DeviceIP
 			err := client.Post("/device-ips", input, &created)
@@ -98,11 +101,12 @@ func init() {
 		},
 		Update: func(client *apiclient.Client, id string, data map[string]string) (any, error) {
 			input := models.DeviceIPInput{
-				InterfaceID: mustInt64(data["interface_id"]),
-				IPAddress:   data["ip_address"],
-				VlanID:      int64Ptr(data["vlan_id"]),
-				IsPrimary:   boolPtr(data["is_primary"]),
-				Notes:       strPtr(data["notes"]),
+				InterfaceID:  mustInt64(data["interface_id"]),
+				IPAddress:    data["ip_address"],
+				VlanID:       int64Ptr(data["vlan_id"]),
+				IsPrimary:    boolPtr(data["is_primary"]),
+				SetAsGateway: boolPtr(data["set_as_gateway"]),
+				Notes:        strPtr(data["notes"]),
 			}
 			var updated models.DeviceIP
 			err := client.Put("/device-ips/"+id, input, &updated)

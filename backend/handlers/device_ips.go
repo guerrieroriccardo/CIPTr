@@ -72,6 +72,24 @@ func (h *DeviceIPHandler) validateDeviceIP(ctx context.Context, input *models.De
 	return nil
 }
 
+// maybeSetVLANGateway updates the VLAN's gateway to point to the given device IP
+// when the input has SetAsGateway=true and a VlanID.
+func (h *DeviceIPHandler) maybeSetVLANGateway(ctx context.Context, c *gin.Context, deviceIPID int64, ipAddress string, input *models.DeviceIPInput) error {
+	if input.SetAsGateway == nil || !*input.SetAsGateway || input.VlanID == nil {
+		return nil
+	}
+	_, err := h.db.ExecContext(ctx,
+		`UPDATE vlans SET gateway_device_ip_id = $1 WHERE id = $2`,
+		deviceIPID, *input.VlanID,
+	)
+	if err != nil {
+		return err
+	}
+	logAudit(ctx, h.db, c, "update", "vlans", *input.VlanID,
+		fmt.Sprintf("Set gateway to device IP '%s' (#%d)", ipAddress, deviceIPID))
+	return nil
+}
+
 // List handles GET /device-ips
 // Supports optional query params: ?interface_id=, ?vlan_id=
 func (h *DeviceIPHandler) List(c *gin.Context) {
@@ -197,6 +215,10 @@ func (h *DeviceIPHandler) Create(c *gin.Context) {
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "create", "device_ips", d.ID, fmt.Sprintf("Created device IP '%s'", d.IPAddress))
+	if err := h.maybeSetVLANGateway(c.Request.Context(), c, d.ID, d.IPAddress, &input); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
 	ok(c, http.StatusCreated, d)
 }
 
@@ -236,6 +258,10 @@ func (h *DeviceIPHandler) Update(c *gin.Context) {
 	}
 
 	logAudit(c.Request.Context(), h.db, c, "update", "device_ips", id, fmt.Sprintf("Updated device IP '%s'", d.IPAddress))
+	if err := h.maybeSetVLANGateway(c.Request.Context(), c, d.ID, d.IPAddress, &input); err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
 	ok(c, http.StatusOK, d)
 }
 

@@ -12,9 +12,10 @@ type DeviceIP struct {
 
 // DeviceIPInput is used for create and update requests.
 type DeviceIPInput struct {
-	InterfaceID int64   `json:"interface_id" binding:"required"`
-	IPAddress   string  `json:"ip_address"   binding:"required"`
-	VlanID      *int64  `json:"vlan_id"`
-	IsPrimary   *bool   `json:"is_primary"`
-	Notes       *string `json:"notes"`
+	InterfaceID  int64   `json:"interface_id" binding:"required"`
+	IPAddress    string  `json:"ip_address"   binding:"required"`
+	VlanID       *int64  `json:"vlan_id"`
+	IsPrimary    *bool   `json:"is_primary"`
+	Notes        *string `json:"notes"`
+	SetAsGateway *bool   `json:"set_as_gateway"`
 }
