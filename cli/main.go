@@ -36,6 +36,20 @@ func main() {
 			}
 			fmt.Println("Logged out successfully.")
 			return
+		case "help", "--help", "-h":
+			fmt.Println("Usage: ciptr-cli [command] [flags]")
+			fmt.Println()
+			fmt.Println("Commands:")
+			fmt.Println("  version    Show version, commit, and build date")
+			fmt.Println("  update     Update to the latest release")
+			fmt.Println("  logout     Clear saved auth token")
+			fmt.Println("  help       Show this help message")
+			fmt.Println()
+			fmt.Println("Flags:")
+			fmt.Println("  --anon     Start in anonymous mode (skip saved token/server)")
+			fmt.Println()
+			fmt.Println("Run without arguments to start the interactive TUI.")
+			return
 		}
 	}
 
