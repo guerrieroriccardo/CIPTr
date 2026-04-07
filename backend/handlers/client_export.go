@@ -1318,7 +1318,7 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 		if len(portIDs) > 0 {
 			tph, targs := inPlaceholders(portIDs)
 			trows, err := db.QueryContext(ctx,
-				`SELECT sptv.switch_port_id, v.name
+				`SELECT sptv.switch_port_id, v.vlan_id
 				 FROM switch_port_tagged_vlans sptv
 				 JOIN vlans v ON v.id = sptv.vlan_id
 				 WHERE sptv.switch_port_id IN `+tph+`
@@ -1330,11 +1330,11 @@ func fetchExportSwitches(ctx context.Context, db *sql.DB, siteIDs []int64) (map[
 			taggedByPort := map[int64][]string{}
 			for trows.Next() {
 				var portID int64
-				var vlanName string
-				if err := trows.Scan(&portID, &vlanName); err != nil {
+				var vlanID int64
+				if err := trows.Scan(&portID, &vlanID); err != nil {
 					return nil, nil, err
 				}
-				taggedByPort[portID] = append(taggedByPort[portID], vlanName)
+				taggedByPort[portID] = append(taggedByPort[portID], strconv.FormatInt(vlanID, 10))
 			}
 			// Attach to ports.
 			for devID, ports := range portsBySwitch {
