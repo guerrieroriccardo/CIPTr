@@ -240,7 +240,7 @@ func (rt ResourceTable) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				rt.applyFilter()
 			}
 			return rt, nil
-		case "b":
+		case "ctrl+b":
 			if rt.def.Update == nil || len(rt.selected) == 0 {
 				break
 			}
@@ -405,7 +405,7 @@ func (rt ResourceTable) View() string {
 		helpText = "/ filter • s sort • n new • enter open • e edit • d delete • r refresh • esc back"
 	}
 	if rt.def.Update != nil {
-		helpText = "space select • b bulk edit • " + helpText
+		helpText = "space select • ctrl+b bulk edit • " + helpText
 	}
 	if rt.def.ExportLabel != nil {
 		helpText = "l label • " + helpText
