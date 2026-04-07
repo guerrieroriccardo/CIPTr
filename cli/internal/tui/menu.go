@@ -60,6 +60,7 @@ func NewMenu() Menu {
 		MenuItem{name: "All Patch Panel Ports", desc: "List all patch panel ports", key: "patch_panel_ports"},
 		MenuItem{name: "All Device Groups", desc: "Named groups of devices", key: "device_groups"},
 		MenuItem{name: "All Device Group Members", desc: "Devices in groups", key: "device_group_members"},
+		MenuItem{name: "All WiFi SSIDs", desc: "WiFi networks per site", key: "wifi_ssids"},
 		MenuItem{name: "All Firewall Rules", desc: "Firewall rules per site", key: "firewall_rules"},
 		MenuItem{name: "All Backup Policies", desc: "Backup policies per client", key: "backup_policies"},
 		// Administration

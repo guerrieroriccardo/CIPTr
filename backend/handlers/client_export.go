@@ -164,6 +164,13 @@ type exportFirewallRule struct {
 	Description string
 }
 
+type exportWifiSSID struct {
+	SSID     string
+	Auth     string
+	VlanName string
+	Notes    string
+}
+
 type exportBackupPolicy struct {
 	Name          string
 	Destination   string
@@ -245,6 +252,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		groupsBySite        = map[int64][]exportDeviceGroup{}
 		membersByGroup      = map[int64][]exportDeviceGroupMember{}
 		firewallsBySite     = map[int64][]exportFirewallRule{}
+		wifiSSIDsBySite     = map[int64][]exportWifiSSID{}
 		vlanIPCount         = map[int64]int{} // vlan_id -> used IP count
 	)
 
@@ -278,6 +286,10 @@ func (h *ClientHandler) Export(c *gin.Context) {
 			return
 		}
 		if firewallsBySite, err = fetchExportFirewallRules(ctx, h.db, siteIDs); err != nil {
+			fail(c, http.StatusInternalServerError, err)
+			return
+		}
+		if wifiSSIDsBySite, err = fetchExportWifiSSIDs(ctx, h.db, siteIDs); err != nil {
 			fail(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -459,6 +471,20 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		if len(vlans) > 0 {
 			pdfSubsectionTitle(pdf, "IP Utilization")
 			pdfIPUtilizationTable(pdf, vlans, vlanIPCount)
+		}
+
+		// WiFi SSIDs
+		wifiSSIDs := wifiSSIDsBySite[site.ID]
+		if len(wifiSSIDs) > 0 {
+			pdfSubsectionTitle(pdf, "WiFi SSIDs")
+			pdfTable(pdf, []string{"SSID", "Auth Protocol", "VLAN", "Notes"},
+				[]float64{50, 40, 50, 50}, func() [][]string {
+					rows := make([][]string, len(wifiSSIDs))
+					for i, w := range wifiSSIDs {
+						rows[i] = []string{w.SSID, w.Auth, w.VlanName, w.Notes}
+					}
+					return rows
+				}())
 		}
 
 		// Switches
@@ -1708,4 +1734,28 @@ func fetchExportBackupPolicies(ctx context.Context, db *sql.DB, clientID int64) 
 		policies = append(policies, bp)
 	}
 	return policies, rows.Err()
+}
+
+func fetchExportWifiSSIDs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int64][]exportWifiSSID, error) {
+	ph, args := inPlaceholders(siteIDs)
+	rows, err := db.QueryContext(ctx,
+		`SELECT w.site_id, w.ssid, COALESCE(w.auth, ''), COALESCE(v.name, ''), COALESCE(w.notes, '')
+		 FROM wifi_ssids w
+		 LEFT JOIN vlans v ON v.id = w.vlan_id
+		 WHERE w.site_id IN `+ph+` ORDER BY w.ssid`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := map[int64][]exportWifiSSID{}
+	for rows.Next() {
+		var siteID int64
+		var w exportWifiSSID
+		if err := rows.Scan(&siteID, &w.SSID, &w.Auth, &w.VlanName, &w.Notes); err != nil {
+			return nil, err
+		}
+		result[siteID] = append(result[siteID], w)
+	}
+	return result, rows.Err()
 }

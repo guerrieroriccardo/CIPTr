@@ -45,6 +45,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 	deviceGroupMemberHandler := handlers.NewDeviceGroupMemberHandler(database)
 	firewallRuleHandler     := handlers.NewFirewallRuleHandler(database)
 	backupPolicyHandler     := handlers.NewBackupPolicyHandler(database)
+	wifiSSIDHandler         := handlers.NewWifiSSIDHandler(database)
 	settingsHandler         := handlers.NewSettingsHandler(database)
 	auditHandler            := handlers.NewAuditHandler(database)
 	ipUsageHandler          := handlers.NewIPUsageHandler(database)
@@ -94,6 +95,7 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		sites.GET("/:id/devices", deviceHandler.ListBySite)
 		sites.GET("/:id/device-groups", deviceGroupHandler.ListBySite)
 		sites.GET("/:id/firewall-rules", firewallRuleHandler.ListBySite)
+		sites.GET("/:id/wifi-ssids", wifiSSIDHandler.ListBySite)
 	}
 
 	manufacturers := api.Group("/manufacturers")
@@ -257,6 +259,15 @@ func setupRouter(database *sql.DB, jwtSecret []byte) *gin.Engine {
 		firewallRules.GET("/:id", firewallRuleHandler.GetByID)
 		firewallRules.PUT("/:id", write, firewallRuleHandler.Update)
 		firewallRules.DELETE("/:id", write, firewallRuleHandler.Delete)
+	}
+
+	wifiSSIDs := api.Group("/wifi-ssids")
+	{
+		wifiSSIDs.GET("", wifiSSIDHandler.List)
+		wifiSSIDs.POST("", write, wifiSSIDHandler.Create)
+		wifiSSIDs.GET("/:id", wifiSSIDHandler.GetByID)
+		wifiSSIDs.PUT("/:id", write, wifiSSIDHandler.Update)
+		wifiSSIDs.DELETE("/:id", write, wifiSSIDHandler.Delete)
 	}
 
 	deviceGroupMembers := api.Group("/device-group-members")

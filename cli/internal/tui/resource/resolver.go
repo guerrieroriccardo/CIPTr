@@ -27,6 +27,7 @@ type Resolver struct {
 	Locations          map[int64]string
 	OperatingSystems   map[int64]string
 	DeviceGroups    map[int64]string
+	WifiSSIDs       map[int64]string
 	SwitchPorts     map[int64]string
 	PatchPanelPorts map[int64]string
 	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
@@ -49,6 +50,7 @@ type Resolver struct {
 	DeviceModelCategory     map[int64]int64 // device model ID → category ID
 	DeviceModelDefaultPorts map[int64]int   // device model ID → default ports (0 if unset)
 	DeviceGroupSite     map[int64]int64  // device group ID → site ID
+	WifiSSIDSite        map[int64]int64  // wifi SSID ID → site ID
 	InterfaceMAC        map[int64]string // interface ID → MAC address
 	UsedMACs            map[string]bool  // MAC addresses already restricted on a switch port
 	CategoryTrackVmID   map[int64]bool   // category ID → true if VM ID tracking is enabled
@@ -76,6 +78,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			Locations:          make(map[int64]string),
 			OperatingSystems:   make(map[int64]string),
 			DeviceGroups:    make(map[int64]string),
+			WifiSSIDs:       make(map[int64]string),
 			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
 			VLANSubnets:     make(map[int64]string),
@@ -96,6 +99,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			DeviceModelCategory:     make(map[int64]int64),
 			DeviceModelDefaultPorts: make(map[int64]int),
 			DeviceGroupSite:     make(map[int64]int64),
+			WifiSSIDSite:        make(map[int64]int64),
 			InterfaceMAC:        make(map[int64]string),
 			UsedMACs:            make(map[string]bool),
 			CategoryTrackVmID:   make(map[int64]bool),
@@ -253,6 +257,14 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			}
 		}
 
+		var wifiSSIDs []models.WifiSSID
+		if err := c.Get("/wifi-ssids", &wifiSSIDs); err == nil {
+			for _, v := range wifiSSIDs {
+				r.WifiSSIDs[v.ID] = v.SSID
+				r.WifiSSIDSite[v.ID] = v.SiteID
+			}
+		}
+
 		var switchPorts []models.SwitchPort
 		if err := c.Get("/switch-ports", &switchPorts); err == nil {
 			for _, v := range switchPorts {
@@ -375,6 +387,8 @@ func (r *Resolver) Lookup(key string) map[int64]string {
 		return r.OperatingSystems
 	case "device_groups":
 		return r.DeviceGroups
+	case "wifi_ssids":
+		return r.WifiSSIDs
 	}
 	return nil
 }

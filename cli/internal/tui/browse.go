@@ -209,6 +209,23 @@ func scopedBackupPolicies(clientID string) *resource.Def {
 	return &base
 }
 
+func scopedWifiSSIDs(siteID string) *resource.Def {
+	base := *resource.Registry["wifi_ssids"]
+	base.Defaults = map[string]string{"site_id": siteID}
+	base.List = func(c *apiclient.Client) ([]any, error) {
+		var items []models.WifiSSID
+		if err := c.Get("/wifi-ssids?site_id="+siteID, &items); err != nil {
+			return nil, err
+		}
+		result := make([]any, len(items))
+		for i := range items {
+			result[i] = &items[i]
+		}
+		return result, nil
+	}
+	return &base
+}
+
 func scopedFirewallRules(siteID string) *resource.Def {
 	base := *resource.Registry["firewall_rules"]
 	base.Defaults = map[string]string{"site_id": siteID}
@@ -529,6 +546,9 @@ func newSiteScopeMenu(site *models.Site, apiClient *apiclient.Client) ScopeMenu 
 			}},
 			{label: "Device Groups", build: func() Screen {
 				return NewResourceTableWithSelect(scopedDeviceGroups(siteID), apiClient, deviceGroupDrillDown(apiClient))
+			}},
+			{label: "WiFi SSIDs", build: func() Screen {
+				return NewResourceTable(scopedWifiSSIDs(siteID), apiClient)
 			}},
 			{label: "Firewall Rules", build: func() Screen {
 				return NewResourceTable(scopedFirewallRules(siteID), apiClient)
