@@ -30,6 +30,7 @@ type Resolver struct {
 	SwitchPorts     map[int64]string
 	PatchPanelPorts map[int64]string
 	VLANSubnets     map[int64]string // VLAN ID → subnet CIDR (for hints)
+	VLANGateway     map[int64]int64  // VLAN ID → gateway device IP ID (0 if unset)
 
 	// Reverse lookups for contextual filtering.
 	InterfaceSite      map[int64]int64  // interface ID → site ID (via device)
@@ -78,6 +79,7 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 			SwitchPorts:     make(map[int64]string),
 			PatchPanelPorts: make(map[int64]string),
 			VLANSubnets:     make(map[int64]string),
+			VLANGateway:     make(map[int64]int64),
 			InterfaceSite:      make(map[int64]int64),
 			InterfaceDevice:    make(map[int64]int64),
 			VLANSite:           make(map[int64]int64),
@@ -198,6 +200,9 @@ func InitResolver(c *apiclient.Client) tea.Cmd {
 				r.VLANSite[v.ID] = v.SiteID
 				if v.Subnet != nil && *v.Subnet != "" {
 					r.VLANSubnets[v.ID] = *v.Subnet
+				}
+				if v.GatewayDeviceIPID != nil {
+					r.VLANGateway[v.ID] = *v.GatewayDeviceIPID
 				}
 			}
 		}

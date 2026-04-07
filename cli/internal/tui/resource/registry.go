@@ -62,6 +62,11 @@ type Def struct {
 	// derived values for other fields. Called in a tea.Cmd (background).
 	AsyncDerive func(client *apiclient.Client, key string, values map[string]string) map[string]string
 
+	// PreSubmit is called before the form submits. If it returns a non-empty
+	// string, the form enters a confirmation prompt showing that message.
+	// The user must type "confirm" to proceed. Called with current form values.
+	PreSubmit func(values map[string]string) string
+
 	// ExportLabel downloads a label PDF for the selected item. Returns saved file path.
 	ExportLabel func(client *apiclient.Client, id string) (string, error)
 

@@ -47,6 +47,26 @@ func init() {
 			{Key: "notes", Label: "Notes"},
 		},
 
+		PreSubmit: func(values map[string]string) string {
+			if values["set_as_gateway"] != "true" || values["vlan_id"] == "" || Resolve == nil {
+				return ""
+			}
+			vlanID := mustInt64(values["vlan_id"])
+			existingGW, ok := Resolve.VLANGateway[vlanID]
+			if !ok || existingGW == 0 {
+				return ""
+			}
+			gwLabel := fmt.Sprintf("%d", existingGW)
+			if name, ok := Resolve.DeviceIPs[existingGW]; ok {
+				gwLabel = name
+			}
+			vlanName := fmt.Sprintf("%d", vlanID)
+			if name, ok := Resolve.VLANs[vlanID]; ok {
+				vlanName = name
+			}
+			return fmt.Sprintf("VLAN '%s' already has gateway '%s'. This will override it.", vlanName, gwLabel)
+		},
+
 		PickerFilter: func(key string, values map[string]string, items map[int64]string) map[int64]string {
 			if key != "vlan_id" || values["interface_id"] == "" || Resolve == nil {
 				return items

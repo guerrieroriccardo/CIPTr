@@ -58,9 +58,12 @@ type ResourceForm struct {
 	bulkDone    int               // items updated so far
 	bulkErrs    []error           // errors collected during bulk update
 
-	// Bulk confirmation
-	bulkConfirming bool            // waiting for user to type "apply"
-	confirmInput   textinput.Model // text input for confirmation
+	// Confirmation prompt (shared by bulk edit and pre-submit)
+	confirming   bool            // waiting for user to type confirmation word
+	confirmInput textinput.Model // text input for confirmation
+	confirmMsg   string          // message to display above prompt
+	confirmWord  string          // word to type (e.g. "apply", "confirm")
+	confirmCmd   func() tea.Cmd  // action to run after confirmation
 }
 
 // NewResourceForm creates a form screen. If id is non-empty and item is
@@ -434,19 +437,19 @@ func (f ResourceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return f, nil
 
 	case tea.KeyMsg:
-		// Bulk confirmation mode — intercept all keys.
-		if f.bulkConfirming {
+		// Confirmation mode — intercept all keys.
+		if f.confirming {
 			switch msg.String() {
 			case "esc":
-				f.bulkConfirming = false
+				f.confirming = false
 				return f, nil
 			case "enter":
-				if f.confirmInput.Value() == "apply" {
-					f.bulkConfirming = false
+				if f.confirmInput.Value() == f.confirmWord {
+					f.confirming = false
 					f.saving = true
-					return f, f.submitBulk()
+					return f, f.confirmCmd()
 				}
-				f.err = fmt.Errorf("type 'apply' to confirm or esc to cancel")
+				f.err = fmt.Errorf("type '%s' to confirm or esc to cancel", f.confirmWord)
 				return f, nil
 			default:
 				var cmd tea.Cmd
@@ -744,8 +747,8 @@ func (f ResourceForm) View() string {
 		b.WriteString(ErrorStyle.Render(fmt.Sprintf("Error: %v", f.err)) + "\n\n")
 	}
 
-	if f.bulkConfirming {
-		b.WriteString(fmt.Sprintf("\nApply changes to %d items? Type 'apply' to confirm:\n", len(f.bulkItems)))
+	if f.confirming {
+		b.WriteString(fmt.Sprintf("\n%s Type '%s' to confirm:\n", f.confirmMsg, f.confirmWord))
 		b.WriteString("  " + f.confirmInput.View() + "\n")
 	}
 
@@ -858,6 +861,20 @@ func (f ResourceForm) updateFocus() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (f *ResourceForm) enterConfirm(msg, word string, action func() tea.Cmd) tea.Cmd {
+	f.confirming = true
+	f.confirmMsg = msg
+	f.confirmWord = word
+	f.confirmCmd = action
+	f.err = nil
+	f.confirmInput = textinput.New()
+	f.confirmInput.Placeholder = "type '" + word + "' to confirm"
+	f.confirmInput.CharLimit = len(word) + 5
+	f.confirmInput.Width = 30
+	f.confirmInput.Focus()
+	return textinput.Blink
+}
+
 func (f *ResourceForm) enterBulkConfirm() tea.Cmd {
 	// Validate that at least one field is non-empty before asking confirmation.
 	hasChange := false
@@ -872,17 +889,14 @@ func (f *ResourceForm) enterBulkConfirm() tea.Cmd {
 			return formErrorMsg{err: fmt.Errorf("no fields to update")}
 		}
 	}
-	f.bulkConfirming = true
-	f.err = nil
-	f.confirmInput = textinput.New()
-	f.confirmInput.Placeholder = "type 'apply' to confirm"
-	f.confirmInput.CharLimit = 10
-	f.confirmInput.Width = 30
-	f.confirmInput.Focus()
-	return textinput.Blink
+	return f.enterConfirm(
+		fmt.Sprintf("Apply changes to %d items?", len(f.bulkItems)),
+		"apply",
+		func() tea.Cmd { return f.submitBulk() },
+	)
 }
 
-func (f ResourceForm) submit() tea.Cmd {
+func (f *ResourceForm) submit() tea.Cmd {
 	if f.bulkItems != nil {
 		return f.enterBulkConfirm()
 	}
@@ -912,6 +926,19 @@ func (f ResourceForm) submit() tea.Cmd {
 		}
 	}
 
+	// Check PreSubmit for confirmation prompt.
+	if f.def.PreSubmit != nil {
+		if msg := f.def.PreSubmit(data); msg != "" {
+			return f.enterConfirm(msg, "confirm", func() tea.Cmd {
+				return f.doSubmit(data)
+			})
+		}
+	}
+
+	return f.doSubmit(data)
+}
+
+func (f ResourceForm) doSubmit(data map[string]string) tea.Cmd {
 	def := f.def
 	client := f.client
 	id := f.id
