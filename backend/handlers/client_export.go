@@ -840,7 +840,7 @@ func pdfSectionTitle(pdf *fpdf.Fpdf, title string) {
 	pdf.SetFillColor(235, 25, 36)
 	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont("Helvetica", "B", pdfTitleSize)
-	pdf.CellFormat(pdfContentW, 9, "  "+title, "", 1, "L", true, 0, "")
+	pdf.CellFormat(pdfContentW, 9, title, "", 1, "C", true, 0, "")
 	pdf.SetTextColor(0, 0, 0)
 	pdf.Ln(3)
 }
@@ -850,7 +850,7 @@ func pdfSubsectionTitle(pdf *fpdf.Fpdf, title string) {
 	pdf.SetFillColor(252, 230, 232)
 	pdf.SetTextColor(235, 25, 36)
 	pdf.SetFont("Helvetica", "B", pdfSubtitleSize)
-	pdf.CellFormat(pdfContentW, 7, "  "+title, "", 1, "L", true, 0, "")
+	pdf.CellFormat(pdfContentW, 7, title, "", 1, "C", true, 0, "")
 	pdf.SetTextColor(0, 0, 0)
 	pdf.Ln(2)
 }
