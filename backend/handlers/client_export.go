@@ -347,9 +347,28 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		pdf.Ln(qrSize + 5)
 	}
 
+	// Company logo
+	if _, err := os.Stat("/app/logo.png"); err == nil {
+		logoOpts := fpdf.ImageOptions{ImageType: "PNG"}
+		logoH := 20.0
+		info := pdf.RegisterImageOptions("/app/logo.png", logoOpts)
+		logoW := logoH * info.Width() / info.Height()
+		pdf.ImageOptions("/app/logo.png", (pdfPageW-logoW)/2, pdf.GetY(), logoW, logoH, false, logoOpts, 0, "")
+		pdf.Ln(logoH + 5)
+	}
+
 	pdf.SetFont("Helvetica", "B", 24)
+	pdf.SetTextColor(235, 25, 36)
 	pdf.CellFormat(pdfContentW, 12, client.Name, "", 1, "C", false, 0, "")
-	pdf.Ln(3)
+	pdf.SetTextColor(0, 0, 0)
+	// Red accent line under title
+	lineY := pdf.GetY() + 1
+	pdf.SetDrawColor(235, 25, 36)
+	pdf.SetLineWidth(0.5)
+	pdf.Line(pdfPageW/2-30, lineY, pdfPageW/2+30, lineY)
+	pdf.SetDrawColor(0, 0, 0)
+	pdf.SetLineWidth(0.2)
+	pdf.Ln(5)
 	pdf.SetFont("Helvetica", "", 14)
 	pdf.CellFormat(pdfContentW, 8, "Short Code: "+client.ShortCode, "", 1, "C", false, 0, "")
 	if client.Domain != "" {
@@ -587,34 +606,70 @@ func (h *ClientHandler) Export(c *gin.Context) {
 				pdf.SetTextColor(0, 0, 0)
 			}
 
-			pdfTable(pdf, []string{"Hostname", "Cat", "Status", "IP", "S/N", "Model", "Location"},
-				[]float64{34, 16, 22, 28, 28, 32, 30}, func() [][]string {
-					rows := make([][]string, len(devs))
-					for i, d := range devs {
-						primaryIP := ""
-						for _, ip := range ipsByDevice[d.ID] {
-							if ip.IsPrimary {
-								primaryIP = ip.IPAddress
-								break
-							}
-						}
-						if primaryIP == "" {
-							// fallback to first IP
-							if ips := ipsByDevice[d.ID]; len(ips) > 0 {
-								primaryIP = ips[0].IPAddress
-							}
-						}
-						cat := d.CategoryCode
-						if cat == "" {
-							cat = d.Category
-						}
-						rows[i] = []string{
-							d.Hostname, cat, d.Status,
-							primaryIP, d.SerialNumber, d.Model, d.Location,
-						}
+			devHeaders := []string{"Hostname", "Cat", "Status", "IP", "S/N", "Model", "Location"}
+			devWidths := []float64{34, 16, 22, 28, 28, 32, 30}
+			statusCol := 2 // index of Status column
+
+			pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
+			pdf.SetFillColor(51, 56, 62)
+			pdf.SetTextColor(255, 255, 255)
+			pdf.SetFont("Helvetica", "B", pdfFontSize)
+			for i, h := range devHeaders {
+				pdf.CellFormat(devWidths[i], pdfHeaderH, " "+h, "1", 0, "L", true, 0, "")
+			}
+			pdf.Ln(-1)
+			pdf.SetTextColor(0, 0, 0)
+
+			pdf.SetFont("Helvetica", "", pdfFontSize)
+			for r, d := range devs {
+				pdfCheckPageBreak(pdf, pdfRowH)
+				if r%2 == 0 {
+					pdf.SetFillColor(248, 242, 242)
+				} else {
+					pdf.SetFillColor(255, 255, 255)
+				}
+				primaryIP := ""
+				for _, ip := range ipsByDevice[d.ID] {
+					if ip.IsPrimary {
+						primaryIP = ip.IPAddress
+						break
 					}
-					return rows
-				}())
+				}
+				if primaryIP == "" {
+					if ips := ipsByDevice[d.ID]; len(ips) > 0 {
+						primaryIP = ips[0].IPAddress
+					}
+				}
+				cat := d.CategoryCode
+				if cat == "" {
+					cat = d.Category
+				}
+				cells := []string{d.Hostname, cat, d.Status, primaryIP, d.SerialNumber, d.Model, d.Location}
+				for i, cell := range cells {
+					if i == statusCol {
+						switch strings.ToLower(d.Status) {
+						case "active":
+							pdf.SetTextColor(34, 139, 34)
+						case "inactive":
+							pdf.SetTextColor(180, 50, 50)
+						case "decommissioned":
+							pdf.SetTextColor(140, 140, 140)
+						case "reserved":
+							pdf.SetTextColor(200, 130, 30)
+						}
+						pdf.SetFont("Helvetica", "B", pdfFontSize)
+					}
+					if i < len(devWidths) {
+						pdf.CellFormat(devWidths[i], pdfRowH, " "+cell, "1", 0, "L", true, 0, "")
+					}
+					if i == statusCol {
+						pdf.SetTextColor(0, 0, 0)
+						pdf.SetFont("Helvetica", "", pdfFontSize)
+					}
+				}
+				pdf.Ln(-1)
+			}
+			pdf.Ln(3)
 
 			// Per-device detail: interfaces, IPs, connections
 			firstDetail := true
@@ -688,18 +743,54 @@ func (h *ClientHandler) Export(c *gin.Context) {
 		fwRules := firewallsBySite[site.ID]
 		if len(fwRules) > 0 {
 			pdfSubsectionTitle(pdf, "Firewall Rules")
-			pdfTable(pdf, []string{"#", "Proto", "Src", "SPort", "Dst", "DPort", "Action", "On"},
-				[]float64{12, 18, 40, 22, 40, 22, 18, 18}, func() [][]string {
-					rows := make([][]string, len(fwRules))
-					for i, r := range fwRules {
-						rows[i] = []string{
-							fmt.Sprintf("%d", r.Position), r.Protocol,
-							r.Src, r.SrcPort, r.Dst, r.DstPort,
-							r.Action, boolStr(r.Enabled),
+			fwHeaders := []string{"#", "Proto", "Src", "SPort", "Dst", "DPort", "Action", "On"}
+			fwWidths := []float64{12, 18, 40, 22, 40, 22, 18, 18}
+			fwActionCol := 6
+
+			pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
+			pdf.SetFillColor(51, 56, 62)
+			pdf.SetTextColor(255, 255, 255)
+			pdf.SetFont("Helvetica", "B", pdfFontSize)
+			for i, h := range fwHeaders {
+				pdf.CellFormat(fwWidths[i], pdfHeaderH, " "+h, "1", 0, "L", true, 0, "")
+			}
+			pdf.Ln(-1)
+			pdf.SetTextColor(0, 0, 0)
+
+			pdf.SetFont("Helvetica", "", pdfFontSize)
+			for r, rule := range fwRules {
+				pdfCheckPageBreak(pdf, pdfRowH)
+				if r%2 == 0 {
+					pdf.SetFillColor(248, 242, 242)
+				} else {
+					pdf.SetFillColor(255, 255, 255)
+				}
+				cells := []string{
+					fmt.Sprintf("%d", rule.Position), rule.Protocol,
+					rule.Src, rule.SrcPort, rule.Dst, rule.DstPort,
+					rule.Action, boolStr(rule.Enabled),
+				}
+				for i, cell := range cells {
+					if i == fwActionCol {
+						switch strings.ToLower(rule.Action) {
+						case "allow", "accept":
+							pdf.SetTextColor(34, 139, 34)
+						case "deny", "drop", "reject":
+							pdf.SetTextColor(180, 50, 50)
 						}
+						pdf.SetFont("Helvetica", "B", pdfFontSize)
 					}
-					return rows
-				}())
+					if i < len(fwWidths) {
+						pdf.CellFormat(fwWidths[i], pdfRowH, " "+cell, "1", 0, "L", true, 0, "")
+					}
+					if i == fwActionCol {
+						pdf.SetTextColor(0, 0, 0)
+						pdf.SetFont("Helvetica", "", pdfFontSize)
+					}
+				}
+				pdf.Ln(-1)
+			}
+			pdf.Ln(3)
 		}
 	}
 
@@ -746,7 +837,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 func pdfSectionTitle(pdf *fpdf.Fpdf, title string) {
 	pdfCheckPageBreak(pdf, 12)
-	pdf.SetFillColor(40, 40, 40)
+	pdf.SetFillColor(235, 25, 36)
 	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont("Helvetica", "B", pdfTitleSize)
 	pdf.CellFormat(pdfContentW, 9, "  "+title, "", 1, "L", true, 0, "")
@@ -756,9 +847,11 @@ func pdfSectionTitle(pdf *fpdf.Fpdf, title string) {
 
 func pdfSubsectionTitle(pdf *fpdf.Fpdf, title string) {
 	pdfCheckPageBreak(pdf, 12)
-	pdf.SetFillColor(220, 220, 220)
+	pdf.SetFillColor(252, 230, 232)
+	pdf.SetTextColor(235, 25, 36)
 	pdf.SetFont("Helvetica", "B", pdfSubtitleSize)
 	pdf.CellFormat(pdfContentW, 7, "  "+title, "", 1, "L", true, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 	pdf.Ln(2)
 }
 
@@ -770,7 +863,7 @@ func pdfTable(pdf *fpdf.Fpdf, headers []string, widths []float64, rows [][]strin
 	pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
 
 	// Header
-	pdf.SetFillColor(60, 60, 60)
+	pdf.SetFillColor(51, 56, 62)
 	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont("Helvetica", "B", pdfFontSize)
 	for i, h := range headers {
@@ -784,7 +877,7 @@ func pdfTable(pdf *fpdf.Fpdf, headers []string, widths []float64, rows [][]strin
 	for r, row := range rows {
 		pdfCheckPageBreak(pdf, pdfRowH)
 		if r%2 == 0 {
-			pdf.SetFillColor(245, 245, 245)
+			pdf.SetFillColor(248, 242, 242)
 		} else {
 			pdf.SetFillColor(255, 255, 255)
 		}
@@ -807,7 +900,7 @@ func pdfTableStyled(pdf *fpdf.Fpdf, headers []string, widths []float64, rows [][
 	pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
 
 	// Header
-	pdf.SetFillColor(60, 60, 60)
+	pdf.SetFillColor(51, 56, 62)
 	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont("Helvetica", "B", pdfFontSize)
 	for i, h := range headers {
@@ -825,7 +918,7 @@ func pdfTableStyled(pdf *fpdf.Fpdf, headers []string, widths []float64, rows [][
 			pdf.SetFillColor(180, 180, 180)
 			pdf.SetTextColor(100, 100, 100)
 		} else if r%2 == 0 {
-			pdf.SetFillColor(245, 245, 245)
+			pdf.SetFillColor(248, 242, 242)
 		} else {
 			pdf.SetFillColor(255, 255, 255)
 		}
@@ -868,7 +961,7 @@ func pdfIPUtilizationTable(pdf *fpdf.Fpdf, vlans []exportVLAN, vlanIPCount map[i
 	pdfCheckPageBreak(pdf, pdfHeaderH+pdfRowH*2)
 
 	// Header
-	pdf.SetFillColor(60, 60, 60)
+	pdf.SetFillColor(51, 56, 62)
 	pdf.SetTextColor(255, 255, 255)
 	pdf.SetFont("Helvetica", "B", pdfFontSize)
 	for i, h := range headers {
@@ -882,7 +975,7 @@ func pdfIPUtilizationTable(pdf *fpdf.Fpdf, vlans []exportVLAN, vlanIPCount map[i
 	for r, v := range vlans {
 		pdfCheckPageBreak(pdf, pdfRowH)
 		if r%2 == 0 {
-			pdf.SetFillColor(245, 245, 245)
+			pdf.SetFillColor(248, 242, 242)
 		} else {
 			pdf.SetFillColor(255, 255, 255)
 		}
