@@ -714,7 +714,7 @@ func (h *ClientHandler) Export(c *gin.Context) {
 
 				pdfCheckPageBreak(pdf, 20)
 				pdf.SetFont("Helvetica", "B", pdfFontSize)
-				pdf.CellFormat(pdfContentW, pdfRowH, "  "+d.Hostname+" - Details", "", 1, "L", false, 0, "")
+				pdf.CellFormat(pdfContentW, pdfRowH, d.Hostname+" - Details", "", 1, "C", false, 0, "")
 
 				if len(ifaces) > 0 {
 					pdfTable(pdf, []string{"Interface", "MAC Address"},
