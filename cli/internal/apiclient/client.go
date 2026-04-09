@@ -17,6 +17,13 @@ var ErrUnauthorized = errors.New("unauthorized")
 // ErrForbidden is returned when the API responds with 403.
 var ErrForbidden = errors.New("forbidden")
 
+// UpgradeRequiredError is returned when the API responds with 426.
+type UpgradeRequiredError struct {
+	Message string
+}
+
+func (e *UpgradeRequiredError) Error() string { return e.Message }
+
 // Client wraps net/http to call the CIPTr REST API.
 type Client struct {
 	BaseURL    string
@@ -101,6 +108,13 @@ func (c *Client) do(method, path string, body any, result any) error {
 	if resp.StatusCode == http.StatusForbidden {
 		return ErrForbidden
 	}
+	if resp.StatusCode == http.StatusUpgradeRequired {
+		var env envelope
+		if json.Unmarshal(raw, &env) == nil && env.Error != nil {
+			return &UpgradeRequiredError{Message: *env.Error}
+		}
+		return &UpgradeRequiredError{Message: "CLI version is too old. Run: ciptr-cli update"}
+	}
 
 	var env envelope
 	if err := json.Unmarshal(raw, &env); err != nil {
@@ -150,6 +164,13 @@ func (c *Client) GetRaw(path string) ([]byte, error) {
 	}
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, ErrForbidden
+	}
+	if resp.StatusCode == http.StatusUpgradeRequired {
+		var env envelope
+		if json.Unmarshal(raw, &env) == nil && env.Error != nil {
+			return nil, &UpgradeRequiredError{Message: *env.Error}
+		}
+		return nil, &UpgradeRequiredError{Message: "CLI version is too old. Run: ciptr-cli update"}
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

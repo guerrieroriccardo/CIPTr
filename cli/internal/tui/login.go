@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -183,6 +184,11 @@ func (l *LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case loginErrorMsg:
 		l.loading = false
+		var ure *apiclient.UpgradeRequiredError
+		if errors.As(msg.err, &ure) {
+			// Bubble up to the app so it shows the upgrade screen.
+			return l, func() tea.Msg { return dataErrorMsg{err: msg.err} }
+		}
 		l.err = msg.err
 		return l, nil
 	}

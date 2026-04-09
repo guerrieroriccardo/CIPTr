@@ -30,11 +30,13 @@ type MutationPopMsg struct{}
 
 // App is the root bubbletea model that manages the navigation stack.
 type App struct {
-	nav    NavStack
-	client *apiclient.Client
-	width  int
-	height int
-	anon   bool // anonymous mode: don't persist token/server URL
+	nav             NavStack
+	client          *apiclient.Client
+	width           int
+	height          int
+	anon            bool   // anonymous mode: don't persist token/server URL
+	upgradeRequired bool   // true when server returned 426
+	upgradeMsg      string // message from the server
 }
 
 // NewApp creates the root application model with the given initial screen.
@@ -68,6 +70,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.updateCurrent(msg)
 
 	case tea.KeyMsg:
+		if a.upgradeRequired {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return a, tea.Quit
+			}
+			return a, nil
+		}
 		switch msg.String() {
 		case "ctrl+c":
 			return a, tea.Quit
@@ -85,6 +94,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, tea.Batch(msg.Screen.Init(), sizeCmd)
 
 	case dataErrorMsg:
+		var ure *apiclient.UpgradeRequiredError
+		if errors.As(msg.err, &ure) {
+			a.upgradeRequired = true
+			a.upgradeMsg = ure.Message
+			return a, nil
+		}
 		if errors.Is(msg.err, apiclient.ErrForbidden) {
 			return a.updateCurrent(msg)
 		}
@@ -94,6 +109,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.updateCurrent(msg)
 
 	case formErrorMsg:
+		var ure *apiclient.UpgradeRequiredError
+		if errors.As(msg.err, &ure) {
+			a.upgradeRequired = true
+			a.upgradeMsg = ure.Message
+			return a, nil
+		}
 		if errors.Is(msg.err, apiclient.ErrForbidden) {
 			return a.updateCurrent(msg)
 		}
@@ -149,6 +170,10 @@ func (a App) View() string {
 		return style.Render(msg)
 	}
 
+	if a.upgradeRequired {
+		return a.upgradeView()
+	}
+
 	current := a.nav.Current()
 	if current == nil {
 		return ""
@@ -163,6 +188,31 @@ func (a App) View() string {
 
 	out += current.View()
 	return out
+}
+
+// upgradeView renders a blocking screen when the CLI version is too old.
+func (a App) upgradeView() string {
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("196")).
+		Render("Update Required")
+
+	msg := a.upgradeMsg
+	if msg == "" {
+		msg = "Your CLI version is too old for this server."
+	}
+
+	hint := lipgloss.NewStyle().
+		Faint(true).
+		Render("Run: ciptr-cli update")
+
+	quit := lipgloss.NewStyle().
+		Faint(true).
+		Render("Press q or ctrl+c to quit")
+
+	content := fmt.Sprintf("\n  %s\n\n  %s\n\n  %s\n\n  %s", title, msg, hint, quit)
+
+	return content
 }
 
 // handleMenuSelection maps a menu key to a resource table screen.
