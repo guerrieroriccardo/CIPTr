@@ -1214,7 +1214,7 @@ func fetchExportVLANs(ctx context.Context, db *sql.DB, siteIDs []int64) (map[int
 	rows, err := db.QueryContext(ctx,
 		`SELECT v.id, v.site_id, v.vlan_id, v.name, COALESCE(v.subnet::text, ''),
 		        COALESCE(dip.ip_address::text, ''),
-		        COALESCE(v.dhcp_start::text, ''), COALESCE(v.dhcp_end::text, '')
+		        COALESCE(host(v.dhcp_start), ''), COALESCE(host(v.dhcp_end), '')
 		 FROM vlans v
 		 LEFT JOIN device_ips dip ON dip.id = v.gateway_device_ip_id
 		 WHERE v.site_id IN `+ph+` ORDER BY v.vlan_id`, args...)
